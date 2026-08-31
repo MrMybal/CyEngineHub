@@ -1,0 +1,338 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Input.Platform;
+using Avalonia.Markup.Xaml;
+using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using CyEngineHub.Desktop.ViewModels;
+using System.Runtime.CompilerServices;
+
+namespace CyEngineHub.Desktop.Views;
+
+public sealed partial class MainWindow : Window
+{
+    private sealed class RealizedRemoteFabRow
+    {
+        public RemoteFabAssetRowViewModel? Value { get; set; }
+    }
+
+    private static readonly ConditionalWeakTable<Control, RealizedRemoteFabRow> RealizedRemoteFabRows = new();
+    private ExtensionHubWindow? _extensionHubWindow;
+    private MainWindowViewModel? _viewModel;
+    private CancellationTokenSource? _fabAuthorizationCaptureCancellation;
+    private ScrollViewer? _remoteFabScrollViewer;
+
+    public MainWindow()
+    {
+        AvaloniaXamlLoader.Load(this);
+        DataContextChanged += OnDataContextChanged;
+        Closed += OnClosed;
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs args) =>
+        AttachViewModel(DataContext as MainWindowViewModel);
+
+    private void AttachViewModel(MainWindowViewModel? viewModel)
+    {
+        if (_viewModel is not null)
+        {
+            _viewModel.ExtensionWindowRequested -= OnExtensionWindowRequested;
+            _viewModel.FabAuthorizationCaptureRequested -= OnFabAuthorizationCaptureRequested;
+            _viewModel.RawLogScrollRequested -= OnRawLogScrollRequested;
+        }
+
+        _viewModel = viewModel;
+        if (_viewModel is not null)
+        {
+            _viewModel.ExtensionWindowRequested += OnExtensionWindowRequested;
+            _viewModel.FabAuthorizationCaptureRequested += OnFabAuthorizationCaptureRequested;
+            _viewModel.RawLogScrollRequested += OnRawLogScrollRequested;
+        }
+    }
+
+    private void OnClosed(object? sender, EventArgs args)
+    {
+        _fabAuthorizationCaptureCancellation?.Cancel();
+        _fabAuthorizationCaptureCancellation?.Dispose();
+        _fabAuthorizationCaptureCancellation = null;
+        DetachRemoteFabScrollViewer();
+        AttachViewModel(null);
+    }
+
+    private void AttachRemoteFabCatalog(object? sender, VisualTreeAttachmentEventArgs args)
+    {
+        if (sender is not Control catalog)
+        {
+            return;
+        }
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            DetachRemoteFabScrollViewer();
+            _remoteFabScrollViewer = catalog.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+            if (_remoteFabScrollViewer is not null)
+            {
+                _remoteFabScrollViewer.ScrollChanged += OnRemoteFabCatalogScrollChanged;
+            }
+        });
+    }
+
+    private void DetachRemoteFabCatalog(object? sender, VisualTreeAttachmentEventArgs args) =>
+        DetachRemoteFabScrollViewer();
+
+    private void DetachRemoteFabScrollViewer()
+    {
+        if (_remoteFabScrollViewer is not null)
+        {
+            _remoteFabScrollViewer.ScrollChanged -= OnRemoteFabCatalogScrollChanged;
+            _remoteFabScrollViewer = null;
+        }
+    }
+
+    private void OnRemoteFabCatalogScrollChanged(object? sender, ScrollChangedEventArgs args)
+    {
+        if (sender is not ScrollViewer scrollViewer || _viewModel is null)
+        {
+            return;
+        }
+
+        var remaining = scrollViewer.Extent.Height - scrollViewer.Offset.Y - scrollViewer.Viewport.Height;
+        if (remaining <= Math.Max(600, scrollViewer.Viewport.Height))
+        {
+            _viewModel.LoadMoreLibraryItems();
+        }
+    }
+
+    private void OnRawLogScrollRequested(object? sender, EventArgs args)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            var list = this.FindControl<ListBox>("RawLogList");
+            if (list is not null && list.ItemCount > 0)
+            {
+                list.ScrollIntoView(list.ItemCount - 1);
+            }
+        });
+    }
+
+    private void OnFabAuthorizationCaptureRequested(object? sender, EventArgs args)
+    {
+        _fabAuthorizationCaptureCancellation?.Cancel();
+        _fabAuthorizationCaptureCancellation?.Dispose();
+        var cancellation = new CancellationTokenSource();
+        _fabAuthorizationCaptureCancellation = cancellation;
+        _ = CaptureFabAuthorizationAsync(cancellation);
+    }
+
+    private async Task CaptureFabAuthorizationAsync(CancellationTokenSource cancellation)
+    {
+        try
+        {
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard is null)
+            {
+                _viewModel?.NotifyFabAuthorizationCaptureTimedOut();
+                return;
+            }
+
+            var previousText = await clipboard.TryGetTextAsync();
+            for (var attempt = 0; attempt < 240; attempt++)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(500), cancellation.Token);
+                var currentText = await clipboard.TryGetTextAsync();
+                if (string.IsNullOrWhiteSpace(currentText) ||
+                    string.Equals(currentText, previousText, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                previousText = currentText;
+                if (_viewModel is not null &&
+                    await _viewModel.TryConnectAuthorizationFromClipboardAsync(currentText))
+                {
+                    return;
+                }
+            }
+
+            _viewModel?.NotifyFabAuthorizationCaptureTimedOut();
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        finally
+        {
+            if (ReferenceEquals(_fabAuthorizationCaptureCancellation, cancellation))
+            {
+                _fabAuthorizationCaptureCancellation.Dispose();
+                _fabAuthorizationCaptureCancellation = null;
+            }
+        }
+    }
+
+    private void OnExtensionWindowRequested(object? sender, EventArgs args)
+    {
+        if (_extensionHubWindow is not null)
+        {
+            _extensionHubWindow.Activate();
+            return;
+        }
+
+        _extensionHubWindow = new ExtensionHubWindow { DataContext = DataContext };
+        _extensionHubWindow.Closed += (_, _) => _extensionHubWindow = null;
+        _extensionHubWindow.Show(this);
+    }
+
+    private static void OpenDetailsFromItem(object? sender, PointerReleasedEventArgs args)
+    {
+        if (sender is not Control item)
+        {
+            return;
+        }
+
+        var current = args.Source as Control;
+        while (current is not null && !ReferenceEquals(current, item))
+        {
+            if (current is Button or TextBox or ComboBox or ToggleSwitch)
+            {
+                return;
+            }
+
+            current = current.Parent as Control;
+        }
+
+        var command = item.DataContext switch
+        {
+            EngineCardViewModel engine => engine.OpenDetailsCommand,
+            LocalEngineInstallationCardViewModel engine => engine.OpenDetailsCommand,
+            ProjectCardViewModel project => project.OpenDetailsCommand,
+            LocalEngineProjectCardViewModel project => project.OpenDetailsCommand,
+            _ => null,
+        };
+        if (command?.CanExecute(null) == true)
+        {
+            command.Execute(null);
+            args.Handled = true;
+        }
+    }
+
+    private static void LoadRemoteFabThumbnail(
+        object? sender,
+        VisualTreeAttachmentEventArgs args)
+    {
+        if (sender is Control { DataContext: RemoteFabAssetCardViewModel card })
+        {
+            card.EnsureThumbnailLoaded();
+        }
+    }
+
+    private static void RealizeRemoteFabRow(
+        object? sender,
+        VisualTreeAttachmentEventArgs args)
+    {
+        if (sender is Control control) TrackRemoteFabRow(control);
+    }
+
+    private static void RealizeRemoteFabRowDataContext(object? sender, EventArgs args)
+    {
+        if (sender is Control control) TrackRemoteFabRow(control);
+    }
+
+    private static void RecycleRemoteFabRow(
+        object? sender,
+        VisualTreeAttachmentEventArgs args)
+    {
+        if (sender is not Control control) return;
+        if (RealizedRemoteFabRows.TryGetValue(control, out var realized))
+        {
+            realized.Value?.Recycle();
+            RealizedRemoteFabRows.Remove(control);
+        }
+    }
+
+    private static void TrackRemoteFabRow(Control control)
+    {
+        var realized = RealizedRemoteFabRows.GetOrCreateValue(control);
+        var current = control.DataContext as RemoteFabAssetRowViewModel;
+        if (ReferenceEquals(realized.Value, current)) return;
+        realized.Value?.Recycle();
+        realized.Value = current;
+        current?.Realize();
+    }
+
+    private async void BrowseManualEnginePath(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
+    {
+        if (_viewModel is null)
+        {
+            return;
+        }
+
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Choisir l’installation du moteur",
+            AllowMultiple = false,
+        });
+        if (folders.Count > 0)
+        {
+            _viewModel.ManualEnginePath = folders[0].Path.LocalPath;
+        }
+    }
+
+    private async void BrowseSourceEngineTarget(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
+    {
+        if (_viewModel is null)
+        {
+            return;
+        }
+
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Choisir le dossier cible Unreal Engine",
+            AllowMultiple = false,
+        });
+        if (folders.Count > 0)
+        {
+            _viewModel.SourceEngineTargetDirectory = folders[0].Path.LocalPath;
+        }
+    }
+
+    private async void BrowseEpicEngineTarget(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
+    {
+        if (_viewModel is null)
+        {
+            return;
+        }
+
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Choisir le dossier parent du moteur Unreal",
+            AllowMultiple = false,
+        });
+        if (folders.Count > 0)
+        {
+            var selected = _viewModel.SelectedEpicEngineRelease;
+            _viewModel.EpicEngineTargetDirectory = Path.Combine(
+                folders[0].Path.LocalPath,
+                selected?.AppName ?? "UE_Official");
+        }
+    }
+
+    private async void BrowseNativeStoreSource(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
+    {
+        if (_viewModel is null)
+        {
+            return;
+        }
+
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = _viewModel.PendingNativeStoreTitle,
+            AllowMultiple = false,
+        });
+        if (folders.Count > 0)
+        {
+            _viewModel.PendingNativeStorePath = folders[0].Path.LocalPath;
+        }
+    }
+}

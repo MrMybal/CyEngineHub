@@ -1,0 +1,64 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../CyEngineHub.Core/CyEngineHub.Core.csproj" />
+    <ProjectReference Include="../CyEngineHub.Engines/CyEngineHub.Engines.csproj" />
+    <ProjectReference Include="../CyEngineHub.Extensions/CyEngineHub.Extensions.csproj" />
+    <ProjectReference Include="../CyEngineHub.AssetBridge.Tool/CyEngineHub.AssetBridge.Tool.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../CyEngineHub.Unity/CyEngineHub.Unity.csproj" />
+    <ProjectReference Include="../CyEngineHub.Godot/CyEngineHub.Godot.csproj" />
+    <ProjectReference Include="../CyEngineHub.CryEngine/CyEngineHub.CryEngine.csproj" />
+    <ProjectReference Include="../CyEngineHub.Unreal/CyEngineHub.Unreal.csproj" />
+    <ProjectReference Include="../CyEngineHub.Projects/CyEngineHub.Projects.csproj" />
+    <ProjectReference Include="../CyEngineHub.Infrastructure/CyEngineHub.Infrastructure.csproj" />
+    <ProjectReference Include="../CyEngineHub.Build/CyEngineHub.Build.csproj" />
+    <ProjectReference Include="../CyEngineHub.Git/CyEngineHub.Git.csproj" />
+    <ProjectReference Include="../CyEngineHub.Plugins/CyEngineHub.Plugins.csproj" />
+    <ProjectReference Include="../CyEngineHub.Toolchains/CyEngineHub.Toolchains.csproj" />
+    <ProjectReference Include="../CyEngineHub.Storage/CyEngineHub.Storage.csproj" />
+    <ProjectReference Include="../CyEngineHub.Epic/CyEngineHub.Epic.csproj" />
+    <ProjectReference Include="../CyEngineHub.Fab/CyEngineHub.Fab.csproj" />
+    <ProjectReference Include="../CyEngineHub.Updates/CyEngineHub.Updates.csproj" />
+    <ProjectReference Include="../CyEngineHub.Updater/CyEngineHub.Updater.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+  </ItemGroup>
+  <ItemGroup>
+    <AvaloniaResource
+        Include="../../assets/branding/cyenginehub-logo.png"
+        Link="Assets/Branding/cyenginehub-logo.png" />
+  </ItemGroup>
+  <Target Name="CopyBuiltInHubExtensions" AfterTargets="Build" Condition="'$(SkipBuiltInExtensionCopy)' != 'true'">
+    <RemoveDir Directories="$(OutDir)Extensions/cyenginehub.unreal-asset-downgrader" />
+    <ItemGroup>
+      <AssetBridgeToolFiles Include="../CyEngineHub.AssetBridge.Tool/bin/$(Configuration)/net8.0/**/*" />
+    </ItemGroup>
+    <Copy
+        SourceFiles="@(AssetBridgeToolFiles)"
+        DestinationFiles="@(AssetBridgeToolFiles->'$(OutDir)Extensions/cyenginehub.asset-bridge/tools/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy
+        SourceFiles="../../extensions/builtin/cyenginehub.asset-bridge/extension.json"
+        DestinationFolder="$(OutDir)Extensions/cyenginehub.asset-bridge" />
+    <ItemGroup>
+      <UnrealVersionBridgeFiles Include="../../extensions/builtin/cyenginehub.unreal-version-bridge/**/*" />
+      <UnrealRelocatedInstallFiles Include="../../extensions/builtin/cyenginehub.unreal-relocated-install/**/*" />
+      <UpdaterFiles Include="../CyEngineHub.Updater/bin/$(Configuration)/net8.0/**/*" />
+    </ItemGroup>
+    <Copy
+        SourceFiles="@(UnrealVersionBridgeFiles)"
+        DestinationFiles="@(UnrealVersionBridgeFiles->'$(OutDir)Extensions/cyenginehub.unreal-version-bridge/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy
+        SourceFiles="@(UnrealRelocatedInstallFiles)"
+        DestinationFiles="@(UnrealRelocatedInstallFiles->'$(OutDir)Extensions/cyenginehub.unreal-relocated-install/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy
+        SourceFiles="@(UpdaterFiles)"
+        DestinationFiles="@(UpdaterFiles->'$(OutDir)Updater/%(RecursiveDir)%(Filename)%(Extension)')" />
+  </Target>
+</Project>

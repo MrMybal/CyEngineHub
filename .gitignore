@@ -1,0 +1,27 @@
+**/bin/
+**/obj/
+.vs/
+.idea/
+*.user
+*.suo
+artifacts/
+Data/
+*.db
+*.db-shm
+*.db-wal
+
+# Personal workspace data and annotation exports (never publish).
+.codex/
+.agents/
+tools/layout-studio/imports/
+assets/branding/references/
+**/artifacts/
+.env
+.env.*
+*.pfx
+*.p12
+*.key
+*.binlog
+TestResults/
+__pycache__/
+*.pyc

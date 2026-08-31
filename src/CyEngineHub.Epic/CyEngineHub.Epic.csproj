@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../CyEngineHub.Core/CyEngineHub.Core.csproj" />
+    <ProjectReference Include="../CyEngineHub.Fab/CyEngineHub.Fab.csproj" />
+  </ItemGroup>
+</Project>

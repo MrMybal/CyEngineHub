@@ -1,0 +1,19 @@
+{
+  "$schema": "../../../extensions/extension.schema.json",
+  "schemaVersion": 1,
+  "id": "studio.example.asset-guide",
+  "displayName": "Studio asset guide",
+  "version": "1.0.0",
+  "publisher": "Example Studio",
+  "description": "Ouvre le guide HTTPS du studio pour préparer des assets portables entre moteurs.",
+  "kind": "EngineIntegration",
+  "executionKind": "WebLink",
+  "capabilities": "AssetInspect, AssetConvert",
+  "supportedEngines": [ "Unreal", "Unity", "Godot", "CryEngine" ],
+  "supportedFileExtensions": [ ".fbx", ".gltf", ".glb", ".png" ],
+  "website": "https://example.com/asset-guide",
+  "writesToOutput": false,
+  "uiContributions": [
+    { "id": "asset-guide", "label": "Guide assets du studio", "placement": "GlobalToolbar", "action": "OpenWebsite", "order": 100 }
+  ]
+}

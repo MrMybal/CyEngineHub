@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/CyEngineHub.Engines/CyEngineHub.Engines.csproj" />
+    <ProjectReference Include="../../src/CyEngineHub.Unreal/CyEngineHub.Unreal.csproj" />
+    <ProjectReference Include="../../src/CyEngineHub.Unity/CyEngineHub.Unity.csproj" />
+    <ProjectReference Include="../../src/CyEngineHub.Godot/CyEngineHub.Godot.csproj" />
+    <ProjectReference Include="../../src/CyEngineHub.CryEngine/CyEngineHub.CryEngine.csproj" />
+  </ItemGroup>
+</Project>

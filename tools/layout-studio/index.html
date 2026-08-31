@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CyEngineHub — Layout Studio</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="../../assets/branding/cyenginehub-logo.png" alt="">
+      <div><strong>CYENGINEHUB</strong><span>LAYOUT STUDIO</span></div>
+    </div>
+    <div class="toolbar">
+      <button id="undoBtn" title="Annuler (Ctrl+Z)">↶</button>
+      <button id="redoBtn" title="Rétablir (Ctrl+Maj+Z)">↷</button>
+      <span class="separator"></span>
+      <button id="addBlockBtn">+ Bloc</button>
+      <button id="addNoteBtn" class="accent">+ Annotation</button>
+      <button id="duplicateBtn">Dupliquer</button>
+      <button id="deleteBtn" class="danger">Supprimer</button>
+      <span class="separator"></span>
+      <label class="zoom-control">Zoom <input id="zoomRange" type="range" min="35" max="100" value="72"><output id="zoomValue">72%</output></label>
+      <label class="check"><input id="gridToggle" type="checkbox" checked> Grille</label>
+      <span class="toolbar-spacer"></span>
+      <button id="copyBriefBtn">Copier le brief</button>
+      <button id="exportBtn">Exporter JSON</button>
+      <button id="importBtn">Importer</button>
+      <input id="importInput" type="file" accept=".json,application/json" hidden>
+    </div>
+  </header>
+  <main class="app-shell">
+    <aside class="page-panel">
+      <div class="panel-title"><span>Pages de l’application</span><button id="addPageBtn" class="icon-btn" title="Ajouter une page">+</button></div>
+      <nav id="pageList" class="page-list"></nav>
+      <div class="page-actions">
+        <button id="renamePageBtn">Renommer</button><button id="duplicatePageBtn">Dupliquer</button><button id="resetPageBtn">Réinitialiser</button>
+      </div>
+      <label class="field page-comment">
+        <span>Note générale de cette page</span>
+        <textarea id="pageComment" rows="6" placeholder="Ex. Je veux une barre de filtres fixe en haut…"></textarea>
+      </label>
+      <div class="legend">
+        <strong>Mode d’emploi</strong>
+        <p>Déplace les blocs directement. Tire le coin inférieur droit pour les redimensionner.</p>
+        <p>Double-clique un élément pour écrire ton instruction. Le point orange indique une demande.</p>
+      </div>
+    </aside>
+    <section class="workspace">
+      <div class="workspace-head">
+        <div><strong id="activePageName">Vue d’ensemble</strong><span>Maquette libre — 1440 × 900</span></div>
+        <div id="saveState">Sauvegarde locale active</div>
+      </div>
+      <div id="viewport" class="viewport"><div id="stage" class="stage grid"><div id="board" class="board"></div></div></div>
+    </section>
+    <aside class="inspector">
+      <div class="panel-title"><span>Élément sélectionné</span><span id="selectionKind" class="badge">Aucun</span></div>
+      <div id="emptyInspector" class="empty-inspector">Clique sur une carte, un titre, une barre ou une annotation pour la modifier.</div>
+      <div id="inspectorForm" hidden>
+        <label class="field"><span>Type visuel</span>
+          <select id="propType">
+            <option value="panel">Panneau</option><option value="card">Carte</option><option value="hero">En-tête</option>
+            <option value="tabs">Onglets</option><option value="toolbar">Barre d’actions</option><option value="status">Statuts</option>
+            <option value="sidebar">Navigation</option><option value="note">Annotation</option>
+          </select>
+        </label>
+        <label class="field"><span>Titre visible</span><input id="propTitle" type="text"></label>
+        <label class="field"><span>Texte visible</span><textarea id="propBody" rows="4"></textarea></label>
+        <label class="field instruction-field"><span>Instruction pour Codex</span>
+          <textarea id="propInstruction" rows="6" placeholder="Ex. Déplacer ce bloc à droite, retirer ce bouton, utiliser des cartes carrées…"></textarea>
+        </label>
+        <div class="coordinates">
+          <label class="field"><span>X</span><input id="propX" type="number"></label>
+          <label class="field"><span>Y</span><input id="propY" type="number"></label>
+          <label class="field"><span>Largeur</span><input id="propW" type="number" min="80"></label>
+          <label class="field"><span>Hauteur</span><input id="propH" type="number" min="50"></label>
+        </div>
+        <label class="field"><span>Tags (séparés par des virgules)</span><input id="propTags" type="text"></label>
+        <div class="layer-actions"><button id="frontBtn">Premier plan</button><button id="backBtn">Arrière-plan</button></div>
+      </div>
+      <div class="inspector-help">
+        <strong>Raccourcis</strong><span>Suppr — retirer</span><span>Flèches — déplacer de 1 px</span>
+        <span>Maj + flèches — déplacer de 10 px</span><span>Ctrl + D — dupliquer</span>
+      </div>
+    </aside>
+  </main>
+  <div id="toast" class="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>

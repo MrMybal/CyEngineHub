@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "cyenginehub.unreal-relocated-install",
+  "displayName": "Unreal Fab Pack Relocator",
+  "version": "0.1.0",
+  "publisher": "CyEngineHub",
+  "description": "Conserve les chemins natifs d’un pack Fab dans un projet Unreal temporaire, déplace les assets vers un dossier configurable, vérifie les références puis publie une variante installable.",
+  "kind": "EngineIntegration",
+  "executionKind": "WebLink",
+  "capabilities": "AssetImport, ProjectTool, DependencyValidation",
+  "supportedEngines": [ "Unreal" ],
+  "supportedFileExtensions": [ ".uasset", ".umap", ".uexp", ".ubulk" ],
+  "website": "https://dev.epicgames.com/documentation/unreal-engine/migrating-assets-in-unreal-engine",
+  "writesToOutput": false,
+  "uiContributions": [
+    { "id": "open-fab-pack-relocator", "label": "Fab Pack Relocator", "placement": "PluginsToolbar", "action": "OpenExtension", "order": 15 }
+  ]
+}

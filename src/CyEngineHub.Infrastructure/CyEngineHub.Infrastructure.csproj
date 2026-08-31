@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="../CyEngineHub.Core/CyEngineHub.Core.csproj" />
+    <ProjectReference Include="../CyEngineHub.Unreal/CyEngineHub.Unreal.csproj" />
+    <ProjectReference Include="../CyEngineHub.Projects/CyEngineHub.Projects.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+</Project>
+

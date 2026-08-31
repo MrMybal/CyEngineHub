@@ -1,0 +1,25 @@
+<Application
+    x:Class="CyEngineHub.Desktop.App"
+    xmlns="https://github.com/avaloniaui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    RequestedThemeVariant="Dark">
+  <Application.Styles>
+    <FluentTheme />
+  </Application.Styles>
+  <TrayIcon.Icons>
+    <TrayIcons>
+      <TrayIcon
+          Icon="avares://CyEngineHub.Desktop/Assets/Branding/cyenginehub-logo.png"
+          ToolTipText="CyEngineHub · Alpha"
+          Clicked="OnTrayIconClicked">
+        <TrayIcon.Menu>
+          <NativeMenu>
+            <NativeMenuItem Header="Ouvrir CyEngineHub" Click="OnTrayOpenClicked" />
+            <NativeMenuItemSeparator />
+            <NativeMenuItem Header="Quitter CyEngineHub" Click="OnTrayExitClicked" />
+          </NativeMenu>
+        </TrayIcon.Menu>
+      </TrayIcon>
+    </TrayIcons>
+  </TrayIcon.Icons>
+</Application>

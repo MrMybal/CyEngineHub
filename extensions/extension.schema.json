@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyenginehub.local/schemas/extension.schema.json",
+  "title": "CyEngineHub extension manifest",
+  "description": "Contract for a CyEngineHub extension.json manifest. Passing this schema does not grant permission to execute local code.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "displayName",
+    "version",
+    "publisher",
+    "description",
+    "kind",
+    "executionKind",
+    "capabilities",
+    "supportedEngines",
+    "supportedFileExtensions",
+    "writesToOutput"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9](?:[a-z0-9.-]{1,62}[a-z0-9])?$"
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "publisher": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+    },
+    "kind": {
+      "enum": [ "Tool", "AssetProcessor", "EngineIntegration" ]
+    },
+    "executionKind": {
+      "enum": [ "ExternalProcess", "WebLink" ]
+    },
+    "capabilities": {
+      "type": "string",
+      "pattern": "^(AssetInspect|AssetCopy|AssetConvert|AssetDowngrade|ProjectTool)(, (AssetInspect|AssetCopy|AssetConvert|AssetDowngrade|ProjectTool))*$"
+    },
+    "supportedEngines": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "enum": [ "Unreal", "Unity", "Godot", "CryEngine", "Custom" ]
+      }
+    },
+    "supportedFileExtensions": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^\\.[A-Za-z0-9]{1,12}$"
+      }
+    },
+    "entryPoint": {
+      "type": "string",
+      "pattern": "^(?![A-Za-z]:)(?![\\\\/])(?!.*(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)).+\\.[Ee][Xx][Ee]$"
+    },
+    "arguments": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "string",
+        "maxLength": 1000,
+        "pattern": "^(?:[^{}]|\\{(?:Input|Output|SourceEngine|TargetEngine)\\})*$"
+      }
+    },
+    "website": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "writesToOutput": {
+      "type": "boolean"
+    },
+    "uiContributions": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [ "id", "label", "placement", "action" ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9](?:[a-z0-9.-]{0,46}[a-z0-9])?$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "placement": {
+            "enum": [ "GlobalToolbar", "EnginesToolbar", "ProjectsToolbar", "PluginsToolbar" ]
+          },
+          "action": {
+            "enum": [ "OpenExtension", "OpenWebsite", "PrepareExecution" ]
+          },
+          "order": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [ "uiContributions" ],
+        "properties": {
+          "executionKind": { "const": "WebLink" }
+        },
+        "required": [ "executionKind" ]
+      },
+      "then": {
+        "required": [ "website" ],
+        "properties": {
+          "writesToOutput": { "const": false },
+          "arguments": { "maxItems": 0 }
+        },
+        "not": {
+          "required": [ "entryPoint" ]
+        }
+      },
+      "else": {
+        "required": [ "entryPoint", "arguments" ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "uiContributions": {
+            "contains": {
+              "properties": { "action": { "const": "OpenWebsite" } },
+              "required": [ "action" ]
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [ "website" ]
+      }
+    }
+  ]
+}
