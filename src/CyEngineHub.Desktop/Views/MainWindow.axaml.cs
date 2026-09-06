@@ -22,6 +22,7 @@ public sealed partial class MainWindow : Window
     private ExtensionHubWindow? _extensionHubWindow;
     private MainWindowViewModel? _viewModel;
     private CancellationTokenSource? _fabAuthorizationCaptureCancellation;
+    private FabAuthorizationWindow? _fabAuthorizationWindow;
     private ScrollViewer? _remoteFabScrollViewer;
 
     public MainWindow()
@@ -40,6 +41,8 @@ public sealed partial class MainWindow : Window
         {
             _viewModel.ExtensionWindowRequested -= OnExtensionWindowRequested;
             _viewModel.FabAuthorizationCaptureRequested -= OnFabAuthorizationCaptureRequested;
+            _viewModel.FabWebAuthorizationRequested -= OnFabWebAuthorizationRequested;
+            _fabAuthorizationWindow?.Close(new FabWebAuthorizationResult());
             _viewModel.RawLogScrollRequested -= OnRawLogScrollRequested;
         }
 
@@ -48,6 +51,7 @@ public sealed partial class MainWindow : Window
         {
             _viewModel.ExtensionWindowRequested += OnExtensionWindowRequested;
             _viewModel.FabAuthorizationCaptureRequested += OnFabAuthorizationCaptureRequested;
+            _viewModel.FabWebAuthorizationRequested += OnFabWebAuthorizationRequested;
             _viewModel.RawLogScrollRequested += OnRawLogScrollRequested;
         }
     }
@@ -124,6 +128,27 @@ public sealed partial class MainWindow : Window
         var cancellation = new CancellationTokenSource();
         _fabAuthorizationCaptureCancellation = cancellation;
         _ = CaptureFabAuthorizationAsync(cancellation);
+    }
+
+    private async void OnFabWebAuthorizationRequested(object? sender, FabWebAuthorizationRequestEventArgs request)
+    {
+        _fabAuthorizationCaptureCancellation?.Cancel();
+        if (_fabAuthorizationWindow is not null)
+        {
+            request.Complete(new FabWebAuthorizationResult());
+            return;
+        }
+        try
+        {
+            var window = new FabAuthorizationWindow(request);
+            _fabAuthorizationWindow = window;
+            request.Complete(await window.ShowDialog<FabWebAuthorizationResult?>(this) ?? new FabWebAuthorizationResult());
+        }
+        catch (Exception)
+        {
+            request.Complete(new FabWebAuthorizationResult { UseManualMode = true });
+        }
+        finally { _fabAuthorizationWindow = null; }
     }
 
     private async Task CaptureFabAuthorizationAsync(CancellationTokenSource cancellation)

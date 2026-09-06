@@ -29,12 +29,19 @@
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <PackageReference Include="Avalonia.Themes.Fluent" />
+    <PackageReference Include="Microsoft.Web.WebView2" />
   </ItemGroup>
   <ItemGroup>
     <AvaloniaResource
         Include="../../assets/branding/cyenginehub-logo.png"
         Link="Assets/Branding/cyenginehub-logo.png" />
   </ItemGroup>
+  <!-- Avalonia hosts Core directly; the SDK's WPF/WinForms adapters are not used. -->
+  <Target Name="UseWebView2CoreOnly" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf' Or '%(Reference.Filename)' == 'Microsoft.Web.WebView2.WinForms'" />
+    </ItemGroup>
+  </Target>
   <Target Name="CopyBuiltInHubExtensions" AfterTargets="Build" Condition="'$(SkipBuiltInExtensionCopy)' != 'true'">
     <RemoveDir Directories="$(OutDir)Extensions/cyenginehub.unreal-asset-downgrader" />
     <ItemGroup>

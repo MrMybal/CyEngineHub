@@ -730,6 +730,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _unityDownloadDirectory = Path.Combine(appData.RootDirectory, "Downloads", "Unity");
         _fabRemoteImageCache = new RemoteImageCache(() => Path.Combine(FabCacheDirectory, "Images"));
         _quixelRemoteImageCache = new RemoteImageCache(() => Path.Combine(QuixelCacheDirectory, "Images"));
+        InitializeQuixelCollections();
         _quixelLibraryCache = new QuixelLibraryCacheStore(
             Path.Combine(appData.RootDirectory, "Cache", "Quixel", "library-v1.json.gz"));
         _marketplaceLibraryCache = new MarketplaceLibraryCacheStore(source =>
@@ -1141,8 +1142,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
             () => !IsEpicBusy,
             ShowError);
         AddFabLocalLibraryRootCommand = _addFabLocalLibraryRootCommand;
+        OpenEmbeddedFabAuthorizationCommand = new AsyncRelayCommand(
+            OpenEmbeddedFabAuthorizationAsync,
+            () => !IsEpicBusy && !IsFabWebLoginActive && !IsDirectFabConnected);
         OpenDirectFabAuthorizationCommand = new AsyncRelayCommand(
             OpenDirectFabAuthorizationAsync,
+            () => !IsFabWebLoginActive,
             onError: ShowError);
         ConnectDirectFabCommand = new AsyncRelayCommand(ConnectDirectFabAsync, onError: ShowError);
         DisconnectDirectFabCommand = new AsyncRelayCommand(DisconnectDirectFabAsync, onError: ShowError);
@@ -2964,6 +2969,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (SetProperty(ref _isEpicBusy, value))
             {
                 _refreshEpicCommand.NotifyCanExecuteChanged();
+                (OpenEmbeddedFabAuthorizationCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
                 _launchFabProjectCommand.NotifyCanExecuteChanged();
                 _confirmFabImportCommand.NotifyCanExecuteChanged();
                 _confirmFabRollbackCommand.NotifyCanExecuteChanged();
@@ -4110,6 +4116,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             if (SetProperty(ref _librarySource, value))
             {
+                _quixelCollectionsNavigation++;
+                NotifyQuixelCollectionNavigation();
                 // A facet selection belongs to one marketplace, not the next one.
                 LibraryEngineFacets.Clear();
                 LibraryAssetTypeFacets.Clear();
@@ -6694,6 +6702,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(FabConnectionStatus));
         OnPropertyChanged(nameof(FabConnectionIndicator));
         _refreshDirectFabLibraryCommand.NotifyCanExecuteChanged();
+        (OpenEmbeddedFabAuthorizationCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
     }
 
     private async Task LoadQuixelStatusAsync()
@@ -6753,6 +6762,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task OpenDirectFabAuthorizationAsync()
     {
+        if (IsFabWebLoginActive) return;
         await _platformLauncher.OpenUriAsync(_directFabClient.AuthorizationUri).ConfigureAwait(true);
         DirectFabStatusSummary =
             "Autorisation ouverte. Après connexion, copiez la réponse Epic : CyEngineHub la détectera et terminera automatiquement.";
@@ -6763,7 +6773,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public async Task<bool> TryConnectDirectFabFromClipboardAsync(string? clipboardText)
     {
-        if (IsDirectFabConnected || IsEpicBusy || !LooksLikeEpicAuthorization(clipboardText))
+        if (IsDirectFabConnected || IsEpicBusy || IsFabWebLoginActive || !LooksLikeEpicAuthorization(clipboardText))
         {
             return false;
         }
@@ -8074,6 +8084,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
             var sourceAssets = GetLibrarySourceAssets().ToArray();
             _librarySourceAssetCount = sourceAssets.Length;
+            OnPropertyChanged(nameof(QuixelCollectionScopeSummary));
             var preferences = _workspacePreferences.Items
                 .Where(item => item.Kind == WorkspaceItemKind.Asset)
                 .GroupBy(item => item.Key, StringComparer.OrdinalIgnoreCase)
@@ -8373,6 +8384,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         var sourceAssets = GetLibrarySourceAssets().ToArray();
         _librarySourceAssetCount = sourceAssets.Length;
+        OnPropertyChanged(nameof(QuixelCollectionScopeSummary));
         _visibleRemoteFabCatalog = sourceAssets;
         _libraryPageIndex = 0;
         RebuildRemoteFabPresentation();
@@ -8571,7 +8583,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private IEnumerable<RemoteFabAsset> GetLibrarySourceAssets() =>
         IsLibraryQuixelSelected
-            ? _remoteFabCatalog.Where(IsQuixelAsset)
+            ? _remoteFabCatalog.Where(asset => IsQuixelAsset(asset) &&
+                (_quixelCollectionAssetIds is null || _quixelCollectionAssetIds.Contains(asset.AssetId)))
             : _remoteFabCatalog.Where(asset => !IsQuixelAsset(asset));
 
     private IEnumerable<string> GetAssetCollections(RemoteFabAsset asset)

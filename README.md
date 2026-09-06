@@ -23,6 +23,8 @@ un certificat Authenticode et Windows peut afficher un avertissement.
 - Découverte et lancement des moteurs/projets installés, outils Unreal de build et packaging.
 - Bibliothèque Fab et Megascans historique Quixel : connexion utilisateur, catalogue
   mis en cache, miniatures asynchrones, recherche, filtres et affichage virtualisé.
+- Onglet Collections Megascans : sélections officielles Quixel, recherche, couvertures
+  en cache et accès à leurs assets présents dans votre catalogue personnel.
 - Téléchargements Unreal et RAW selon les formats réellement disponibles dans le compte.
 - Compression ZIP configurable par marketplace, métadonnées JSON accessibles séparément,
   dossiers de cache/téléchargement et bibliothèques multiples avec quotas et ordre de priorité.
@@ -51,6 +53,11 @@ Les scripts d'installation/post-création doivent provenir de sources de confian
 CyEngineHub est indépendant d'Epic Games, Quixel, Unity et des autres éditeurs cités.
 
 ## Données et mises à jour
+
+La connexion Fab propose une fenêtre Epic intégrée via WebView2 sur Windows,
+avec récupération automatique du code JSON. Le **mode manuel** dans le navigateur
+externe reste disponible, y compris si WebView2 est absent ou refusé par le
+fournisseur de connexion. Voir [Connexion Epic / Fab](docs/fab-login.md).
 
 Par défaut, les réglages, catalogues et logs sont dans `%LOCALAPPDATA%\CyEngineHub`.
 Les paquets et caches peuvent être placés dans les dossiers définis dans les paramètres.
@@ -94,6 +101,8 @@ et les notices embarquées dans les binaires.
 
 ## Documentation
 
+- [Connexion Epic / Fab : automatique et manuelle](docs/fab-login.md)
+- [Collections officielles Megascans](docs/megascan-collections.md)
 - [Profils et création de projets](docs/project-creation-profiles.md)
 - [Mises à jour et publication](docs/application-updates.md)
 - [Extensions](docs/extensions.md)

@@ -1,5 +1,15 @@
 # Third-party notices
 
+## Microsoft Edge WebView2
+
+The Windows embedded sign-in window uses the Microsoft.Web.WebView2 SDK.
+Copyright Microsoft Corporation. The SDK and the separately installed WebView2
+Runtime are subject to Microsoft's respective license terms, not the egs-api-rs
+MIT license below. SDK license metadata/text is included in packaged build notices.
+
+- SDK: https://www.nuget.org/packages/Microsoft.Web.WebView2
+- Runtime and distribution: https://learn.microsoft.com/microsoft-edge/webview2/concepts/distribution
+
 ## egs-api-rs
 
 Parts of the Epic manifest/chunk format support and the Fab compatibility flow were

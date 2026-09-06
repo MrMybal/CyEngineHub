@@ -3,6 +3,7 @@
     xmlns="https://github.com/avaloniaui"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:vm="using:CyEngineHub.Desktop.ViewModels"
+    xmlns:views="using:CyEngineHub.Desktop.Views"
     x:DataType="vm:MainWindowViewModel"
     Title="CyEngineHub — Multi-Engine Development Hub"
     Icon="avares://CyEngineHub.Desktop/Assets/Branding/cyenginehub-logo.png"
@@ -2132,9 +2133,24 @@
             </StackPanel>
           </Border>
 
-          <Grid Grid.Column="1">
-            <Grid>
-              <Grid IsVisible="{Binding IsLibraryRemoteSelected}">
+          <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*">
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,10" IsVisible="{Binding IsLibraryQuixelSelected}">
+              <Button Classes="ghost view-mode" Classes.active="{Binding IsQuixelAssetsTabSelected}" Content="Mes assets" Command="{Binding ShowQuixelAssetsTabCommand}" />
+              <Button Classes="ghost view-mode" Classes.active="{Binding IsQuixelCollectionsTabSelected}" Content="Collections Megascans" Command="{Binding ShowQuixelCollectionsTabCommand}" />
+            </StackPanel>
+            <Border Grid.Row="1" Classes="card" Margin="0,0,0,10" IsVisible="{Binding IsQuixelCollectionScopeVisible}">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
+                <Button Classes="ghost" Content="← Collections" Command="{Binding ShowQuixelCollectionsTabCommand}" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Spacing="5">
+                  <TextBlock Text="{Binding QuixelCollectionScopeTitle}" FontSize="18" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding QuixelCollectionScopeDescription}" Foreground="#A4B3C2" FontSize="10" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding QuixelCollectionScopeSummary}" Foreground="#70A8FA" FontSize="10" TextWrapping="Wrap" />
+                </StackPanel>
+              </Grid>
+            </Border>
+            <Grid Grid.Row="2">
+              <views:QuixelCollectionsPanel IsVisible="{Binding IsQuixelCollectionsListVisible}" />
+              <Grid IsVisible="{Binding IsRemoteMarketplaceContentVisible}">
               <Border Classes="card" IsVisible="{Binding !IsSelectedRemoteConnectionReady}">
                 <StackPanel>
                   <TextBlock Text="{Binding LibraryRemoteHeading}" FontSize="12" FontWeight="SemiBold" />
@@ -3432,18 +3448,7 @@
                           <Button Grid.Column="1" Classes="ghost" Content="Déconnecter" Command="{Binding DisconnectDirectFabCommand}" IsVisible="{Binding IsDirectFabConnected}" VerticalAlignment="Center" />
                         </Grid>
                         <Border IsVisible="{Binding !IsDirectFabConnected}" Background="#0D141C" BorderBrush="#202C39" BorderThickness="1" CornerRadius="8" Padding="14">
-                          <StackPanel Spacing="10">
-                            <TextBlock Text="AUTORISATION AUTOMATISÉE" FontSize="10" FontWeight="Bold" Foreground="#70A8FA" />
-                            <TextBlock Text="Ouvrez la page Epic et connectez-vous. Quand la réponse JSON apparaît, faites Ctrl+A puis Ctrl+C : CyEngineHub détecte le code dans le presse-papiers, l’échange et termine la connexion sans collage ni second bouton." FontSize="10" Foreground="#A4B3C2" TextWrapping="Wrap" />
-                            <Button Classes="accent" Content="Ouvrir l’autorisation Epic" Command="{Binding OpenDirectFabAuthorizationCommand}" HorizontalAlignment="Left" />
-                            <TextBlock Text="Le navigateur système protège sa page : CyEngineHub ne peut pas lire son contenu sans votre copie. Le mot de passe n’est jamais accessible à l’application." FontSize="9" Foreground="#D9A55C" TextWrapping="Wrap" />
-                            <Expander Header="Mode manuel de secours">
-                              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,8,0,0">
-                                <TextBox Classes="path" Text="{Binding FabAuthorizationCode}" PlaceholderText="authorizationCode ou réponse JSON Epic" />
-                                <Button Grid.Column="1" Classes="ghost" Content="Connecter" Command="{Binding ConnectDirectFabCommand}" />
-                              </Grid>
-                            </Expander>
-                          </StackPanel>
+                          <views:FabSignInPanel />
                         </Border>
                       </StackPanel>
                     </Border>
@@ -3462,10 +3467,10 @@
                           <TextBlock Text="CONNEXION FAB" FontSize="10" FontWeight="Bold" Foreground="#65788D" />
                           <TextBlock Text="{Binding FabConnectionStatus}" FontSize="18" FontWeight="SemiBold" Margin="0,7,0,0" />
                           <TextBlock Text="{Binding DirectFabStatusSummary}" FontSize="10" Foreground="#A8C9F2" Margin="0,6,0,0" TextWrapping="Wrap" />
-                          <TextBlock Text="Fab réutilise l’autorisation Epic directe. Cette page ne contient que son état et les actions liées à My Library." FontSize="10" Foreground="#8294A8" Margin="0,6,0,0" TextWrapping="Wrap" />
+                          <TextBlock Text="Fab réutilise votre compte Epic. Choisissez la fenêtre intégrée ou gardez le mode manuel avec votre navigateur." FontSize="10" Foreground="#8294A8" Margin="0,6,0,0" TextWrapping="Wrap" />
                         </StackPanel>
                         <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Center">
-                          <Button Classes="accent" Content="Configurer le compte Epic" Command="{Binding ShowEpicConnectionSettingsCommand}" IsVisible="{Binding !IsDirectFabConnected}" />
+                          <Button Classes="ghost" Content="Déconnecter" Command="{Binding DisconnectDirectFabCommand}" IsVisible="{Binding IsDirectFabConnected}" />
                           <Button Classes="accent refresh-running" Command="{Binding RefreshDirectFabLibraryCommand}" IsVisible="{Binding IsDirectFabConnected}" IsEnabled="{Binding !IsFabLibraryRefreshing}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                               <Path Width="15" Height="15" Stretch="Uniform" Data="M 7,1 A 6,6 0 1 1 1,7" Stroke="#EAF4FF" StrokeThickness="2" StrokeLineCap="Round" IsVisible="{Binding IsFabLibraryRefreshing}" RenderTransformOrigin="50%,50%">
@@ -3477,6 +3482,9 @@
                           <Button Classes="ghost" Content="Ouvrir la Bibliothèque Fab" Command="{Binding ShowLibraryFabCommand}" IsVisible="{Binding IsDirectFabConnected}" />
                         </StackPanel>
                       </Grid>
+                    </Border>
+                    <Border Classes="card" IsVisible="{Binding !IsDirectFabConnected}">
+                      <views:FabSignInPanel />
                     </Border>
                   </StackPanel>
 

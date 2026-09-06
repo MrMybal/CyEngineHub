@@ -1,0 +1,56 @@
+<UserControl x:Class="CyEngineHub.Desktop.Views.QuixelCollectionsPanel"
+    xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:CyEngineHub.Desktop.ViewModels" x:DataType="vm:MainWindowViewModel">
+  <Grid RowDefinitions="Auto,*" RowSpacing="14">
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+          <StackPanel Spacing="5">
+            <TextBlock Text="COLLECTIONS OFFICIELLES MEGASCANS" FontSize="12" FontWeight="SemiBold" Foreground="#70A8FA" />
+            <TextBlock Text="Environnements, végétation, architecture et sélections Quixel. Ouvrez une collection pour retrouver ses assets dans votre bibliothèque." FontSize="11" Foreground="#A4B3C2" TextWrapping="Wrap" />
+          </StackPanel>
+          <Button Grid.Column="1" Classes="accent" Command="{Binding RefreshQuixelCollectionsCommand}" IsEnabled="{Binding !IsQuixelCollectionsBusy}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Path Width="15" Height="15" Stretch="Uniform" Data="M 7,1 A 6,6 0 1 1 1,7" Stroke="#EAF4FF" StrokeThickness="2" StrokeLineCap="Round" IsVisible="{Binding IsQuixelCollectionsBusy}" RenderTransformOrigin="50%,50%">
+                <Path.RenderTransform><RotateTransform Angle="{Binding QuixelCollectionsSpinnerAngle}" /></Path.RenderTransform>
+              </Path>
+              <TextBlock Text="{Binding QuixelCollectionsRefreshLabel}" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </Grid>
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+          <TextBox Classes="path" Text="{Binding QuixelCollectionsSearch, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Rechercher une collection par nom, catégorie ou description…" />
+          <TextBlock Grid.Column="1" Text="{Binding QuixelCollectionsResults}" VerticalAlignment="Center" Foreground="#A8C9F2" FontSize="11" />
+        </Grid>
+        <TextBlock Text="{Binding QuixelCollectionsStatus}" TextWrapping="Wrap" FontSize="10" Foreground="#8294A8" />
+      </StackPanel>
+    </Border>
+    <TextBlock Grid.Row="1" Text="Aucune collection à afficher. Modifiez la recherche ou actualisez le catalogue." IsVisible="{Binding HasNoQuixelCollections}" Margin="16,25" Foreground="#8294A8" TextWrapping="Wrap" />
+    <ListBox Grid.Row="1" ItemsSource="{Binding QuixelCollectionCards}" Background="Transparent" BorderThickness="0" Padding="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.VerticalScrollBarVisibility="Auto">
+      <ListBox.Styles><Style Selector="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="0" /><Setter Property="Background" Value="Transparent" /></Style></ListBox.Styles>
+      <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel CacheLength="0.5" /></ItemsPanelTemplate></ListBox.ItemsPanel>
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:QuixelCollectionCardViewModel">
+          <Border Height="156" Margin="0,0,0,10" Background="#0D141C" BorderBrush="#202C39" BorderThickness="1" CornerRadius="9" Padding="10" AttachedToVisualTree="AttachCard" DetachedFromVisualTree="DetachCard" DataContextChanged="ChangeCard">
+            <Button Command="{Binding OpenCommand}" Padding="0" Background="Transparent" BorderThickness="0" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" ToolTip.Tip="Voir les assets de cette collection présents dans votre bibliothèque">
+              <Grid ColumnDefinitions="222,*,Auto" ColumnSpacing="18">
+                <Border Background="#091018" CornerRadius="7" ClipToBounds="True">
+                  <Grid>
+                    <TextBlock Text="MEGASCANS" Foreground="#29415A" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    <Image Source="{Binding Thumbnail}" IsVisible="{Binding HasThumbnail}" Stretch="UniformToFill" />
+                  </Grid>
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="7">
+                  <TextBlock Text="{Binding Name}" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Category}" Foreground="#70A8FA" FontSize="11" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Description}" Foreground="#A4B3C2" FontSize="11" TextWrapping="Wrap" MaxHeight="40" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <TextBlock Grid.Column="2" Text="Voir les assets →" FontSize="12" Foreground="#A8C9F2" VerticalAlignment="Center" />
+              </Grid>
+            </Button>
+          </Border>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </Grid>
+</UserControl>
