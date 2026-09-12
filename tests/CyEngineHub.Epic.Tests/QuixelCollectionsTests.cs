@@ -13,6 +13,7 @@ public sealed class QuixelCollectionsTests
         using var handler = new FixtureHandler(async request =>
         {
             Assert.Null(request.Headers.Authorization);
+            Assert.Equal("unit-test-catalog-key", Assert.Single(request.Headers.GetValues("X-Algolia-API-Key")));
             Assert.EndsWith("/collections/query", request.RequestUri!.AbsolutePath, StringComparison.Ordinal);
             using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
             return body.RootElement.GetProperty("page").GetInt32() == 0 ? """
@@ -26,7 +27,7 @@ public sealed class QuixelCollectionsTests
                 """;
         });
         using var http = new HttpClient(handler);
-        var client = new QuixelMegascansApiClient(http, new ForbiddenSessionStore(), new ForbiddenSessionStore());
+        var client = new QuixelMegascansApiClient(http, new ForbiddenSessionStore(), new ForbiddenSessionStore(), algoliaSearchKey: "unit-test-catalog-key");
         var collections = await client.GetCollectionsAsync();
         Assert.Equal(2, handler.Calls);
         Assert.Equal(["Architecture", "Forest"], collections.Select(item => item.Name));
@@ -50,7 +51,7 @@ public sealed class QuixelCollectionsTests
                 """);
         });
         using var http = new HttpClient(handler);
-        var collection = await new QuixelMegascansApiClient(http, new ForbiddenSessionStore(), new ForbiddenSessionStore()).GetCollectionAsync("forest");
+        var collection = await new QuixelMegascansApiClient(http, new ForbiddenSessionStore(), new ForbiddenSessionStore(), algoliaSearchKey: "unit-test-catalog-key").GetCollectionAsync("forest");
         Assert.Equal(["asset1", "asset2"], collection.AssetIds);
         Assert.Equal("Trees and rocks", collection.Description);
         Assert.EndsWith("forest_644.jpg", collection.ThumbnailUri!.AbsolutePath, StringComparison.Ordinal);
@@ -65,7 +66,7 @@ public sealed class QuixelCollectionsTests
     {
         using var handler = new FixtureHandler(_ => throw new InvalidOperationException());
         using var http = new HttpClient(handler);
-        var client = new QuixelMegascansApiClient(http, new ForbiddenSessionStore(), new ForbiddenSessionStore());
+        var client = new QuixelMegascansApiClient(http, new ForbiddenSessionStore(), new ForbiddenSessionStore(), algoliaSearchKey: "unit-test-catalog-key");
         await Assert.ThrowsAsync<ArgumentException>(() => client.GetCollectionAsync(id));
         Assert.Equal(0, handler.Calls);
     }
@@ -79,7 +80,7 @@ public sealed class QuixelCollectionsTests
     {
         using var handler = new FixtureHandler(_ => Task.FromResult(json));
         using var http = new HttpClient(handler);
-        var client = new QuixelMegascansApiClient(http, new ForbiddenSessionStore(), new ForbiddenSessionStore());
+        var client = new QuixelMegascansApiClient(http, new ForbiddenSessionStore(), new ForbiddenSessionStore(), algoliaSearchKey: "unit-test-catalog-key");
         await Assert.ThrowsAsync<QuixelException>(() => client.GetCollectionsAsync());
     }
 
@@ -90,7 +91,7 @@ public sealed class QuixelCollectionsTests
             {"id":"different","name":"Forest","assets":[],"presentation":{"coverImages":[],"splashImage":"https://evil.test/image.jpg"}}
             """));
         using var http = new HttpClient(handler);
-        var client = new QuixelMegascansApiClient(http, new ForbiddenSessionStore(), new ForbiddenSessionStore());
+        var client = new QuixelMegascansApiClient(http, new ForbiddenSessionStore(), new ForbiddenSessionStore(), algoliaSearchKey: "unit-test-catalog-key");
         await Assert.ThrowsAsync<QuixelException>(() => client.GetCollectionAsync("forest"));
         var empty = await client.GetCollectionAsync("different");
         Assert.Null(empty.ThumbnailUri);
@@ -121,6 +122,21 @@ public sealed class QuixelCollectionsTests
             Assert.Null(await cache.LoadAsync());
         }
         finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task MissingCatalogKeyDisablesSearchBeforeNetworkOrSessionAccess(string configuredKey)
+    {
+        using var handler = new FixtureHandler(_ => throw new InvalidOperationException("Network access must remain disabled."));
+        using var http = new HttpClient(handler);
+        var client = new QuixelMegascansApiClient(http, new ForbiddenSessionStore(), new ForbiddenSessionStore(), configuredKey);
+        var collectionsError = await Assert.ThrowsAsync<QuixelException>(() => client.GetCollectionsAsync());
+        var libraryError = await Assert.ThrowsAsync<QuixelException>(() => client.GetLibraryAsync());
+        Assert.Contains("désactivée", collectionsError.Message, StringComparison.Ordinal);
+        Assert.Contains("désactivée", libraryError.Message, StringComparison.Ordinal);
+        Assert.Equal(0, handler.Calls);
     }
 
     private sealed class FixtureHandler(Func<HttpRequestMessage, Task<string>> reply) : HttpMessageHandler

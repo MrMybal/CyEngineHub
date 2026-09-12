@@ -113,3 +113,7 @@ et les notices embarquées dans les binaires.
 
 Certaines notes de conception historiques décrivent des étapes antérieures de l'Alpha.
 Les limites de la release courante sont précisées dans ses notes de version.
+
+## Optional Megascans catalog access
+
+See [local catalog configuration](docs/quixel-local-configuration.md). Catalog search is disabled until an authorized key is configured locally.

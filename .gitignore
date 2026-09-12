@@ -25,3 +25,12 @@ assets/branding/references/
 TestResults/
 __pycache__/
 *.pyc
+
+# Private local data and diagnostic outputs
+.cyrevision/
+/.openai/hosting.json
+!.env.example
+*.pem
+*.dmp
+*.etl
+*.log
