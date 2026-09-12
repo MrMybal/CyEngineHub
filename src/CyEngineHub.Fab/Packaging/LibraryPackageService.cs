@@ -25,6 +25,12 @@ public enum LibraryPackageContentKind
     RawAsset,
 }
 
+public sealed record LibraryPackageDerivation(
+    string SourceArtifactId,
+    string Name,
+    string Notes,
+    DateTimeOffset CreatedAt);
+
 public sealed record LibraryPackageManifest(
     int SchemaVersion,
     string AssetId,
@@ -44,7 +50,8 @@ public sealed record LibraryPackageManifest(
     IReadOnlyList<string> EngineVersions,
     IReadOnlyList<string> Platforms,
     DirectFabSourceManifest? SourceManifest,
-    DateTimeOffset PackagedAt);
+    DateTimeOffset PackagedAt,
+    LibraryPackageDerivation? Derivation = null);
 
 public sealed class LibraryPackageService
 {
@@ -64,6 +71,46 @@ public sealed class LibraryPackageService
         LibraryPackageStorageMode storageMode,
         IProgress<DirectFabDownloadProgress>? progress = null,
         CancellationToken cancellationToken = default)
+        => await PackageCoreAsync(
+                asset,
+                version,
+                download,
+                storageMode,
+                null,
+                null,
+                progress,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+    public static async Task<DirectFabDownloadResult> PackageDerivedAsync(
+        RemoteFabAsset asset,
+        RemoteFabProjectVersion version,
+        DirectFabDownloadResult download,
+        LibraryPackageStorageMode storageMode,
+        LibraryPackageContentKind contentKind,
+        LibraryPackageDerivation derivation,
+        IProgress<DirectFabDownloadProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+        => await PackageCoreAsync(
+                asset,
+                version,
+                download,
+                storageMode,
+                contentKind,
+                derivation,
+                progress,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+    private static async Task<DirectFabDownloadResult> PackageCoreAsync(
+        RemoteFabAsset asset,
+        RemoteFabProjectVersion version,
+        DirectFabDownloadResult download,
+        LibraryPackageStorageMode storageMode,
+        LibraryPackageContentKind? contentKindOverride,
+        LibraryPackageDerivation? derivation,
+        IProgress<DirectFabDownloadProgress>? progress,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(asset);
         ArgumentNullException.ThrowIfNull(version);
@@ -92,7 +139,7 @@ public sealed class LibraryPackageService
             .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
             .Take(128)
             .ToDictionary(group => group.Key, group => group.Count(), StringComparer.OrdinalIgnoreCase);
-        var contentKind = Classify(asset, version, files);
+        var contentKind = contentKindOverride ?? Classify(asset, version, files);
         string? archiveFile = null;
         long storedBytes = uncompressedBytes;
 
@@ -123,7 +170,7 @@ public sealed class LibraryPackageService
             }
 
             var manifest = new LibraryPackageManifest(
-                1,
+                derivation is null ? 1 : 2,
                 asset.AssetId,
                 asset.Title,
                 NormalizeSource(asset),
@@ -141,7 +188,8 @@ public sealed class LibraryPackageService
                 version.EngineVersions,
                 version.Platforms,
                 download.SourceManifest,
-                DateTimeOffset.UtcNow);
+                DateTimeOffset.UtcNow,
+                derivation);
             await WriteManifestAsync(root, manifest, cancellationToken).ConfigureAwait(false);
 
             if (IsZipStorageMode(storageMode))

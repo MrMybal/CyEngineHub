@@ -31,7 +31,7 @@ public sealed class HubExtensionExecutionService(IProcessRunner processRunner)
     private static readonly TimeSpan PlanLifetime = TimeSpan.FromMinutes(10);
     private static readonly HashSet<string> PortableExtensions = new(
         [
-            ".fbx", ".obj", ".gltf", ".glb",
+            ".fbx", ".obj", ".mtl", ".gltf", ".glb", ".bin",
             ".png", ".jpg", ".jpeg", ".tga", ".tif", ".tiff", ".exr", ".hdr",
             ".wav", ".ogg",
         ],
@@ -348,6 +348,7 @@ public sealed class HubExtensionExecutionService(IProcessRunner processRunner)
 
         if (File.Exists(input))
         {
+            CyEngineHub.Core.Assets.PortableAssetSelection.ValidateSingleFile(input);
             ClassifyFile(input);
         }
         else

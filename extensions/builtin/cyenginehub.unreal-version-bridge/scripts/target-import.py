@@ -10,6 +10,8 @@ imported = []
 errors = []
 for root, _, files in os.walk(config["exchangeRoot"]):
     for filename in files:
+        if os.path.splitext(filename)[1].lower() in {'.bin', '.mtl'}:
+            continue  # Companion data is consumed by the glTF/OBJ importer, not a standalone asset.
         source = os.path.join(root, filename)
         relative_dir = os.path.relpath(root, config["exchangeRoot"]).replace("\\", "/")
         destination = "/Game" if relative_dir == "." else "/Game/" + relative_dir

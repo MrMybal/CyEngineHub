@@ -42,7 +42,9 @@ public sealed record RemoteFabAsset(
     IReadOnlyList<string> Categories,
     IReadOnlyList<RemoteFabProjectVersion> ProjectVersions,
     IReadOnlyList<Uri>? ImageUris = null,
-    DateTimeOffset? AcquiredAt = null)
+    DateTimeOffset? AcquiredAt = null,
+    string? WebLibraryItemId = null,
+    bool WebCanDownload = false)
 {
     public IReadOnlyList<Uri> GalleryUris => ImageUris is { Count: > 0 }
         ? ImageUris
@@ -98,6 +100,8 @@ public interface IDirectFabSessionStore
 
 public interface IDirectFabClient
 {
+    Task<DirectFabDownloadEstimate?> EstimateDownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version,
+        CancellationToken cancellationToken = default) => Task.FromResult<DirectFabDownloadEstimate?>(null);
     Uri AuthorizationUri { get; }
 
     Task<DirectFabStatus> GetStatusAsync(CancellationToken cancellationToken = default);
@@ -128,6 +132,8 @@ public interface IDirectFabClient
         IProgress<DirectFabDownloadProgress>? progress = null,
         CancellationToken cancellationToken = default);
 }
+
+public sealed record DirectFabDownloadEstimate(long DownloadBytes, long UncompressedBytes, int FileCount);
 
 public sealed class DirectFabException : Exception
 {

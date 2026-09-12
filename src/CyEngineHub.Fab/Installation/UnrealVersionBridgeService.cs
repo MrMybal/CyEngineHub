@@ -13,22 +13,27 @@ internal sealed record UnrealVersionBridgeRequest(
     string StorageRoot,
     string Profile,
     bool KeepStaging,
-    bool ValidateOutput);
+    bool ValidateOutput,
+    string Mode = "native",
+    string? ProfileFile = null,
+    bool AllowLossyConversion = false,
+    bool AnalyzeOnly = false);
 
 internal sealed record UnrealVersionBridgeResult(
     string VariantDirectory,
     string ManifestPath,
     string ReportPath,
     int ImportedAssetCount,
-    int UnsupportedAssetCount);
+    int UnsupportedAssetCount,
+    bool AnalysisOnly = false);
 
-internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner)
+internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner, string? nativePluginRoot = null)
 {
     private const int MaximumFiles = 100_000;
     private const long MaximumBytes = 200L * 1024 * 1024 * 1024;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
     private static readonly HashSet<string> PortableExtensions = new(
-        [".fbx", ".obj", ".gltf", ".glb", ".png", ".jpg", ".jpeg", ".tga", ".tif", ".tiff", ".exr", ".hdr", ".wav", ".ogg"],
+        [".fbx", ".obj", ".mtl", ".gltf", ".glb", ".bin", ".png", ".jpg", ".jpeg", ".tga", ".tif", ".tiff", ".exr", ".hdr", ".wav", ".ogg"],
         StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> NativeExtensions = new(
         [".uasset", ".umap", ".uexp", ".ubulk", ".uptnl"],
@@ -69,14 +74,49 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner)
             var sourceProjectFile = await WriteProjectAsync(sourceProject, "CyVersionBridgeSource", cancellationToken).ConfigureAwait(false);
             var targetProjectFile = await WriteProjectAsync(targetProject, "CyVersionBridgeTarget", cancellationToken).ConfigureAwait(false);
             var sourceReport = Path.Combine(staging, "source-report.json");
-            if (inventory.Any(file => file.Extension.Equals(".uasset", StringComparison.OrdinalIgnoreCase)))
+            var planPath = Path.Combine(staging, "asset-conversion-plan.json");
+            var hasNative = inventory.Any(file => file.Extension.Equals(".uasset", StringComparison.OrdinalIgnoreCase) ||
+                file.Extension.Equals(".umap", StringComparison.OrdinalIgnoreCase));
+            if (hasNative)
             {
+                var profileFile = string.IsNullOrWhiteSpace(request.ProfileFile)
+                    ? Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(ResolveScript("source-inspect.py")))!, "profiles", "ue-5.6-to-5.5.json")
+                    : Path.GetFullPath(request.ProfileFile);
+                var profiles = UnrealAssetConversionProfiles.Load(profileFile);
+                await WriteJsonAsync(Path.Combine(staging, "profiles-snapshot.json"), profiles, cancellationToken).ConfigureAwait(false);
+                var inventoryReport = Path.Combine(staging, "asset-inventory.json");
+                var inspectConfig = Path.Combine(staging, "inspect-config.json");
+                await WriteJsonAsync(inspectConfig, new { reportPath = inventoryReport }, cancellationToken).ConfigureAwait(false);
+                progress?.Report(new(0.1, "Analyse des types, fonctionnalités et dépendances avant conversion…"));
+                await RunEditorAsync(request.SourceEngine, sourceProjectFile, ResolveScript("source-inspect.py"),
+                    inspectConfig, Path.Combine(staging, "inspect-editor.log"), progress, cancellationToken).ConfigureAwait(false);
+                ValidateReportErrors(inventoryReport);
+                using var inspected = JsonDocument.Parse(await File.ReadAllTextAsync(inventoryReport, cancellationToken).ConfigureAwait(false));
+                var assets = inspected.RootElement.GetProperty("assets").Deserialize<UnrealAssetConversionInventoryItem[]>(JsonOptions)
+                    ?? throw new InvalidOperationException("Inventaire natif invalide.");
+                var plan = UnrealAssetConversionProfiles.Analyze(profiles, assets,
+                    $"{request.SourceEngine.Version.Major}.{request.SourceEngine.Version.Minor}",
+                    $"{request.TargetEngine.Version.Major}.{request.TargetEngine.Version.Minor}", request.Mode, request.AllowLossyConversion);
+                await WriteJsonAsync(planPath, plan, cancellationToken).ConfigureAwait(false);
+                foreach (var decision in plan.Assets.Take(20))
+                    progress?.Report(new(0.15, $"{decision.AssetPath} · {decision.Status} · {decision.Reason}"));
+                if (request.AnalyzeOnly)
+                    return new(string.Empty, string.Empty, planPath, 0, plan.Assets.Count(a => !UnrealAssetConversionProfiles.IsExecutable(a)), true);
+                if (!plan.CanConvert)
+                    throw new InvalidOperationException($"Conversion bloquée par les profils : {string.Join(" ; ", plan.Assets.Where(a => !UnrealAssetConversionProfiles.IsExecutable(a)).Take(3).Select(a => a.AssetPath + " : " + a.Reason))} Rapport : {planPath}");
+                if (request.Mode == "native")
+                {
+                    await PrepareNativePluginAsync(sourceProjectFile, request.SourceEngine, cancellationToken).ConfigureAwait(false);
+                    await PrepareNativePluginAsync(targetProjectFile, request.TargetEngine, cancellationToken).ConfigureAwait(false);
+                }
                 var sourceConfig = Path.Combine(staging, "source-config.json");
                 await WriteJsonAsync(sourceConfig, new
                 {
                     exchangeRoot,
                     reportPath = sourceReport,
                     profile = request.Profile,
+                    planPath,
+                    operation = "export",
                 }, cancellationToken).ConfigureAwait(false);
                 progress?.Report(new(
                     0.2,
@@ -84,7 +124,7 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner)
                 await RunEditorAsync(
                         request.SourceEngine,
                         sourceProjectFile,
-                        ResolveScript("source-export.py"),
+                        ResolveScript(request.Mode == "native" ? "native-textures.py" : "source-export.py"),
                         sourceConfig,
                         Path.Combine(staging, "source-editor.log"),
                         progress,
@@ -93,9 +133,14 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner)
             }
             else
             {
+                if (request.Mode != "portable" || !request.AllowLossyConversion || request.AnalyzeOnly)
+                    throw new InvalidOperationException("Cette source ne contient pas d'assets Unreal natifs à analyser. L'import de fichiers sources exige le mode portable et l'accord explicite sur les pertes.");
                 await WriteJsonAsync(sourceReport, new { exported = Array.Empty<string>(), unsupported = Array.Empty<string>(), errors = Array.Empty<string>() }, cancellationToken)
                     .ConfigureAwait(false);
             }
+            ValidateReportErrors(sourceReport);
+            if (ReadStringArray(sourceReport, "unsupported").Length > 0)
+                throw new InvalidOperationException($"Le pack contient des assets non convertibles : aucune variante partielle publiée. Rapport : {sourceReport}");
             if (!Directory.EnumerateFiles(exchangeRoot, "*", SearchOption.AllDirectories).Any())
             {
                 throw new InvalidOperationException(
@@ -109,6 +154,7 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner)
                 exchangeRoot,
                 reportPath = targetReport,
                 validateOutput = request.ValidateOutput,
+                operation = "import",
             }, cancellationToken).ConfigureAwait(false);
             progress?.Report(new(
                 0.55,
@@ -116,16 +162,30 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner)
             await RunEditorAsync(
                     request.TargetEngine,
                     targetProjectFile,
-                    ResolveScript("target-import.py"),
+                    ResolveScript(request.Mode == "native" ? "native-textures.py" : "target-import.py"),
                     targetConfig,
                     Path.Combine(staging, "target-editor.log"),
                     progress,
                     cancellationToken)
                 .ConfigureAwait(false);
+            ValidateReportErrors(targetReport);
             var importedCount = ReadArrayCount(targetReport, "imported");
             if (importedCount == 0)
             {
                 throw new InvalidOperationException($"Le moteur cible n’a produit aucun asset. Diagnostic conservé dans {staging}.");
+            }
+
+            if (request.Mode == "native")
+            {
+                // Always reopen in a fresh target process, even when legacy validation is disabled.
+                var verifyReport = Path.Combine(staging, "native-reopen-report.json");
+                var verifyConfig = Path.Combine(staging, "native-reopen-config.json");
+                await WriteJsonAsync(verifyConfig, new { exchangeRoot, reportPath = verifyReport, operation = "verify" }, cancellationToken).ConfigureAwait(false);
+                await RunEditorAsync(request.TargetEngine, targetProjectFile, ResolveScript("native-textures.py"), verifyConfig,
+                    Path.Combine(staging, "native-reopen-editor.log"), progress, cancellationToken).ConfigureAwait(false);
+                ValidateReportErrors(verifyReport);
+                if (ReadArrayCount(verifyReport, "imported") != importedCount || ReadArrayCount(sourceReport, "exported") != importedCount)
+                    throw new InvalidOperationException("Le nombre de textures natives ne correspond pas après réouverture.");
             }
 
             var unsupported = ReadStringArray(sourceReport, "unsupported");
@@ -136,6 +196,13 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner)
                 .ConfigureAwait(false);
             var reportPath = Path.Combine(publishing, "conversion-report.json");
             await WriteCombinedReportAsync(sourceReport, targetReport, reportPath, cancellationToken).ConfigureAwait(false);
+            if (File.Exists(planPath))
+            {
+                await CopyFileAsync(planPath, Path.Combine(publishing, "asset-conversion-plan.json"), cancellationToken).ConfigureAwait(false);
+                await CopyFileAsync(Path.Combine(staging, "profiles-snapshot.json"), Path.Combine(publishing, "profiles-snapshot.json"), cancellationToken).ConfigureAwait(false);
+            }
+            if (request.Mode == "native")
+                await CopyFileAsync(Path.Combine(staging, "native-reopen-report.json"), Path.Combine(publishing, "native-reopen-report.json"), cancellationToken).ConfigureAwait(false);
             var manifest = new UnrealVersionBridgeVariantManifest(
                 1,
                 request.AssetId,
@@ -147,7 +214,8 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner)
                 unsupported.Length,
                 unsupported,
                 "Content",
-                DateTimeOffset.UtcNow);
+                DateTimeOffset.UtcNow,
+                request.Mode);
             await WriteJsonAsync(Path.Combine(publishing, "cyenginehub-derived-variant.json"), manifest, cancellationToken)
                 .ConfigureAwait(false);
             PublishVariant(publishing, variantDirectory);
@@ -169,6 +237,23 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner)
                 Directory.Delete(staging, recursive: true);
             }
         }
+    }
+
+    private async Task PrepareNativePluginAsync(string projectFile, UnrealEngineInstallation engine, CancellationToken cancellationToken)
+    {
+        var source = Path.Combine(nativePluginRoot ?? Path.Combine(AppContext.BaseDirectory, "Extensions", "cyenginehub.unreal-version-bridge", "native-binaries"),
+            $"UE_{engine.Version.Major}.{engine.Version.Minor}");
+        var descriptor = Path.Combine(source, "CyHubNativeBridge.uplugin");
+        var binaryRoot = Path.Combine(source, "Binaries", "Win64");
+        if (!OperatingSystem.IsWindows() || !File.Exists(descriptor) || !File.Exists(Path.Combine(binaryRoot, "UnrealEditor-CyHubNativeBridge.dll")) || !File.Exists(Path.Combine(binaryRoot, "UnrealEditor.modules")))
+            throw new InvalidOperationException($"Adaptateur natif compilé absent pour UE {engine.Version.Major}.{engine.Version.Minor}. Attendu : {descriptor}");
+        var destination = Path.Combine(Path.GetDirectoryName(projectFile)!, "Plugins", "CyHubNativeBridge");
+        Directory.CreateDirectory(destination);
+        await CopyFileAsync(descriptor, Path.Combine(destination, "CyHubNativeBridge.uplugin"), cancellationToken).ConfigureAwait(false);
+        await CopyTreeAsync(binaryRoot, Path.Combine(destination, "Binaries", "Win64"), cancellationToken).ConfigureAwait(false);
+        var project = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(projectFile, cancellationToken).ConfigureAwait(false))!;
+        project["Plugins"]!.AsArray().Add(new System.Text.Json.Nodes.JsonObject { ["Name"] = "CyHubNativeBridge", ["Enabled"] = true });
+        await File.WriteAllTextAsync(projectFile, project.ToJsonString(JsonOptions), cancellationToken).ConfigureAwait(false);
     }
 
     private async Task RunEditorAsync(
@@ -194,7 +279,8 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner)
                         "-nop4",
                         "-nosplash",
                         "-NullRHI",
-                        "-NoSound",
+                        // SoundWave import needs the audio decoder factories, even without playback.
+                        "-AllowCommandletAudio",
                         $"-abslog={logFile}",
                     ],
                     EnvironmentVariables = new Dictionary<string, string?>
@@ -209,6 +295,9 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner)
             .ConfigureAwait(false);
         if (!result.Succeeded)
         {
+            using var config = JsonDocument.Parse(await File.ReadAllTextAsync(configFile, cancellationToken).ConfigureAwait(false));
+            if (config.RootElement.TryGetProperty("reportPath", out var report) && report.ValueKind == JsonValueKind.String && File.Exists(report.GetString()))
+                ValidateReportErrors(report.GetString()!);
             throw new InvalidOperationException(
                 $"Unreal {engine.Version.Major}.{engine.Version.Minor} a interrompu la conversion (code {result.ExitCode}). Consultez {logFile}.");
         }
@@ -296,6 +385,16 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner)
 
     private static async Task WriteJsonAsync<T>(string path, T value, CancellationToken cancellationToken) =>
         await File.WriteAllTextAsync(path, JsonSerializer.Serialize(value, JsonOptions), cancellationToken).ConfigureAwait(false);
+
+    private static void ValidateReportErrors(string path)
+    {
+        if (!File.Exists(path)) throw new InvalidOperationException($"Rapport de conversion absent : {path}");
+        using var document = JsonDocument.Parse(File.ReadAllText(path));
+        if (!document.RootElement.TryGetProperty("errors", out var errors) || errors.ValueKind != JsonValueKind.Array)
+            throw new InvalidOperationException($"Rapport de conversion invalide : {path}");
+        if (errors.GetArrayLength() > 0)
+            throw new InvalidOperationException($"Conversion arrêtée avant installation : {string.Join(" · ", errors.EnumerateArray().Take(5).Select(item => item.ToString()))}. Rapport : {path}");
+    }
 
     private static string[] ReadStringArray(string path, string property)
     {

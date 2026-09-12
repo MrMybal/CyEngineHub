@@ -44,7 +44,7 @@ public sealed class FabProjectContentImportService : IFabProjectContentImportSer
         [
             ".uasset", ".umap", ".uexp", ".ubulk", ".uptnl",
             ".png", ".jpg", ".jpeg", ".tga", ".bmp", ".exr", ".hdr", ".dds",
-            ".tif", ".tiff", ".fbx", ".obj", ".gltf", ".glb", ".usd", ".usda",
+            ".tif", ".tiff", ".fbx", ".obj", ".mtl", ".gltf", ".glb", ".bin", ".usd", ".usda",
             ".usdc", ".abc", ".wav", ".ogg", ".mp3", ".flac", ".json", ".csv",
             ".txt", ".md",
         ],

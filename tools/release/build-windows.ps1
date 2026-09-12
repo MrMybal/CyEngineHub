@@ -30,10 +30,12 @@ try {
     if (-not $SkipTests) { Invoke-DotNet @('test', 'CyEngineHub.sln', '-c', 'Release', '--nologo') }
     $publishArguments = @('-c', 'Release', '-r', 'win-x64', '--self-contained', 'true',
         '-p:RuntimeFrameworkVersion=8.0.30',
+        "-p:PathMap=$repoRoot=/_/CyEngineHub", '-p:ContinuousIntegrationBuild=true',
         '-p:PublishSingleFile=false', '-p:PublishTrimmed=false', '-p:DebugType=None',
         '-p:DebugSymbols=false', '-p:SkipBuiltInExtensionCopy=true', '--nologo')
     Invoke-DotNet (@('publish', 'src/CyEngineHub.Desktop/CyEngineHub.Desktop.csproj') + $publishArguments + @('-o', $appStage))
     Invoke-DotNet (@('publish', 'src/CyEngineHub.Updater/CyEngineHub.Updater.csproj') + $publishArguments + @('-o', (Join-Path $appStage 'Updater')))
+    Invoke-DotNet (@('publish', 'src/CyEngineHub.Mcp/CyEngineHub.Mcp.csproj') + $publishArguments + @('-o', (Join-Path $appStage 'Mcp')))
     Invoke-DotNet (@('publish', 'src/CyEngineHub.AssetBridge.Tool/CyEngineHub.AssetBridge.Tool.csproj') + $publishArguments + @('-o', (Join-Path $appStage 'Extensions\cyenginehub.asset-bridge\tools')))
 
     # Some native NuGet packages supply symbols even when DebugSymbols=false.
@@ -46,7 +48,7 @@ try {
     }
     # Executable project references may contribute orphan hosts at the app root;
     # the real tools live in their own self-contained folders above.
-    foreach ($toolName in @('CyEngineHub.Updater', 'CyEngineHub.AssetBridge.Tool')) {
+    foreach ($toolName in @('CyEngineHub.Updater', 'CyEngineHub.AssetBridge.Tool', 'CyEngineHub.Mcp')) {
         foreach ($extension in @('.exe', '.deps.json', '.runtimeconfig.json')) {
             $orphan = Join-Path $appStage ($toolName + $extension)
             if (Test-Path -LiteralPath $orphan -PathType Leaf) { Remove-Item -LiteralPath $orphan }
@@ -56,7 +58,7 @@ try {
     $extensionsRoot = Join-Path $repoRoot 'extensions\builtin'
     foreach ($file in Get-ChildItem -LiteralPath $extensionsRoot -Recurse -File) {
         # Copy extension manifests/scripts, never local bytecode or test outputs.
-        if ($file.Extension -notin @('.json', '.py')) { continue }
+        if ($file.Extension -notin @('.json', '.py', '.uplugin', '.cs', '.cpp', '.h', '.hpp', '.inl')) { continue }
         $relative = [IO.Path]::GetRelativePath($extensionsRoot, $file.FullName)
         $destination = Join-Path (Join-Path $appStage 'Extensions') $relative
         New-Item -ItemType Directory -Path (Split-Path $destination) -Force | Out-Null
@@ -106,6 +108,7 @@ try {
     }
 
     $required = @('CyEngineHub.Desktop.exe', 'coreclr.dll', 'Updater\CyEngineHub.Updater.exe',
+        'Mcp\CyEngineHub.Mcp.exe', 'Mcp\coreclr.dll',
         'Updater\coreclr.dll', 'Extensions\cyenginehub.asset-bridge\tools\CyEngineHub.AssetBridge.Tool.exe',
         'Extensions\cyenginehub.unreal-version-bridge\scripts\source-export.py',
         'Extensions\cyenginehub.unreal-relocated-install\scripts\relocate-pack.py')
@@ -117,6 +120,9 @@ try {
     })
     if ($unexpected.Count -gt 0) { throw 'Private/generated files unexpectedly present in the package.' }
 
+    & python (Join-Path $repoRoot 'scripts/check-release-privacy.py') --directory $appStage
+    if ($LASTEXITCODE -ne 0) { throw 'Release privacy check failed before packaging.' }
+
     & $InnoCompiler '/Qp' "/DAppVersion=$version" "/DAppSource=$appStage" "/DReleaseOutput=$assets" (Join-Path $PSScriptRoot 'CyEngineHub.iss')
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
 
@@ -125,6 +131,8 @@ try {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $archive = Join-Path $assets "CyEngineHub-$version-win-x64.zip"
     [IO.Compression.ZipFile]::CreateFromDirectory($appStage, $archive, [IO.Compression.CompressionLevel]::Optimal, $false)
+    & python (Join-Path $repoRoot 'scripts/check-release-privacy.py') --zip $archive
+    if ($LASTEXITCODE -ne 0) { throw 'Release archive privacy check failed.' }
     $hashes = @(Get-ChildItem -LiteralPath $assets -File | Sort-Object Name | ForEach-Object {
         "$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)"
     })

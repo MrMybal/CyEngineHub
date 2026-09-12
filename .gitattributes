@@ -1,0 +1,2 @@
+# Keep publication diffs independent of Windows checkout line endings.
+* text=auto

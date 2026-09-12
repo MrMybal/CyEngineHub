@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "cyenginehub.marketplace-megascans-fab",
+  "displayName": "Megascans via Fab",
+  "version": "0.1.0",
+  "publisher": "CyEngineHub · connecteur non officiel",
+  "description": "Accès au catalogue Megascans sur Fab dans le navigateur interne, sans connexion Quixel historique. Fab contrôle les droits de téléchargement avec votre session web. Fiches natives des fichiers téléchargés, dossier configurable et session conservée. Pas de synchronisation automatique de tout le catalogue possédé, ni d’achat automatique.",
+  "kind": "Marketplace",
+  "executionKind": "WebLink",
+  "capabilities": "OwnedInventory",
+  "supportedEngines": ["Unreal", "Unity", "Custom"],
+  "website": "https://www.fab.com/sellers/Quixel%20Megascans",
+  "marketplace": { "inventoryUrl": "https://www.fab.com/sellers/Quixel%20Megascans" }
+}

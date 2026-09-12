@@ -175,6 +175,17 @@ public sealed class DirectFabApiClient : IDirectFabClient, IDisposable
                 .ToArray());
     }
 
+    public async Task<DirectFabDownloadEstimate?> EstimateDownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await EnsureSessionAsync(cancellationToken).ConfigureAwait(false);
+        var distribution = await GetDistributionAsync(asset, version, session, cancellationToken).ConfigureAwait(false);
+        var bytes = await ReadBoundedBytesAsync(distribution.ManifestUri, MaximumManifestBytes, cancellationToken).ConfigureAwait(false);
+        var manifest = EpicManifestParser.Parse(bytes, distribution.BaseUri);
+        if (manifest.Files.Count == 0 || manifest.Chunks.Count == 0) throw new DirectFabException("Manifest vide : taille inconnue.");
+        return new(manifest.DownloadSize, manifest.Files.Sum(file => file.Size), manifest.Files.Count);
+    }
+
     public async Task<DirectFabDownloadResult> DownloadAsync(
         RemoteFabAsset asset,
         string libraryRoot,
@@ -242,15 +253,20 @@ public sealed class DirectFabApiClient : IDirectFabClient, IDisposable
         {
             cancellationToken.ThrowIfCancellationRequested();
             var cachePath = Path.Combine(chunkCache, chunk.ChunkId + ".chunk");
-            if (!File.Exists(cachePath))
+            if (!File.Exists(cachePath) || (chunk.DownloadSize > 0 && new FileInfo(cachePath).Length != chunk.DownloadSize))
             {
                 var bytes = await ReadBoundedBytesAsync(
                         chunk.DownloadUri,
                         MaximumChunkBytes,
-                        cancellationToken)
+                        cancellationToken,
+                        received => progress?.Report(new DirectFabDownloadProgress(
+                            Math.Clamp((double)(completedBytes + received) / totalBytes * 0.72, 0, 0.72),
+                            "Téléchargement des chunks Fab", completedBytes + received, totalBytes)))
                     .ConfigureAwait(false);
-                await File.WriteAllBytesAsync(cachePath, bytes.ToArray(), cancellationToken)
+                var partialChunk = cachePath + ".partial";
+                await File.WriteAllBytesAsync(partialChunk, bytes.ToArray(), cancellationToken)
                     .ConfigureAwait(false);
+                File.Move(partialChunk, cachePath, overwrite: true);
             }
             completedBytes = checked(completedBytes + Math.Max(0, new FileInfo(cachePath).Length));
             progress?.Report(new DirectFabDownloadProgress(
@@ -534,7 +550,8 @@ public sealed class DirectFabApiClient : IDirectFabClient, IDisposable
     private async Task<ReadOnlyMemory<byte>> ReadBoundedBytesAsync(
         Uri uri,
         int maximumBytes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<long>? onBytes = null)
     {
         if (!uri.IsAbsoluteUri || uri.Scheme != Uri.UriSchemeHttps)
         {
@@ -560,6 +577,8 @@ public sealed class DirectFabApiClient : IDirectFabClient, IDisposable
             .ConfigureAwait(false);
         using var destination = new MemoryStream();
         var buffer = new byte[128 * 1024];
+        var lastReport = System.Diagnostics.Stopwatch.GetTimestamp();
+        onBytes?.Invoke(0);
         while (true)
         {
             var read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
@@ -570,7 +589,13 @@ public sealed class DirectFabApiClient : IDirectFabClient, IDisposable
             }
             await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken)
                 .ConfigureAwait(false);
+            if (System.Diagnostics.Stopwatch.GetElapsedTime(lastReport).TotalMilliseconds >= 250)
+            {
+                onBytes?.Invoke(destination.Length);
+                lastReport = System.Diagnostics.Stopwatch.GetTimestamp();
+            }
         }
+        onBytes?.Invoke(destination.Length);
         return destination.ToArray();
     }
 

@@ -273,6 +273,17 @@ public sealed partial class QuixelMegascansApiClient : IQuixelMegascansClient
                     FileOptions.Asynchronous | FileOptions.SequentialScan);
                 var buffer = new byte[1024 * 128];
                 long fileBytes = 0;
+                var lastReport = System.Diagnostics.Stopwatch.GetTimestamp();
+                void ReportTransfer()
+                {
+                    var ratio = announced > 0 ? Math.Clamp((double)fileBytes / announced.Value, 0, 1) : 0;
+                    var fileStatus = announced > 0 ? $" · {ratio * 100:N1} % du fichier" : " · taille du fichier inconnue";
+                    // Earlier URLs have no known sizes: never extrapolate a total from file count.
+                    long? knownTotal = index == urls.Length - 1 && announced > 0 ? totalDownloaded + announced.Value : null;
+                    progress?.Report(new DirectFabDownloadProgress((index + ratio) / urls.Length,
+                        $"Fichier {index + 1:N0}/{urls.Length:N0}{fileStatus}", totalDownloaded + fileBytes, knownTotal));
+                }
+                ReportTransfer();
                 while (true)
                 {
                     var read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
@@ -283,7 +294,13 @@ public sealed partial class QuixelMegascansApiClient : IQuixelMegascansClient
                         throw new QuixelException("Un fichier Megascans dépasse la limite de sécurité de 16 Gio.");
                     }
                     await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                    if (System.Diagnostics.Stopwatch.GetElapsedTime(lastReport).TotalMilliseconds >= 250)
+                    {
+                        ReportTransfer();
+                        lastReport = System.Diagnostics.Stopwatch.GetTimestamp();
+                    }
                 }
+                ReportTransfer();
                 totalDownloaded += fileBytes;
                 fileCount++;
             }

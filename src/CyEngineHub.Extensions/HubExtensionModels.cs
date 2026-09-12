@@ -8,6 +8,7 @@ public enum HubExtensionKind
     Tool,
     AssetProcessor,
     EngineIntegration,
+    Marketplace,
 }
 
 public enum HubExtensionExecutionKind
@@ -25,6 +26,9 @@ public enum HubExtensionCapability
     AssetConvert = 1 << 2,
     AssetDowngrade = 1 << 3,
     ProjectTool = 1 << 4,
+    AssetImport = 1 << 5,
+    DependencyValidation = 1 << 6,
+    OwnedInventory = 1 << 7,
 }
 
 public enum HubExtensionOrigin
@@ -100,6 +104,14 @@ public sealed class HubExtensionManifest
     public bool WritesToOutput { get; init; }
 
     public IReadOnlyList<HubUiContribution> UiContributions { get; init; } = [];
+
+    public HubMarketplaceDescriptor? Marketplace { get; init; }
+}
+
+/// <summary>Browser-based access to an account's owned inventory, not a store catalogue.</summary>
+public sealed class HubMarketplaceDescriptor
+{
+    public string InventoryUrl { get; init; } = string.Empty;
 }
 
 public sealed record HubExtensionSnapshot(

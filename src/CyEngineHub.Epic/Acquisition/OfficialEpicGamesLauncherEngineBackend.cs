@@ -223,7 +223,10 @@ public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBa
                 var bytes = await ReadBoundedBytesAsync(
                         chunk.DownloadUri,
                         MaximumChunkBytes,
-                        cancellationToken)
+                        cancellationToken,
+                        received => progress?.Report(new EpicBinaryEngineDownloadProgress(
+                            Math.Clamp((double)(completedBytes + received) / totalBytes * 0.74, 0, 0.74),
+                            "Téléchargement des chunks Unreal", completedBytes + received, totalBytes)))
                     .ConfigureAwait(false);
                 await File.WriteAllBytesAsync(cachePath, bytes.ToArray(), cancellationToken)
                     .ConfigureAwait(false);
@@ -384,7 +387,10 @@ public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBa
                 var bytes = await ReadBoundedBytesAsync(
                         chunk.DownloadUri,
                         MaximumChunkBytes,
-                        cancellationToken)
+                        cancellationToken,
+                        received => progress?.Report(new EpicBinaryEngineDownloadProgress(
+                            Math.Clamp((double)(completedBytes + received) / totalBytes * 0.68, 0, 0.68),
+                            "Téléchargement des composants Unreal", completedBytes + received, totalBytes)))
                     .ConfigureAwait(false);
                 await File.WriteAllBytesAsync(cachePath, bytes.ToArray(), cancellationToken)
                     .ConfigureAwait(false);
@@ -591,7 +597,8 @@ public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBa
     private async Task<ReadOnlyMemory<byte>> ReadBoundedBytesAsync(
         Uri uri,
         int maximumBytes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<long>? onBytes = null)
     {
         if (!uri.IsAbsoluteUri || uri.Scheme != Uri.UriSchemeHttps)
         {
@@ -614,6 +621,8 @@ public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBa
             .ConfigureAwait(false);
         using var output = new MemoryStream(declared is > 0 ? checked((int)declared.Value) : 0);
         var buffer = new byte[128 * 1024];
+        var lastReport = System.Diagnostics.Stopwatch.GetTimestamp();
+        onBytes?.Invoke(0);
         while (true)
         {
             var read = await input.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
@@ -623,7 +632,13 @@ public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBa
                 throw new InvalidOperationException("Un fichier Epic dépasse la taille de sécurité autorisée.");
             }
             await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            if (System.Diagnostics.Stopwatch.GetElapsedTime(lastReport).TotalMilliseconds >= 250)
+            {
+                onBytes?.Invoke(output.Length);
+                lastReport = System.Diagnostics.Stopwatch.GetTimestamp();
+            }
         }
+        onBytes?.Invoke(output.Length);
         return output.ToArray();
     }
 

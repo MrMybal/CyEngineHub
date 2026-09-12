@@ -108,13 +108,13 @@
               <Border Background="#241E12" BorderBrush="#6F5420" BorderThickness="1" CornerRadius="8" Padding="14">
                 <StackPanel Spacing="5">
                   <TextBlock Text="CONVERSION CONTRÔLÉE — PAS DE PATCH AVEUGLE DES .UASSET" FontSize="10" FontWeight="Bold" Foreground="#F0B95F" />
-                  <TextBlock Text="Unreal refuse volontairement de charger un package plus récent dans une ancienne version. Version Bridge utilise donc deux projets temporaires isolés : export dans le moteur source, reconstruction et sauvegarde native dans le moteur cible." FontSize="10" Foreground="#D7C39C" TextWrapping="Wrap" />
+                  <TextBlock Text="Chaque asset est analysé dans une copie temporaire. Natif expérimental : Texture2D BGRA8/G8, pixels bruts et propriétés contrôlées, sans import d'image. Les données GPU sont régénérées par le moteur cible. Réouverture et comparaison obligatoires avant installation. Les autres types natifs restent bloqués." FontSize="10" Foreground="#D7C39C" TextWrapping="Wrap" />
                 </StackPanel>
               </Border>
               <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
-                <Border Classes="card"><StackPanel Spacing="5"><TextBlock Text="1 · SOURCE" FontSize="10" FontWeight="Bold" Foreground="#70A8FA" /><TextBlock Text="Le moteur récent charge le pack et exporte les types compatibles vers un échange neutre." FontSize="9" Foreground="#AAB8C6" TextWrapping="Wrap" /></StackPanel></Border>
+                <Border Classes="card"><StackPanel Spacing="5"><TextBlock Text="1 · ANALYSE" FontSize="10" FontWeight="Bold" Foreground="#70A8FA" /><TextBlock Text="Inventaire des types, fonctionnalités et dépendances. Rapport par asset avant tout export." FontSize="9" Foreground="#AAB8C6" TextWrapping="Wrap" /></StackPanel></Border>
                 <Border Grid.Column="1" Classes="card"><StackPanel Spacing="5"><TextBlock Text="2 · CIBLE" FontSize="10" FontWeight="Bold" Foreground="#70A8FA" /><TextBlock Text="La version du projet reconstruit, recharge et sauvegarde ses propres packages natifs." FontSize="9" Foreground="#AAB8C6" TextWrapping="Wrap" /></StackPanel></Border>
-                <Border Grid.Column="2" Classes="card"><StackPanel Spacing="5"><TextBlock Text="3 · VARIANTE" FontSize="10" FontWeight="Bold" Foreground="#70A8FA" /><TextBlock Text="CyEngineHub publie une fausse variante UE cible avec manifeste et rapport, puis peut l’installer." FontSize="9" Foreground="#AAB8C6" TextWrapping="Wrap" /></StackPanel></Border>
+                <Border Grid.Column="2" Classes="card"><StackPanel Spacing="5"><TextBlock Text="3 · VARIANTE" FontSize="10" FontWeight="Bold" Foreground="#70A8FA" /><TextBlock Text="Publication après contrôles, avec rapport et copie des profils utilisés. Aucun pack partiel si un type n'est pas pris en charge." FontSize="9" Foreground="#AAB8C6" TextWrapping="Wrap" /></StackPanel></Border>
               </Grid>
               <Border Background="#0D141C" BorderBrush="#202C39" BorderThickness="1" CornerRadius="8" Padding="14">
                 <StackPanel Spacing="11">
@@ -125,20 +125,26 @@
                   </StackPanel>
                   <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                     <StackPanel Spacing="4">
-                      <TextBlock Text="Profil par défaut" FontWeight="SemiBold" />
+                      <TextBlock Text="Ancien préréglage d'export" FontWeight="SemiBold" />
                       <ComboBox ItemsSource="{Binding UnrealVersionBridgeProfiles}" SelectedItem="{Binding UnrealVersionBridgeProfile}" />
-                      <TextBlock Text="safe : statiques, textures et sons · extended : ajoute skeletal, animations et tables." FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
+                      <TextBlock Text="Les profils par type ont priorité. Les exports squelettiques et animations non validés restent bloqués, même en extended." FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" Spacing="8">
                       <ToggleSwitch IsChecked="{Binding UnrealVersionBridgeValidateOutput}" OnContent="Validation cible activée" OffContent="Validation cible désactivée" />
                       <ToggleSwitch IsChecked="{Binding UnrealVersionBridgeKeepStaging}" OnContent="Conserver les projets temporaires" OffContent="Nettoyer après réussite" />
                     </StackPanel>
                   </Grid>
-                  <Button Classes="accent" Content="Enregistrer les paramètres" Command="{Binding SaveUnrealVersionBridgeSettingsCommand}" HorizontalAlignment="Left" />
+                  <TextBlock Text="Catalogue de profils personnalisé (JSON, facultatif)" FontWeight="SemiBold" />
+                  <TextBox Classes="path" Text="{Binding UnrealVersionBridgeAssetProfileFile}" PlaceholderText="Vide : catalogue intégré UE 5.6 → 5.5" />
+                  <TextBlock Text="Éditable en JSON. Un catalogue ne peut pas activer un adaptateur absent du code. Les options du script permettent de choisir natif/portable et Analyser seulement." FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" />
+                  <Button Classes="accent" Content="Enregistrer / recharger les profils" Command="{Binding SaveUnrealVersionBridgeSettingsCommand}" HorizontalAlignment="Left" />
+                  <Expander Header="Profils par type : adaptations et contrôles prévus">
+                    <TextBlock Text="{Binding UnrealVersionBridgeAssetProfilesSummary}" FontSize="11" TextWrapping="Wrap" Margin="0,10,0,0" />
+                  </Expander>
                 </StackPanel>
               </Border>
               <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                <Border Classes="card"><StackPanel Spacing="5"><TextBlock Text="CONVERSION PRÉVUE" FontSize="10" FontWeight="Bold" Foreground="#65CCA9" /><TextBlock Text="Static Mesh · Texture2D · SoundWave · FBX/OBJ/glTF RAW" FontSize="10" TextWrapping="Wrap" /><TextBlock Text="Profil étendu : Skeletal Mesh · AnimSequence · DataTable, selon les exporteurs disponibles dans les deux versions." FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" /></StackPanel></Border>
+                <Border Classes="card"><StackPanel Spacing="5"><TextBlock Text="PORTABLE EXPÉRIMENTAL" FontSize="10" FontWeight="Bold" Foreground="#65CCA9" /><TextBlock Text="Static Mesh · Texture2D · SoundWave" FontSize="10" TextWrapping="Wrap" /><TextBlock Text="Accord explicite sur les pertes requis. Nanite, LOD multiples, virtual texturing et dépendances projet/plugin non gérés sont bloquants." FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" /></StackPanel></Border>
                 <Border Grid.Column="1" Classes="card"><StackPanel Spacing="5"><TextBlock Text="RAPPORT OBLIGATOIRE" FontSize="10" FontWeight="Bold" Foreground="#E6A94B" /><TextBlock Text="Blueprints · graphes de matériaux · Niagara · Control Rig · niveaux et types de plugins spécifiques ne sont jamais déclarés convertis sans reconstruction dédiée." FontSize="9" Foreground="#B9A77E" TextWrapping="Wrap" /></StackPanel></Border>
               </Grid>
               <TextBlock Text="Pour l’utiliser : ouvrez un produit Fab/Megascans, choisissez un projet Unreal plus ancien puis sélectionnez le script « Unreal · Convertir puis installer ». Ses options peuvent surcharger ces valeurs pour ce projet." FontSize="10" Foreground="#8CC2FF" TextWrapping="Wrap" />

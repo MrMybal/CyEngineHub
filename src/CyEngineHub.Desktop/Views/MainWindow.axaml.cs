@@ -23,6 +23,7 @@ public sealed partial class MainWindow : Window
     private MainWindowViewModel? _viewModel;
     private CancellationTokenSource? _fabAuthorizationCaptureCancellation;
     private FabAuthorizationWindow? _fabAuthorizationWindow;
+    private readonly Dictionary<string, MarketplaceBrowserWindow> _marketplaceWindows = new(StringComparer.OrdinalIgnoreCase);
     private ScrollViewer? _remoteFabScrollViewer;
 
     public MainWindow()
@@ -42,6 +43,11 @@ public sealed partial class MainWindow : Window
             _viewModel.ExtensionWindowRequested -= OnExtensionWindowRequested;
             _viewModel.FabAuthorizationCaptureRequested -= OnFabAuthorizationCaptureRequested;
             _viewModel.FabWebAuthorizationRequested -= OnFabWebAuthorizationRequested;
+            _viewModel.MarketplaceBrowserRequested -= OnMarketplaceBrowserRequested;
+            _viewModel.MarketplaceImportRequested -= OnMarketplaceImportRequested;
+            _viewModel.MarketplaceLibraryActivated -= OnMarketplaceLibraryActivated;
+            foreach (var browser in _marketplaceWindows.Values.ToArray()) browser.ForceClose();
+            _marketplaceWindows.Clear();
             _fabAuthorizationWindow?.Close(new FabWebAuthorizationResult());
             _viewModel.RawLogScrollRequested -= OnRawLogScrollRequested;
         }
@@ -52,8 +58,51 @@ public sealed partial class MainWindow : Window
             _viewModel.ExtensionWindowRequested += OnExtensionWindowRequested;
             _viewModel.FabAuthorizationCaptureRequested += OnFabAuthorizationCaptureRequested;
             _viewModel.FabWebAuthorizationRequested += OnFabWebAuthorizationRequested;
+            _viewModel.MarketplaceBrowserRequested += OnMarketplaceBrowserRequested;
+            _viewModel.MarketplaceImportRequested += OnMarketplaceImportRequested;
+            _viewModel.MarketplaceLibraryActivated += OnMarketplaceLibraryActivated;
             _viewModel.RawLogScrollRequested += OnRawLogScrollRequested;
         }
+    }
+
+    private void OnMarketplaceBrowserRequested(object? sender, MarketplaceBrowserRequestEventArgs request)
+    {
+        if (_marketplaceWindows.TryGetValue(request.Id, out var existing))
+        {
+            existing.Show();
+            if (existing.WindowState == WindowState.Minimized) existing.WindowState = WindowState.Normal;
+            existing.Activate();
+            return;
+        }
+        var window = new MarketplaceBrowserWindow(request);
+        _marketplaceWindows.Add(request.Id, window);
+        window.Closed += (_, _) => _marketplaceWindows.Remove(request.Id);
+        window.Show(this);
+    }
+
+    private void OnMarketplaceLibraryActivated(object? sender, EventArgs args)
+    {
+        // Owned browser windows otherwise remain in front of their native library owner.
+        // Minimize instead of closing: ongoing downloads and the WebView session are kept.
+        foreach (var browser in _marketplaceWindows.Values) browser.WindowState = WindowState.Minimized;
+        Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+        Activate();
+    }
+
+    private async void OnMarketplaceImportRequested(object? sender, MarketplaceImportRequestEventArgs args)
+    {
+        try
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Ajouter des fichiers téléchargés · originaux conservés sur place",
+                AllowMultiple = true,
+                FileTypeFilter = [new FilePickerFileType("Archives et packages") { Patterns = ["*.zip", "*.7z", "*.rar", "*.unitypackage"] }, FilePickerFileTypes.All]
+            });
+            args.Completion.TrySetResult(files.Select(item => item.TryGetLocalPath()).OfType<string>().ToArray());
+        }
+        catch (Exception exception) { args.Completion.TrySetException(exception); }
     }
 
     private void OnClosed(object? sender, EventArgs args)
@@ -119,6 +168,17 @@ public sealed partial class MainWindow : Window
                 list.ScrollIntoView(list.ItemCount - 1);
             }
         });
+    }
+
+    private async void BrowseDerivedSourceFolder(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
+    {
+        if (_viewModel is null) return;
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Choisir le dossier déjà préparé à enregistrer comme dérivé",
+            AllowMultiple = false,
+        });
+        if (folders.Count > 0) _viewModel.DerivedSourceFolder = folders[0].Path.LocalPath;
     }
 
     private void OnFabAuthorizationCaptureRequested(object? sender, EventArgs args)

@@ -16,6 +16,8 @@ jobs:
           persist-credentials: false
       - name: Check local files, paths and commit identities
         run: python3 scripts/check-repository-privacy.py
+      - name: Test privacy guards with synthetic fixtures
+        run: python3 scripts/test_privacy.py
       - name: Scan history for credentials
         shell: bash
         run: |

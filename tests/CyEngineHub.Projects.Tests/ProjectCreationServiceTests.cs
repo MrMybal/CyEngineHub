@@ -12,6 +12,40 @@ public sealed class ProjectCreationServiceTests : IDisposable
 
     public ProjectCreationServiceTests() => Directory.CreateDirectory(_root);
 
+    public static IEnumerable<object[]> UnrealProfileCases()
+    {
+        foreach (var profile in new ProjectCreationService().ConfigurationProfiles.Where(item => item.Engine == EngineFamily.Unreal))
+        {
+            yield return new object[] { "unreal-blueprint", profile.Id };
+            yield return new object[] { "unreal-cpp", profile.Id };
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(UnrealProfileCases))]
+    public async Task EveryUnrealProfileWritesItsSettingsAndPluginOverrides(string presetId, string profileId)
+    {
+        var service = new ProjectCreationService();
+        var profile = service.ConfigurationProfiles.Single(item => item.Id == profileId);
+        var result = await service.CreateAsync(new ProjectCreationRequest(
+            service.Presets.Single(item => item.Id == presetId), "QaProfile", _root, "5.6", [], profile));
+        using var descriptor = JsonDocument.Parse(await File.ReadAllTextAsync(result.ProjectMarker));
+        Assert.Equal("5.6", descriptor.RootElement.GetProperty("EngineAssociation").GetString());
+        if (profile.DisableEnginePluginsByDefault)
+            Assert.True(descriptor.RootElement.GetProperty("DisableEnginePluginsByDefault").GetBoolean());
+        var plugins = descriptor.RootElement.GetProperty("Plugins").EnumerateArray()
+            .ToDictionary(item => item.GetProperty("Name").GetString()!, item => item.GetProperty("Enabled").GetBoolean(), StringComparer.OrdinalIgnoreCase);
+        foreach (var plugin in profile.EnabledPlugins) Assert.True(plugins[plugin]);
+        foreach (var plugin in profile.DisabledPlugins) Assert.False(plugins[plugin]);
+        if (profile.EngineSettings.Count > 0)
+        {
+            var config = await File.ReadAllTextAsync(Path.Combine(result.ProjectRoot, "Config", "DefaultEngine.ini"));
+            foreach (var setting in profile.EngineSettings) Assert.Contains(setting.Key + "=" + setting.Value, config, StringComparison.Ordinal);
+        }
+        Assert.Equal(presetId == "unreal-cpp", File.Exists(Path.Combine(result.ProjectRoot, "Source", "QaProfile", "QaProfile.Build.cs")));
+        Assert.True(File.Exists(result.ReceiptPath));
+    }
+
     [Fact]
     public async Task CreatesUnrealCppLegacyProfileWithDeclaredPlugins()
     {

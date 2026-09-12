@@ -8,6 +8,47 @@ namespace CyEngineHub.Extensions.Tests;
 
 public sealed class HubExtensionServicesTests
 {
+    [Theory]
+    [InlineData("cyenginehub.marketplace-cosmos")]
+    [InlineData("cyenginehub.marketplace-megascans-fab")]
+    [InlineData("cyenginehub.unreal-relocated-install")]
+    [InlineData("cyenginehub.unreal-version-bridge")]
+    public async Task BuiltInWebExtensionsHaveValidManifests(string id)
+    {
+        var root = Path.Combine(AppContext.BaseDirectory, "BuiltInManifests", id);
+        var manifest = await new HubExtensionManifestParser().ParseAsync(root);
+        Assert.Equal(id, manifest.Id);
+        Assert.Equal(HubExtensionExecutionKind.WebLink, manifest.ExecutionKind);
+        if (manifest.Kind == HubExtensionKind.Marketplace)
+        {
+            Assert.Equal(id == "cyenginehub.marketplace-megascans-fab"
+                ? "https://www.fab.com/sellers/Quixel%20Megascans"
+                : "https://cosmos.leartesstudios.com/inventory", manifest.Marketplace!.InventoryUrl);
+            Assert.True(manifest.Capabilities.HasFlag(HubExtensionCapability.OwnedInventory));
+        }
+    }
+
+    [Theory]
+    [InlineData("http://example.com/inventory")]
+    [InlineData("https://another.example/inventory")]
+    [InlineData("https://example.com/inventory?token=secret")]
+    [InlineData("https://user:password@example.com/inventory")]
+    [InlineData("https://example.com/inventory#token")]
+    public async Task MarketplaceRejectsUnsafeInventoryLinks(string url)
+    {
+        using var temporary = new TemporaryDirectory();
+        WriteManifest(temporary.Path, new HubExtensionManifest
+        {
+            SchemaVersion = 1, Id = "test.marketplace", DisplayName = "Test", Version = "1.0.0",
+            Publisher = "Test", Description = "Owned assets", Kind = HubExtensionKind.Marketplace,
+            ExecutionKind = HubExtensionExecutionKind.WebLink,
+            Capabilities = HubExtensionCapability.OwnedInventory,
+            SupportedEngines = [EngineFamily.Unreal], Website = "https://example.com/inventory",
+            Marketplace = new HubMarketplaceDescriptor { InventoryUrl = url },
+        });
+        await Assert.ThrowsAsync<HubExtensionException>(() => new HubExtensionManifestParser().ParseAsync(temporary.Path));
+    }
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,

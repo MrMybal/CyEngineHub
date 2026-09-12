@@ -226,7 +226,10 @@ internal sealed class UnrealRelocatedContentService(IProcessRunner processRunner
 
     private static string NormalizeDestinationPath(string value)
     {
-        var path = value.Trim().Replace('\\', '/').Trim('/');
+        var normalized = value.Trim().Replace('\\', '/');
+        if (normalized.StartsWith('/') && !normalized.StartsWith("/Game/", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Le chemin absolu de destination doit être sous /Game.");
+        var path = normalized.Trim('/');
         if (path.StartsWith("Game/", StringComparison.OrdinalIgnoreCase)) path = path[5..];
         if (path.Length == 0) throw new InvalidOperationException("Configurez un dossier sous /Game.");
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -301,7 +304,7 @@ internal sealed class UnrealRelocatedContentService(IProcessRunner processRunner
         using var reader = new StreamReader(path);
         while (await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false) is { } line)
         {
-            var dependencyError = line.Contains("Can''t find file", StringComparison.OrdinalIgnoreCase) ||
+            var dependencyError = line.Contains("Can't find file", StringComparison.OrdinalIgnoreCase) ||
                                   line.Contains("Failed to load", StringComparison.OrdinalIgnoreCase) ||
                                   line.Contains("LogLinker: Error", StringComparison.OrdinalIgnoreCase);
             if (dependencyError && line.Contains("/Game/", StringComparison.OrdinalIgnoreCase))

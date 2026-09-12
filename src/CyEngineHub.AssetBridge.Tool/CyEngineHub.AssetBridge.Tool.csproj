@@ -2,4 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../CyEngineHub.Core/Assets/PortableAssetSelection.cs" Link="PortableAssetSelection.cs" />
+  </ItemGroup>
 </Project>

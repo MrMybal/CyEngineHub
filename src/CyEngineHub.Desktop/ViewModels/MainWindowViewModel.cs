@@ -312,6 +312,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private HubExtensionCardViewModel? _selectedHubExtension;
     private string _unrealVersionBridgeStorageRoot = string.Empty;
     private string _unrealVersionBridgeProfile = "safe";
+    private string _unrealVersionBridgeAssetProfileFile = string.Empty;
     private bool _unrealVersionBridgeKeepStaging;
     private bool _unrealVersionBridgeValidateOutput = true;
     private HubExtensionInstallPlan? _pendingHubExtensionInstall;
@@ -731,6 +732,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _fabRemoteImageCache = new RemoteImageCache(() => Path.Combine(FabCacheDirectory, "Images"));
         _quixelRemoteImageCache = new RemoteImageCache(() => Path.Combine(QuixelCacheDirectory, "Images"));
         InitializeQuixelCollections();
+        InitializeDerivedWorkspaces();
         _quixelLibraryCache = new QuixelLibraryCacheStore(
             Path.Combine(appData.RootDirectory, "Cache", "Quixel", "library-v1.json.gz"));
         _marketplaceLibraryCache = new MarketplaceLibraryCacheStore(source =>
@@ -790,6 +792,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             "advanced",
             "Avancé",
             "Logs et diagnostic"));
+        SettingsCategories.Add(new SettingsCategoryOptionViewModel("ai", "IA / MCP", "Codex, Claude et OpenCode"));
+        InitializeAiCommands();
         SelectedSettingsCategory = SettingsCategories.FirstOrDefault();
 
         ShowHomeCommand = new RelayCommand(() => ShowSection(PageSection.Home));
@@ -1153,7 +1157,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         DisconnectDirectFabCommand = new AsyncRelayCommand(DisconnectDirectFabAsync, onError: ShowError);
         _refreshDirectFabLibraryCommand = new AsyncRelayCommand(
             RefreshDirectFabLibraryAsync,
-            () => IsDirectFabConnected && !IsFabLibraryRefreshing,
+            () => IsDirectFabConnected && IsFabLibrarySourceAvailable && !IsFabLibraryRefreshing,
             ShowError);
         RefreshDirectFabLibraryCommand = _refreshDirectFabLibraryCommand;
         OpenQuixelAuthorizationCommand = new AsyncRelayCommand(
@@ -1166,13 +1170,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         DisconnectQuixelCommand = new AsyncRelayCommand(DisconnectQuixelAsync, onError: ShowError);
         _refreshQuixelLibraryCommand = new AsyncRelayCommand(
             RefreshQuixelLibraryAsync,
-            () => IsQuixelConnected && !IsQuixelLibraryRefreshing,
+            () => IsQuixelConnected && IsQuixelLibrarySourceAvailable && !IsQuixelLibraryRefreshing,
             ShowError);
         RefreshQuixelLibraryCommand = _refreshQuixelLibraryCommand;
         _downloadSelectedFabAssetCommand = new AsyncRelayCommand(
             DownloadSelectedFabAssetAsync,
-            () => SelectedRemoteFabAsset?.PreferredProjectVersion is not null && !IsEpicBusy,
-            ShowError);
+            () => SelectedRemoteFabAsset?.PreferredProjectVersion is not null && IsMarketplaceAvailable(NormalizeAssetSource(SelectedRemoteFabAsset)),
+            ShowError,
+            allowConcurrentExecutions: true);
         DownloadSelectedFabAssetCommand = _downloadSelectedFabAssetCommand;
         OpenFabDownloadOptionsCommand = new RelayCommand(() =>
         {
@@ -1182,8 +1187,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         CloseFabDownloadOptionsCommand = new RelayCommand(() => IsFabDownloadOptionsVisible = false);
         OpenFabInstallOptionsCommand = new RelayCommand(() =>
         {
+            _activeDerivedInstallArtifactId = null;
+            if (SelectedRemoteFabAssetCard is not null)
+            {
+                RestoreSupplierInstallVersions(SelectedRemoteFabAssetCard);
+            }
             IsFabDownloadOptionsVisible = false;
             IsFabInstallOptionsVisible = true;
+            OnPropertyChanged(nameof(HasActiveDerivedInstall));
+            OnPropertyChanged(nameof(FabInstallContentKindLabel));
+            OnPropertyChanged(nameof(FabInstallContentKindReason));
+            OnPropertyChanged(nameof(FabInstallModeGuidance));
         });
         CloseFabInstallOptionsCommand = new RelayCommand(() => IsFabInstallOptionsVisible = false);
         CloseFabInstallationScriptConfigurationCommand = new RelayCommand(() =>
@@ -1207,8 +1221,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             onError: ShowError);
         _downloadSelectedFabVersionsCommand = new AsyncRelayCommand(
             () => DownloadSelectedFabVersionsAsync(FabInstallDestination.Library),
-            () => SelectedRemoteFabAsset is not null && !IsEpicBusy,
-            ShowError);
+            () => SelectedRemoteFabAsset is not null && IsMarketplaceAvailable(NormalizeAssetSource(SelectedRemoteFabAsset)),
+            ShowError,
+            allowConcurrentExecutions: true);
         DownloadSelectedFabVersionsCommand = _downloadSelectedFabVersionsCommand;
         InstallSelectedFabVersionsCommand = new AsyncRelayCommand(
             InstallSelectedFabVersionsIntoTargetsAsync,
@@ -2297,6 +2312,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 OnPropertyChanged(nameof(IsSettingsMarketplacesSelected));
                 OnPropertyChanged(nameof(IsSettingsStorageSelected));
                 OnPropertyChanged(nameof(IsSettingsAdvancedSelected));
+                OnPropertyChanged(nameof(IsSettingsAiSelected));
             }
         }
     }
@@ -4125,6 +4141,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 LibraryCollectionFacets.Clear();
                 RefreshVisibleLibraryFacets();
                 OnPropertyChanged(nameof(IsLibraryFabSelected));
+                OnPropertyChanged(nameof(IsLibraryFabWebSelected));
                 OnPropertyChanged(nameof(IsLibraryUnitySelected));
                 OnPropertyChanged(nameof(IsLibraryQuixelSelected));
                 OnPropertyChanged(nameof(IsLibraryCompatibilityFilterVisible));
@@ -4137,7 +4154,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 OnPropertyChanged(nameof(LibraryRemoteStatusSummary));
                 OnPropertyChanged(nameof(LibraryRemoteAccount));
                 OnPropertyChanged(nameof(IsLibraryLocalSelected));
-                if (value is "Fab" or "Quixel")
+                OnPropertyChanged(nameof(IsConnectorLibrarySelected));
+                if (value is "Fab" or "Quixel" or "FabWeb")
                 {
                     ShowCachedRemoteFabPreview();
                     QueueRemoteFabViewRefresh();
@@ -4152,27 +4170,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public bool IsLibraryQuixelSelected => LibrarySource == "Quixel";
 
-    public bool IsLibraryCompatibilityFilterVisible => !IsLibraryQuixelSelected;
+    public bool IsLibraryCompatibilityFilterVisible => !IsLibraryQuixelSelected && !IsLibraryFabWebSelected;
 
-    public bool IsLibraryRemoteSelected => IsLibraryFabSelected || IsLibraryQuixelSelected;
+    public bool IsLibraryRemoteSelected => IsLibraryFabSelected || IsLibraryQuixelSelected || IsLibraryFabWebSelected;
 
-    public string LibraryRemoteHeading => IsLibraryQuixelSelected
+    public string LibraryRemoteHeading => IsLibraryFabWebSelected ? "MEGASCANS VIA FAB · FICHES ACQUISES" : IsLibraryQuixelSelected
         ? "MEGASCANS · BIBLIOTHÈQUE HISTORIQUE"
         : "FAB · MY LIBRARY";
 
-    public string LibraryProductHeading => IsLibraryQuixelSelected
+    public string LibraryProductHeading => IsLibraryFabWebSelected ? "FICHE PRODUIT MEGASCANS VIA FAB" : IsLibraryQuixelSelected
         ? "FICHE PRODUIT MEGASCANS"
         : "FICHE PRODUIT FAB";
 
-    public bool IsSelectedRemoteConnectionReady => IsLibraryQuixelSelected
+    public bool IsSelectedRemoteConnectionReady => IsLibraryFabWebSelected || (IsLibraryQuixelSelected
         ? IsQuixelConnected
-        : IsDirectFabConnected;
+        : IsDirectFabConnected);
 
-    public string LibraryRemoteStatusSummary => IsLibraryQuixelSelected
+    public string LibraryRemoteStatusSummary => IsLibraryFabWebSelected ? "Fiches acquises synchronisées depuis Fab · connexion / synchronisation dans la fenêtre intégrée" : IsLibraryQuixelSelected
         ? QuixelStatusSummary
         : DirectFabStatusSummary;
 
-    public string LibraryRemoteAccount => IsLibraryQuixelSelected
+    public string LibraryRemoteAccount => IsLibraryFabWebSelected ? "Session web Fab indépendante de la connexion Launcher" : IsLibraryQuixelSelected
         ? QuixelAccount
         : DirectFabAccount;
 
@@ -4184,9 +4202,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public bool IsQuixelConnected => _quixelState == QuixelConnectionState.Connected;
 
-    public bool IsUnityLibrarySourceAvailable => IsProviderEnabled("unity") && IsUnityConnectionEnabled;
+    public bool IsUnityLibrarySourceAvailable => UnityMarketplaceEnabled && IsProviderEnabled("unity") && IsUnityConnectionEnabled;
 
-    public bool IsQuixelLibrarySourceAvailable => IsQuixelConnectionEnabled;
+    public bool IsQuixelLibrarySourceAvailable => QuixelMarketplaceEnabled && IsQuixelConnectionEnabled;
 
     public bool IsEpicConnectionEnabled => IsConnectionModuleEnabled("epic");
 
@@ -4357,6 +4375,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public bool IsAnyFabModalVisible =>
         IsFabOptionsModalVisible || IsFabImagePreviewVisible ||
+        IsDerivedWorkspaceCreatorVisible || IsDerivedWorkspaceDeletionVisible ||
+        IsDerivedFolderImporterVisible || IsPackTestCreatorVisible ||
         IsEngineRemovalConfirmationVisible || IsEngineUninstallConfirmationVisible ||
         IsProjectCreatorVisible || IsProjectProfileEditorVisible;
 
@@ -4372,8 +4392,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool IsFabDownloadActive
     {
         get => _isFabDownloadActive;
-        private set => SetProperty(ref _isFabDownloadActive, value);
+        private set
+        {
+            if (SetProperty(ref _isFabDownloadActive, value))
+            {
+                OnPropertyChanged(nameof(FabDownloadActionLabel));
+                _downloadSelectedFabAssetCommand.NotifyCanExecuteChanged();
+                _downloadSelectedFabVersionsCommand.NotifyCanExecuteChanged();
+            }
+        }
     }
+
+    public string FabDownloadActionLabel => IsFabDownloadActive
+        ? "Ajouter les versions à la file"
+        : "Télécharger les versions sélectionnées";
 
     public double FabDownloadProgress
     {
@@ -4615,6 +4647,36 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         get => _unrealVersionBridgeProfile;
         set => SetProperty(ref _unrealVersionBridgeProfile, value);
+    }
+
+    public string UnrealVersionBridgeAssetProfileFile
+    {
+        get => _unrealVersionBridgeAssetProfileFile;
+        set
+        {
+            if (SetProperty(ref _unrealVersionBridgeAssetProfileFile, value))
+                OnPropertyChanged(nameof(UnrealVersionBridgeAssetProfilesSummary));
+        }
+    }
+
+    public string UnrealVersionBridgeAssetProfilesSummary
+    {
+        get
+        {
+            try
+            {
+                var file = string.IsNullOrWhiteSpace(UnrealVersionBridgeAssetProfileFile)
+                    ? Path.Combine(AppContext.BaseDirectory, "Extensions", "cyenginehub.unreal-version-bridge", "profiles", "ue-5.6-to-5.5.json")
+                    : UnrealVersionBridgeAssetProfileFile;
+                var profiles = UnrealAssetConversionProfiles.Load(file);
+                return string.Join(Environment.NewLine + Environment.NewLine, profiles.Profiles.Select(p =>
+                    $"{p.AssetType} · UE {p.SourceVersion} → {p.TargetVersion} · révision {p.Revision}\n{p.Notes}\nContrôles prévus : {string.Join(", ", p.Checks)}"));
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidOperationException or ArgumentException)
+            {
+                return "Profils indisponibles : " + error.Message;
+            }
+        }
     }
 
     public bool UnrealVersionBridgeKeepStaging
@@ -4861,7 +4923,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             await RefreshFabInstallationScriptsAsync().ConfigureAwait(true);
             await RefreshProjectCreationScriptsAsync().ConfigureAwait(true);
             await LoadLibrarySettingsAsync().ConfigureAwait(true);
+            InitializeMarketplaceStorageAutosave();
             await LoadFabLibraryCacheAsync().ConfigureAwait(true);
+            await LoadFabWebCacheAsync().ConfigureAwait(true);
             await LoadQuixelLibraryCacheAsync().ConfigureAwait(true);
             RebuildEngineModuleCards();
             RebuildEngineTabs();
@@ -4876,6 +4940,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             await LoadQuixelStatusAsync().ConfigureAwait(true);
             await LoadFabLocalLibraryCacheAsync().ConfigureAwait(true);
             await LoadCachedCatalogAsync().ConfigureAwait(true);
+            await LoadDownloadQueueAsync().ConfigureAwait(true);
+            await LoadAiSettingsAsync().ConfigureAwait(true);
             await RefreshCatalogAsync().ConfigureAwait(true);
             _ = RefreshMarketplacesOnStartupAsync();
             _ = CheckForUpdatesOnStartupAsync();
@@ -4927,7 +4993,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var snapshot = await _marketplaceLibraryCache.LoadAsync("fab").ConfigureAwait(true);
         snapshot ??= await _legacyMarketplaceLibraryCache.LoadAsync("fab").ConfigureAwait(true);
         if (snapshot?.Assets.Count is not > 0) return;
-        ReplaceRemoteAssets(asset => !IsQuixelAsset(asset), snapshot.Assets);
+        ReplaceRemoteAssets(IsLauncherFabAsset, snapshot.Assets);
         _fabCatalogCachedAt = snapshot.UpdatedAt;
         DirectFabStatusSummary =
             $"{snapshot.Assets.Count:N0} élément(s) Fab restauré(s) · cache {FormatCacheDate(snapshot.UpdatedAt)}.";
@@ -4939,6 +5005,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task LoadLibrarySettingsAsync()
     {
+        await LoadMarketplaceAvailabilityAsync().ConfigureAwait(true);
         AutoRefreshFabOnStartup = ParseEnabledSetting(
             await _settings.GetAsync(FabAutoRefreshOnStartupSetting).ConfigureAwait(true));
         AutoRefreshQuixelOnStartup = ParseEnabledSetting(
@@ -4964,6 +5031,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             UnrealVersionBridgeStorageRoot = Path.GetFullPath(versionBridgeRoot.Trim().Trim((char)34));
         }
         var versionBridgeProfile = await _settings.GetAsync(UnrealVersionBridgeSettings.ConversionProfile).ConfigureAwait(true);
+        UnrealVersionBridgeAssetProfileFile = await _settings.GetAsync(UnrealVersionBridgeSettings.AssetProfileFile).ConfigureAwait(true) ?? string.Empty;
         UnrealVersionBridgeProfile = string.Equals(versionBridgeProfile, "extended", StringComparison.OrdinalIgnoreCase)
             ? "extended"
             : "safe";
@@ -5033,6 +5101,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 AppendRawLog("WARN", "Settings/Library", "Historique des téléchargements Fab ignoré : données invalides.");
             }
         }
+        await LoadDerivedWorkspacesAsync().ConfigureAwait(true);
 
         var modulesJson = await _settings.GetAsync(ConnectionModulesSetting).ConfigureAwait(true);
         if (!string.IsNullOrWhiteSpace(modulesJson))
@@ -5288,8 +5357,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
             $"Dossier de téléchargement : {normalized}");
     }
 
-    private async Task SaveMarketplaceSettingsAsync()
+    private async Task SaveMarketplaceSettingsCoreAsync()
     {
+        foreach (var connector in MarketplaceConnectors)
+            _ = Views.MarketplaceDownloadStorage.ValidateDirectory(connector.DownloadDirectory);
         var nativeCacheMaximumBytes = ParseMaximumLibraryBytes(
             FabNativeCacheMaximumGigabytes,
             "cache Vault Epic");
@@ -5356,6 +5427,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         EpicVaultNativeCacheStatus = nativeCacheMaximumBytes > 0
             ? $"Cache de reconstruction prêt · limite {FormatBytes(nativeCacheMaximumBytes)}."
             : "Cache de reconstruction prêt · taille illimitée.";
+        await SaveMarketplaceAvailabilityAsync().ConfigureAwait(true);
         StatusMessage = "Paramètres des marketplaces enregistrés.";
         AppendRawLog(
             "INFO",
@@ -5808,12 +5880,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             throw new InvalidOperationException($"Choisissez un dossier pour {label}.");
         }
-        return Path.TrimEndingDirectorySeparator(
-            Path.GetFullPath(value.Trim().Trim((char)34)));
+        return MarketplaceStorageSettingsStore.NormalizePath(value);
     }
 
     private async Task SaveUnrealVersionBridgeSettingsAsync()
     {
+        if (!string.IsNullOrWhiteSpace(UnrealVersionBridgeAssetProfileFile))
+        {
+            var profilePath = Path.GetFullPath(UnrealVersionBridgeAssetProfileFile.Trim().Trim((char)34));
+            _ = UnrealAssetConversionProfiles.Load(profilePath);
+            UnrealVersionBridgeAssetProfileFile = profilePath;
+        }
         if (string.IsNullOrWhiteSpace(UnrealVersionBridgeStorageRoot))
         {
             throw new InvalidOperationException("Choisissez un dossier de stockage pour les variantes converties.");
@@ -5833,6 +5910,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? "extended"
             : "safe";
         await _settings.SetAsync(UnrealVersionBridgeSettings.StorageRoot, root).ConfigureAwait(true);
+        await _settings.SetAsync(UnrealVersionBridgeSettings.AssetProfileFile, UnrealVersionBridgeAssetProfileFile).ConfigureAwait(true);
+        OnPropertyChanged(nameof(UnrealVersionBridgeAssetProfilesSummary));
         await _settings.SetAsync(
             UnrealVersionBridgeSettings.ConversionProfile,
             UnrealVersionBridgeProfile).ConfigureAwait(true);
@@ -5854,11 +5933,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         await Task.Delay(800).ConfigureAwait(true);
         try
         {
-            if (AutoRefreshFabOnStartup && IsDirectFabConnected)
+            if (AutoRefreshFabOnStartup && IsDirectFabConnected && IsFabLibrarySourceAvailable)
             {
                 await RefreshDirectFabLibraryAsync().ConfigureAwait(true);
             }
-            if (AutoRefreshQuixelOnStartup && IsQuixelConnected)
+            if (AutoRefreshQuixelOnStartup && IsQuixelConnected && IsQuixelLibrarySourceAvailable)
             {
                 await RefreshQuixelLibraryAsync().ConfigureAwait(true);
             }
@@ -6969,7 +7048,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ApplyDirectFabStatus(new DirectFabStatus(
                 DirectFabConnectionState.Disconnected,
                 "Compte Epic/Fab déconnecté. La session a été supprimée du coffre Windows."));
-            RemoveRemoteAssets(asset => !IsQuixelAsset(asset));
+            RemoveRemoteAssets(IsLauncherFabAsset);
             _visibleRemoteFabCatalog = [];
             ClearPagedRemoteFabRows();
             SelectedRemoteFabAsset = null;
@@ -6987,6 +7066,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task RefreshDirectFabLibraryAsync()
     {
+        if (!IsFabLibrarySourceAvailable) return;
         if (!IsDirectFabConnected)
         {
             throw new InvalidOperationException("Connectez d’abord votre compte Epic/Fab.");
@@ -7006,6 +7086,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
                 "Bibliothèque · Fab",
                 "Actualiser My Library",
+                [new HubTaskLink("library", "Fab", "Voir la bibliothèque Fab")],
                 async (context, cancellationToken) =>
                 {
                     context.Report(null, "Lecture paginée de la bibliothèque Fab…");
@@ -7044,10 +7125,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
 
             ResetRemoteFabPresentationForRefresh();
-            ReplaceRemoteAssets(asset => !IsQuixelAsset(asset), assets);
-            SelectedRemoteFabAsset = null;
-            SelectedRemoteFabAssetCard = null;
-            IsRemoteFabProductVisible = false;
+            ReplaceRemoteAssets(IsLauncherFabAsset, assets);
+            // Keep the open product snapshot and its modal selection during refresh.
             await RefreshRemoteFabViewNowAsync().ConfigureAwait(true);
             _fabCatalogCachedAt = cachedAt;
             DirectFabStatusSummary =
@@ -7068,6 +7147,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task RefreshQuixelLibraryAsync()
     {
+        if (!IsQuixelLibrarySourceAvailable) return;
         if (!IsQuixelConnected)
         {
             throw new InvalidOperationException(
@@ -7091,6 +7171,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
                 "Bibliothèque · Megascans",
                 "Actualiser la bibliothèque historique Quixel",
+                [new HubTaskLink("library", "Quixel", "Voir la bibliothèque Megascans")],
                 async (context, cancellationToken) =>
                 {
                     context.Report(null, "Lecture des acquisitions Quixel puis résolution du catalogue…");
@@ -7133,9 +7214,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
             ResetRemoteFabPresentationForRefresh();
             ReplaceRemoteAssets(IsQuixelAsset, result.Assets);
-            SelectedRemoteFabAsset = null;
-            SelectedRemoteFabAssetCard = null;
-            IsRemoteFabProductVisible = false;
+            // Refreshing either marketplace must not orphan the open product dialog.
             await RefreshRemoteFabViewNowAsync().ConfigureAwait(true);
             _quixelCatalogCachedAt = cachedAt;
             QuixelStatusSummary = result.UnresolvedCount == 0
@@ -7198,21 +7277,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SelectedRemoteFabAssetCard?.Dispose();
         SelectedRemoteFabAssetCard = detailCard;
         SelectedRemoteFabAsset = detailCard.Asset;
-        FabInstallVersions.Clear();
-        var preferred = detailCard.Asset.PreferredProjectVersion;
-        foreach (var version in detailCard.Asset.ProjectVersions
-                     .OrderByDescending(item => ParseEngineVersion(
-                         item.EngineVersions.Count == 0 ? string.Empty : item.EngineVersions[0])))
-        {
-            FabInstallVersions.Add(new FabInstallVersionOptionViewModel(
-                version,
-                Equals(version, preferred)));
-        }
+        _activeDerivedInstallArtifactId = null;
+        RestoreSupplierInstallVersions(detailCard);
         SelectedFabInstallProject = Projects.FirstOrDefault();
         SelectedFabInstallEngine = Engines.FirstOrDefault();
         ShowOnlyCompatibleFabTargets = !IsQuixelAsset(detailCard.Asset);
-        RebuildFabInstallTargets(detailCard);
         RebuildSelectedFabStoredDownloads(detailCard.Asset.AssetId);
+        RebuildSelectedDerivedWorkspaces(detailCard.Asset.AssetId);
         RebuildSelectedFabVersionDownloads(detailCard.Asset.AssetId, productSource);
         IsFabInstallOptionsVisible = false;
         IsFabDownloadOptionsVisible = false;
@@ -7221,14 +7292,29 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsFabInstallCompatibilityFilterVisible));
         OnPropertyChanged(nameof(HasSelectedFabStoredDownloads));
         OnPropertyChanged(nameof(SelectedFabAssetVisibilityLabel));
+        OnPropertyChanged(nameof(HasActiveDerivedInstall));
         StatusMessage = detailCard.CanDownload
             ? $"{detailCard.Name} · {detailCard.Asset.ProjectVersions.Count:N0} variante(s) téléchargeable(s)."
             : $"{detailCard.Name} · fiche produit ouverte, aucun téléchargement exposé.";
-        _ = LoadRemoteFabProductDetailsAsync(detailCard);
+        if (IsMarketplaceAvailable(productSource)) _ = LoadRemoteFabProductDetailsAsync(detailCard);
+    }
+
+    private void RestoreSupplierInstallVersions(RemoteFabAssetCardViewModel detailCard)
+    {
+        FabInstallVersions.Clear();
+        var preferred = detailCard.Asset.PreferredProjectVersion;
+        foreach (var version in detailCard.Asset.ProjectVersions
+                     .OrderByDescending(item => ParseEngineVersion(
+                         item.EngineVersions.Count == 0 ? string.Empty : item.EngineVersions[0])))
+        {
+            FabInstallVersions.Add(new FabInstallVersionOptionViewModel(version, Equals(version, preferred)));
+        }
+        RebuildFabInstallTargets(detailCard);
     }
 
     private async Task OpenRemoteFabCardListingAsync(RemoteFabAssetCardViewModel card)
     {
+        if (IsFabWebAsset(card.Asset)) { await OpenFabWebAssetAsync(card.Asset).ConfigureAwait(true); return; }
         var uri = card.ListingUri
             ?? throw new InvalidOperationException("Aucune page produit Fab n’est disponible.");
         await _platformLauncher.OpenUriAsync(uri).ConfigureAwait(true);
@@ -7239,6 +7325,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private Task DownloadRemoteFabCardAsync(RemoteFabAssetCardViewModel card)
     {
+        if (IsFabWebAsset(card.Asset)) return OpenFabWebAssetAsync(card.Asset);
         OpenRemoteFabProduct(card);
         IsFabDownloadOptionsVisible = true;
         return Task.CompletedTask;
@@ -7251,11 +7338,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IsFabInstallOptionsVisible = true;
     }
 
-    private void RebuildFabInstallTargets(RemoteFabAssetCardViewModel card)
+    private void RebuildFabInstallTargets(
+        RemoteFabAssetCardViewModel card,
+        LibraryPackageContentKind? contentKindOverride = null,
+        IReadOnlyList<RemoteFabProjectVersion>? versionsOverride = null)
     {
         FabInstallTargets.Clear();
-        var ignoresEngineCompatibility = IsQuixelAsset(card.Asset);
-        var supported = card.Asset.ProjectVersions
+        var contentKind = contentKindOverride ?? card.ContentKind;
+        var sourceVersions = versionsOverride ?? card.Asset.ProjectVersions;
+        var ignoresEngineCompatibility = IsQuixelAsset(card.Asset) && versionsOverride is null;
+        var supported = sourceVersions
             .SelectMany(item => item.EngineVersions)
             .Select(NormalizeEngineVersion)
             .Where(value => !string.IsNullOrWhiteSpace(value))
@@ -7265,13 +7357,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             supported.Count == 0 ||
             supported.Contains(NormalizeEngineVersion(value));
 
-        var acceptsProjects = card.ContentKind is
+        var acceptsProjects = contentKind is
             LibraryPackageContentKind.ContentPack or
             LibraryPackageContentKind.CodePlugin or
             LibraryPackageContentKind.EnginePackage or
             LibraryPackageContentKind.RawAsset or
             LibraryPackageContentKind.Unknown;
-        var acceptsEngines = card.ContentKind is
+        var acceptsEngines = contentKind is
             LibraryPackageContentKind.CodePlugin or
             LibraryPackageContentKind.EnginePackage;
 
@@ -7291,7 +7383,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     engineVersion,
                     Compatible(engineVersion),
                     ignoresEngineCompatibility,
-                    card.ContentKind,
+                    contentKind,
                     project,
                     null));
             }
@@ -7308,7 +7400,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     engine.Engine.Version.ToString(),
                     Compatible(engine.Engine.Version.ToString()),
                     ignoresEngineCompatibility,
-                    card.ContentKind,
+                    contentKind,
                     null,
                     engine));
             }
@@ -7717,7 +7809,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 sizes.StoredBytes,
                 OpenFolderAsync,
                 DeleteStoredFabDownloadAsync,
-                ShowError));
+                ShowError,
+                stored.DerivationName,
+                stored.DerivationNotes,
+                stored.SourceArtifactId,
+                OpenDerivedForInstallationAsync,
+                OpenDerivedWorkspaceCreator,
+                OpenPackTestCreator,
+                stored.EngineVersions));
         }
         OnPropertyChanged(nameof(HasSelectedFabStoredDownloads));
         if (ConfirmDeleteAllFabDownloadsCommand is AsyncRelayCommand command)
@@ -7846,11 +7945,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task PersistStoredFabDownloadsAsync()
     {
-        InvalidateLibraryLocalIndex();
-        await _settings.SetAsync(
-                FabStoredDownloadsSetting,
-                JsonSerializer.Serialize(_fabStoredDownloads.TakeLast(10_000)))
-            .ConfigureAwait(true);
+        await _storedDownloadsPersistenceGate.WaitAsync().ConfigureAwait(true);
+        try
+        {
+            InvalidateLibraryLocalIndex();
+            await _settings.SetAsync(
+                    FabStoredDownloadsSetting,
+                    JsonSerializer.Serialize(_fabStoredDownloads.TakeLast(10_000)))
+                .ConfigureAwait(true);
+        }
+        finally { _storedDownloadsPersistenceGate.Release(); }
     }
 
     private void UpdateStoredFabAssetState(string assetId)
@@ -7950,6 +8054,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task LoadRemoteFabProductDetailsAsync(RemoteFabAssetCardViewModel card)
     {
+        if (IsFabWebAsset(card.Asset))
+        {
+            card.EnsureGalleryLoaded();
+            StatusMessage = "Fiche Fab acquise · formats et droits du compte mis en cache. Téléchargement dans la page officielle intégrée.";
+            return;
+        }
         IsRemoteFabProductLoading = true;
         try
         {
@@ -7979,6 +8089,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void SelectLibrarySource(string source)
     {
+        if (!IsMarketplaceAvailable(source)) return;
         if (string.Equals(LibrarySource, source, StringComparison.OrdinalIgnoreCase))
         {
             return;
@@ -7986,7 +8097,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         LibrarySource = source;
         CloseRemoteFabProduct(forgetSelection: false);
-        if (source is not ("Fab" or "Quixel") ||
+        if (source is not ("Fab" or "Quixel" or "FabWeb") ||
             !_libraryProductAssetIds.TryGetValue(source, out var assetId))
         {
             return;
@@ -8013,7 +8124,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void CloseRemoteFabProduct(bool forgetSelection)
     {
-        if (forgetSelection && LibrarySource is "Fab" or "Quixel")
+        if (forgetSelection && LibrarySource is "Fab" or "Quixel" or "FabWeb")
         {
             _libraryProductAssetIds.Remove(LibrarySource);
         }
@@ -8582,10 +8693,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     private IEnumerable<RemoteFabAsset> GetLibrarySourceAssets() =>
-        IsLibraryQuixelSelected
+        IsLibraryFabWebSelected ? _remoteFabCatalog.Where(IsFabWebAsset) : IsLibraryQuixelSelected
             ? _remoteFabCatalog.Where(asset => IsQuixelAsset(asset) &&
                 (_quixelCollectionAssetIds is null || _quixelCollectionAssetIds.Contains(asset.AssetId)))
-            : _remoteFabCatalog.Where(asset => !IsQuixelAsset(asset));
+            : _remoteFabCatalog.Where(IsLauncherFabAsset);
 
     private IEnumerable<string> GetAssetCollections(RemoteFabAsset asset)
     {
@@ -8601,7 +8712,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         string.Equals(asset.Source, "quixel", StringComparison.OrdinalIgnoreCase);
 
     private static string NormalizeAssetSource(RemoteFabAsset asset) =>
-        IsQuixelAsset(asset) ? "Quixel" : "Fab";
+        IsFabWebAsset(asset) ? FabWebLibraryClient.Source : IsQuixelAsset(asset) ? "Quixel" : "Fab";
 
     private static bool IsStoredDownloadForAsset(
         FabStoredDownloadRecord item,
@@ -8747,14 +8858,32 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private Task DownloadSelectedFabAssetAsync() =>
         DownloadSelectedFabVersionsAsync(FabInstallDestination.Library);
 
-    private async Task DownloadSelectedFabVersionsAsync(FabInstallDestination destination)
+    private async Task DownloadSelectedFabVersionsAsync(FabInstallDestination destination,
+        RemoteFabAsset? requestedAsset = null, FabInstallVersionOptionViewModel[]? requestedVersions = null,
+        Action<HubTaskHandle>? onQueued = null, SavedLibraryDownload? resumedEntry = null)
     {
-        var asset = SelectedRemoteFabAsset
+        var asset = requestedAsset ?? SelectedRemoteFabAsset
             ?? throw new InvalidOperationException("Sélectionnez d’abord un asset Fab.");
-        var versions = FabInstallVersions.Where(item => item.IsSelected).ToArray();
+        if (!IsMarketplaceAvailable(NormalizeAssetSource(asset)))
+            throw new InvalidOperationException("Cette marketplace est désactivée dans les paramètres.");
+        var versions = requestedVersions ?? FabInstallVersions.Where(item => item.IsSelected).ToArray();
         if (versions.Length == 0)
         {
             throw new InvalidOperationException("Sélectionnez au moins une version à télécharger.");
+        }
+        // Queue other packs while an earlier batch is running, but never write the
+        // same artifact twice concurrently. No installed engine is needed here.
+        var downloadSource = NormalizeAssetSource(asset);
+        versions = versions.Where(option => !_fabVersionDownloads.Any(item =>
+            !item.IsTerminal &&
+            item.AssetId.Equals(asset.AssetId, StringComparison.OrdinalIgnoreCase) &&
+            item.Source.Equals(downloadSource, StringComparison.OrdinalIgnoreCase) &&
+            item.ArtifactId.Equals(option.Version.ArtifactId, StringComparison.OrdinalIgnoreCase)))
+            .DistinctBy(option => option.Version.ArtifactId, StringComparer.OrdinalIgnoreCase).ToArray();
+        if (versions.Length == 0)
+        {
+            StatusMessage = "Ces variantes sont déjà dans la file de téléchargement.";
+            return;
         }
         if (destination == FabInstallDestination.Project && SelectedFabInstallProject is null)
         {
@@ -8770,16 +8899,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var results = new DirectFabDownloadResult?[versions.Length];
         var handles = new HubTaskHandle[versions.Length];
         var queueItems = new FabVersionDownloadViewModel[versions.Length];
-        IsEpicBusy = true;
+        if (destination != FabInstallDestination.Library) IsEpicBusy = true;
         IsFabDownloadActive = true;
         FabDownloadProgress = 0;
         FabDownloadStatus = "Préparation du téléchargement…";
-        IsFabInstallOptionsVisible = false;
-        IsFabDownloadOptionsVisible = false;
+        if (requestedAsset is null)
+        {
+            IsFabInstallOptionsVisible = false;
+            IsFabDownloadOptionsVisible = false;
+        }
         var verb = destination == FabInstallDestination.Library ? "Télécharger" : "Télécharger et installer";
         var isQuixel = IsQuixelAsset(asset);
-        var packageStorageMode = ResolveMarketplaceStorageMode(asset);
-        var marketplaceStorage = ResolveMarketplaceStorageProfile(asset);
+        var packageStorageMode = resumedEntry?.Mode ?? ResolveMarketplaceStorageMode(asset);
+        var marketplaceStorage = resumedEntry?.Storage ?? ResolveMarketplaceStorageProfile(asset);
         var source = NormalizeAssetSource(asset);
 
         try
@@ -8788,6 +8920,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 var option = versions[index];
                 var versionIndex = index;
+                var durableId = DurableDownloadId(asset, option.Version);
+                var durable = destination == FabInstallDestination.Library
+                    ? new SavedLibraryDownload(asset, option.Version, marketplaceStorage, packageStorageMode, resumedEntry?.CreatedAt ?? DateTimeOffset.UtcNow)
+                    : null;
+                if (durable is not null) DownloadJournal.Upsert(durableId, durable);
                 var queueItem = new FabVersionDownloadViewModel(
                     asset.AssetId,
                     source,
@@ -8800,12 +8937,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
                     isQuixel ? "Bibliothèque · Megascans" : "Bibliothèque · Fab",
                     $"{verb} {asset.Title} · {option.Label}",
+                    ProductTaskLinks(asset, destination == FabInstallDestination.Project && targetProject is not null
+                        ? [ProjectTaskLink(targetProject.Project.FilePath, targetProject.Name)]
+                        : destination == FabInstallDestination.Engine && targetEngine is not null
+                            ? [EngineTaskLink(targetEngine.Path, targetEngine.DisplayName)] : []),
                     async (context, cancellationToken) =>
                     {
+                        var assetGate = AssetDownloadLocks.GetOrAdd(source + ":" + asset.AssetId, _ => new SemaphoreSlim(1, 1));
+                        await assetGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+                        try
+                        {
+                        var transfer = new CyEngineHub.Core.Marketplaces.DownloadProgressText();
                         var progress = new InlineProgress<DirectFabDownloadProgress>(value =>
                         {
                             var fraction = value.Fraction ?? 0;
-                            var message = $"{option.Label} · {value.Message}";
+                            var message = transfer.Format($"{option.Label} · {value.Message}", value.DownloadedBytes, value.TotalBytes);
                             context.Report(fraction, message);
                             Dispatcher.UIThread.Post(() => FabDownloadStatus = message);
                         });
@@ -8854,10 +9000,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
                                 packageProgress,
                                 cancellationToken)
                             .ConfigureAwait(false);
-                    }));
+                        if (durable is not null)
+                            DownloadJournal.Upsert(durableId, durable with { Result = results[versionIndex]! with { SourceManifest = null } });
+                        }
+                        finally { assetGate.Release(); }
+                    }) { IsDownload = destination == FabInstallDestination.Library });
                 handles[index] = handle;
                 queueItem.AttachTask(handle.Id);
                 _fabVersionDownloadsByTaskId[handle.Id] = queueItem;
+                if (durable is not null) _durableDownloadTasks[handle.Id] = durableId;
+                onQueued?.Invoke(handle);
             }
 
             var completed = await Task.WhenAll(handles.Select(item => item.Completion)).ConfigureAwait(true);
@@ -8872,6 +9024,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 {
                     succeeded++;
                     await SaveStoredFabDownloadAsync(asset, versions[index], result).ConfigureAwait(true);
+                    if (destination == FabInstallDestination.Library)
+                    {
+                        var id = DurableDownloadId(asset, versions[index].Version);
+                        var saved = DownloadJournal.Read()[id];
+                        DownloadJournal.Upsert(id, saved with { State = "Completed" });
+                    }
                     AppendRawLog(
                         "INFO",
                         isQuixel ? "Library/Quixel" : "Library/Fab",
@@ -8886,6 +9044,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     continue;
                 }
                 failures.Add((versions[index], snapshot.Error ?? "Le téléchargement a échoué."));
+                if (destination == FabInstallDestination.Library)
+                {
+                    var id = DurableDownloadId(asset, versions[index].Version);
+                    var saved = DownloadJournal.Read()[id];
+                    DownloadJournal.Upsert(id, saved with { State = "Failed" });
+                }
             }
 
             foreach (var failure in failures)
@@ -8924,8 +9088,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         finally
         {
-            IsEpicBusy = false;
-            IsFabDownloadActive = false;
+            if (destination != FabInstallDestination.Library) IsEpicBusy = false;
+            IsFabDownloadActive = _fabVersionDownloads.Any(item => !item.IsTerminal);
         }
     }
 
@@ -8946,7 +9110,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
             throw new InvalidOperationException(
                 $"Aucun script d’installation compatible pour : {string.Join(", ", targetsWithoutScript)}.");
         }
-        var contentKind = SelectedRemoteFabAssetCard?.ContentKind ?? LibraryPackageContentKind.Unknown;
+        var selectedDerived = string.IsNullOrWhiteSpace(_activeDerivedInstallArtifactId)
+            ? null
+            : _fabStoredDownloads.LastOrDefault(item =>
+                item.ArtifactId.Equals(_activeDerivedInstallArtifactId, StringComparison.OrdinalIgnoreCase));
+        if (selectedDerived is null && !IsMarketplaceAvailable(NormalizeAssetSource(asset)))
+            throw new InvalidOperationException("Cette marketplace est désactivée. Réactivez-la dans les paramètres pour une nouvelle installation distante.");
+        var contentKind = selectedDerived is null
+            ? SelectedRemoteFabAssetCard?.ContentKind ?? LibraryPackageContentKind.Unknown
+            : ParseContentKind(selectedDerived.PackageKind);
         if (contentKind == LibraryPackageContentKind.CompleteProject)
         {
             throw new InvalidOperationException(
@@ -8971,7 +9143,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IsEpicBusy = true;
         IsFabDownloadActive = true;
         FabDownloadProgress = 0;
-        FabDownloadStatus = "Préparation du téléchargement et des installations…";
+        FabDownloadStatus = selectedDerived is null
+            ? "Préparation du téléchargement et des installations…"
+            : "Préparation du dérivé local et des installations…";
         IsFabInstallOptionsVisible = false;
         var completedDownloads = new List<(FabInstallVersionOptionViewModel Option, DirectFabDownloadResult Result)>();
         var completedInstallations = 0;
@@ -8980,21 +9154,64 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
             "Bibliothèque · Fab",
             $"Installer {asset.Title} vers {targets.Length:N0} cible(s)",
+            ProductTaskLinks(asset, targets.Select(target => target.IsEngine
+                ? EngineTaskLink(target.Path, target.Name) : ProjectTaskLink(target.Path, target.Name))),
             async (context, cancellationToken) =>
             {
                 for (var index = 0; index < versions.Length; index++)
                 {
                     var option = versions[index];
+                    var transfer = new CyEngineHub.Core.Marketplaces.DownloadProgressText();
                     var progress = new InlineProgress<DirectFabDownloadProgress>(value =>
                     {
                         var fraction = (index + (value.Fraction ?? 0)) / versions.Length;
-                        context.Report(fraction, $"{option.Label} · {value.Message}");
+                        var message = transfer.Format($"{option.Label} · {value.Message}", value.DownloadedBytes, value.TotalBytes);
+                        context.Report(fraction, message);
                         Dispatcher.UIThread.Post(() =>
                         {
                             FabDownloadProgress = fraction;
-                            FabDownloadStatus = $"{option.Label} · {value.Message}";
+                            FabDownloadStatus = message;
                         });
                     });
+                    var localDerived = _fabStoredDownloads.LastOrDefault(item =>
+                        item.AssetId.Equals(asset.AssetId, StringComparison.OrdinalIgnoreCase) &&
+                        item.ArtifactId.Equals(option.Version.ArtifactId, StringComparison.OrdinalIgnoreCase) &&
+                        !string.IsNullOrWhiteSpace(item.SourceArtifactId));
+                    if (localDerived is not null)
+                    {
+                        var materialized = Path.Combine(
+                            DataDirectory,
+                            "DerivedInstallSources",
+                            Guid.NewGuid().ToString("N"));
+                        try
+                        {
+                            await DerivedLibraryPackageService.MaterializeAsync(
+                                    localDerived.Path,
+                                    materialized,
+                                    ParseContentKind(localDerived.PackageKind),
+                                    progress,
+                                    cancellationToken)
+                                .ConfigureAwait(false);
+                            foreach (var target in targets.Where(target =>
+                                         CanInstallFabVersionIntoTarget(option.Version, target)))
+                            {
+                                await ExecuteSelectedFabInstallationScriptAsync(
+                                        asset,
+                                        option.Version,
+                                        materialized,
+                                        target,
+                                        context,
+                                        cancellationToken)
+                                    .ConfigureAwait(false);
+                                completedInstallations++;
+                            }
+                        }
+                        finally
+                        {
+                            DeleteOwnedDerivedDirectory(materialized, "DerivedInstallSources");
+                        }
+                        continue;
+                    }
                     var result = IsQuixelAsset(asset)
                         ? await _quixelClient.DownloadAsync(
                                 asset,
@@ -9052,6 +9269,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var completed = await handle.Completion.ConfigureAwait(true);
         IsEpicBusy = false;
         IsFabDownloadActive = false;
+        foreach (var downloaded in completedDownloads)
+        {
+            await SaveStoredFabDownloadAsync(asset, downloaded.Option, downloaded.Result).ConfigureAwait(true);
+        }
         if (completed.Status != HubTaskStatus.Completed)
         {
             FabDownloadStatus = completed.Status == HubTaskStatus.Canceled
@@ -9059,13 +9280,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 : $"Échec : {completed.Error}";
             return;
         }
-        foreach (var downloaded in completedDownloads)
-        {
-            await SaveStoredFabDownloadAsync(asset, downloaded.Option, downloaded.Result).ConfigureAwait(true);
-        }
         FabDownloadProgress = 1;
-        FabDownloadStatus =
-            $"{versions.Length:N0} version(s) téléchargée(s) · {completedInstallations:N0} installation(s) compatible(s) terminée(s).";
+        FabDownloadStatus = selectedDerived is null
+            ? $"{versions.Length:N0} version(s) téléchargée(s) · {completedInstallations:N0} installation(s) compatible(s) terminée(s)."
+            : $"Dérivé local installé · {completedInstallations:N0} installation(s) compatible(s) terminée(s).";
         StatusMessage = FabDownloadStatus;
     }
 
@@ -9161,7 +9379,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             string.IsNullOrWhiteSpace(manifestPath) ? null : manifestPath,
             bytes,
             bytes,
-            asset.Title));
+            asset.Title,
+            $"{asset.Title} · UE {target.EngineVersion}",
+            "Conversion créée automatiquement par le script d’installation.",
+            sourceVersion.ArtifactId,
+            [target.EngineVersion]));
         await PersistStoredFabDownloadsAsync().ConfigureAwait(true);
         UpdateStoredFabAssetState(asset.AssetId);
         RebuildSelectedFabStoredDownloads(asset.AssetId);
@@ -9479,6 +9701,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
             "Fab",
             $"Importer {plan.SourceDisplayName}",
+            [ProjectTaskLink(plan.TargetProjectPath, Path.GetFileNameWithoutExtension(plan.TargetProjectPath))],
             async (context, cancellationToken) =>
             {
                 var progress = new InlineProgress<FabProjectImportProgress>(value =>
@@ -9676,6 +9899,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
             "Fab · Unity",
             $"Importer {plan.SourceDisplayName}",
+            [ProjectTaskLink(plan.TargetProjectRoot, Path.GetFileName(plan.TargetProjectRoot))],
             async (context, cancellationToken) =>
             {
                 var progress = new InlineProgress<UnityFabAssetImportProgress>(value =>
@@ -9831,6 +10055,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
             "Fab · Godot",
             $"Importer {plan.SourceDisplayName}",
+            [ProjectTaskLink(plan.TargetProjectRoot, Path.GetFileName(plan.TargetProjectRoot))],
             async (context, cancellationToken) =>
             {
                 var progress = new InlineProgress<GodotFabAssetImportProgress>(value =>
@@ -9986,6 +10211,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
             "Fab · CryEngine",
             $"Importer {plan.SourceDisplayName}",
+            [ProjectTaskLink(plan.TargetProjectRoot, Path.GetFileName(plan.TargetProjectRoot))],
             async (context, cancellationToken) =>
             {
                 var progress = new InlineProgress<CryEngineFabAssetImportProgress>(value =>
@@ -10149,23 +10375,27 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IsEpicEngineDownloadActive = true;
         EpicEngineDownloadProgress = 0;
         EpicBinaryEngineDownloadResult? result = null;
+        var targetDirectory = EpicEngineTargetDirectory;
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
             "Moteurs · Epic",
             $"Télécharger {release.DisplayName}",
+            [EngineTaskLink(targetDirectory, release.DisplayName)],
             async (context, cancellationToken) =>
             {
+                var transfer = new CyEngineHub.Core.Marketplaces.DownloadProgressText();
                 var progress = new InlineProgress<EpicBinaryEngineDownloadProgress>(value =>
                 {
-                    context.Report(value.Fraction, value.Message);
+                    var message = transfer.Format(value.Message, value.DownloadedBytes, value.TotalBytes);
+                    context.Report(value.Fraction, message);
                     Dispatcher.UIThread.Post(() =>
                     {
                         EpicEngineDownloadProgress = value.Fraction ?? EpicEngineDownloadProgress;
-                        EngineBinaryDownloadSummary = value.Message;
+                        EngineBinaryDownloadSummary = message;
                     });
                 });
                 result = await _epicBinaryEngineBackend.DownloadAsync(
                         release,
-                        EpicEngineTargetDirectory,
+                        targetDirectory,
                         progress,
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -10348,6 +10578,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
             "Unreal source",
             title,
+            [EngineTaskLink(plan.Download.TargetDirectory, plan.Download.Branch)],
             async (context, cancellationToken) =>
             {
                 var progress = new InlineProgress<UnrealSourceDownloadProgress>(value =>
@@ -10460,11 +10691,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsQuixelConnectionEnabled));
         OnPropertyChanged(nameof(IsUnityLibrarySourceAvailable));
         OnPropertyChanged(nameof(IsQuixelLibrarySourceAvailable));
-        if ((!IsUnityConnectionEnabled && LibrarySource == "Unity") ||
-            (!IsQuixelConnectionEnabled && LibrarySource == "Quixel"))
-        {
-            LibrarySource = "Fab";
-        }
+        UpdateMarketplaceAvailability();
         StatusMessage = enabled
             ? $"Connexion {id} activée."
             : $"Connexion {id} masquée; aucune donnée locale n’a été supprimée.";
@@ -11527,6 +11754,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
             "Projets · Initialisation",
             title,
+            [ProjectTaskLink(project.Project.FilePath, project.Name)],
             async (context, cancellationToken) =>
             {
                 var total = assets.Length + localPacks.Length;
@@ -11536,6 +11764,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var asset = assets[index];
+                    if (!IsMarketplaceAvailable(NormalizeAssetSource(asset)))
+                    {
+                        skipped++;
+                        context.Report((double)(index + 1) / total, $"{asset.Title} ignoré : marketplace désactivée.");
+                        continue;
+                    }
                     var version = SelectStarterCollectionVersion(
                         asset,
                         project.Project.EngineAssociation);
@@ -11553,10 +11787,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
                     var packageStorage = ResolveMarketplaceStorageProfile(asset);
                     var storageMode = ResolveMarketplaceStorageMode(asset);
+                    var transfer = new CyEngineHub.Core.Marketplaces.DownloadProgressText();
                     var progress = new InlineProgress<DirectFabDownloadProgress>(value =>
                     {
                         var fraction = (index + (value.Fraction ?? 0)) / total;
-                        context.Report(fraction, $"{asset.Title} · {value.Message}");
+                        context.Report(fraction, transfer.Format($"{asset.Title} · {value.Message}", value.DownloadedBytes, value.TotalBytes));
                     });
                     var download = IsQuixelAsset(asset)
                         ? await _quixelClient.DownloadAsync(
@@ -12836,6 +13071,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         ReplaceHubExtensions(extensions);
+        await RebuildMarketplaceConnectorsAsync(extensions).ConfigureAwait(true);
         var invalidCount = extensions.Count(extension => extension.Health != HubExtensionHealth.Ready);
         HubExtensionStatus =
             $"{extensions.Count:N0} extension(s) · {invalidCount:N0} invalide(s) · " +
@@ -13018,6 +13254,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         var extension = SelectedHubExtension?.Snapshot
             ?? throw new InvalidOperationException("Sélectionnez une extension.");
+        if (extension.Manifest.Kind == HubExtensionKind.Marketplace)
+        {
+            var connector = MarketplaceConnectors.FirstOrDefault(item => item.Id == extension.Manifest.Id);
+            if (connector is null || !connector.IsEnabled)
+                throw new InvalidOperationException("Cette marketplace est désactivée ou son connecteur est invalide.");
+            await OpenMarketplaceBrowserAsync(connector.Id, connector.Name, new Uri(connector.InventoryUrl)).ConfigureAwait(true);
+            return;
+        }
         if (!HubExtensionManifestParser.TryGetHttpsUri(extension.Manifest.Website, out var uri) ||
             uri is null)
         {
@@ -13421,6 +13665,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
             "Plugins",
             $"Installer · {plan.Plugin.FriendlyName}",
+            [plan.Target.Kind == PluginInstallTargetKind.Engine
+                ? EngineTaskLink(plan.Target.Engine.RootPath, plan.Target.DisplayName)
+                : ProjectTaskLink(Path.GetDirectoryName(plan.Target.PluginsDirectory)!, plan.Target.DisplayName)],
             async (context, cancellationToken) =>
             {
                 var progress = new InlineProgress<PluginInstallProgress>(value =>
@@ -13570,6 +13817,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
             "Plugins",
             $"Installer package · {plan.DisplayName}",
+            [ProjectTaskLink(plan.TargetProject.RootPath, plan.TargetProject.Name)],
             async (context, cancellationToken) =>
             {
                 var progress = new InlineProgress<LocalEnginePackageInstallProgress>(value =>
@@ -14424,11 +14672,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
             eventArgs.Task.Status == HubTaskStatus.Failed ? "ERROR" : "TASK",
             eventArgs.Task.Category,
             $"{eventArgs.Task.Title} · {eventArgs.Task.Status} · {eventArgs.Task.Message ?? eventArgs.Task.Error ?? string.Empty}");
+        if (Interlocked.Exchange(ref _taskRefreshPending, 1) != 0) return;
         Dispatcher.UIThread.Post(() =>
         {
-            if (_fabVersionDownloadsByTaskId.TryGetValue(eventArgs.Task.Id, out var versionDownload))
+            Interlocked.Exchange(ref _taskRefreshPending, 0);
+            var snapshot = _taskScheduler.GetSnapshot();
+            foreach (var task in snapshot)
             {
-                versionDownload.ApplySnapshot(eventArgs.Task);
+                if (_fabVersionDownloadsByTaskId.TryGetValue(task.Id, out var versionDownload))
+                    versionDownload.ApplySnapshot(task);
+            }
+            if (_fabVersionDownloadsByTaskId.Count > 0)
+            {
                 var activeDownloads = _fabVersionDownloads
                     .Where(item => !item.IsTerminal)
                     .ToArray();
@@ -14438,11 +14693,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     FabDownloadProgress = _fabVersionDownloads.Average(item => item.ProgressPercent) / 100D;
                 }
             }
-            var snapshot = _taskScheduler.GetSnapshot();
-            Tasks.Clear();
+            var existing = Tasks.ToDictionary(item => item.Id);
             foreach (var task in snapshot)
             {
-                Tasks.Add(new TaskItemViewModel(task, CancelTask));
+                if (existing.TryGetValue(task.Id, out var row)) row.ApplySnapshot(task);
+                else
+                {
+                    var index = snapshot.TakeWhile(item => item.Id != task.Id).Count();
+                    Tasks.Insert(Math.Min(index, Tasks.Count), new TaskItemViewModel(task, CancelTask, NavigateTaskLink));
+                }
             }
 
             OnPropertyChanged(nameof(HasNoTasks));
@@ -14453,6 +14712,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void CancelTask(Guid taskId)
     {
+        if (_durableDownloadTasks.TryGetValue(taskId, out var id) && DownloadJournal.Read().TryGetValue(id, out var saved))
+            DownloadJournal.Upsert(id, saved with { State = "Canceled" });
         if (_taskScheduler.Cancel(taskId))
         {
             StatusMessage = "Annulation demandée…";
@@ -14617,12 +14878,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
             var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
                 "Moteurs · Epic",
                 $"Modifier {selected.DisplayName}",
+                [EngineTaskLink(selected.Path, selected.DisplayName)],
                 async (context, cancellationToken) =>
                 {
+                    var transfer = new CyEngineHub.Core.Marketplaces.DownloadProgressText();
                     var progress = new InlineProgress<EpicBinaryEngineDownloadProgress>(value =>
                     {
-                        context.Report(value.Fraction, value.Message);
-                        Dispatcher.UIThread.Post(() => EngineComponentUpdateStatus = value.Message);
+                        var message = transfer.Format(value.Message, value.DownloadedBytes, value.TotalBytes);
+                        context.Report(value.Fraction, message);
+                        Dispatcher.UIThread.Post(() => EngineComponentUpdateStatus = message);
                     });
                     result = await _epicBinaryEngineBackend.UpdateComponentsAsync(
                             release,
@@ -15123,7 +15387,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         string? ManifestPath = null,
         long? UncompressedBytes = null,
         long? StoredBytes = null,
-        string? AssetTitle = null);
+        string? AssetTitle = null,
+        string? DerivationName = null,
+        string? DerivationNotes = null,
+        string? SourceArtifactId = null,
+        string[]? EngineVersions = null);
 
     private sealed record QuixelLocalEntry(
         string Name,

@@ -6,7 +6,7 @@ internal static class Program
     private const long MaximumTotalBytes = 20L * 1024 * 1024 * 1024;
     private static readonly HashSet<string> AllowedExtensions = new(
         [
-            ".fbx", ".obj", ".gltf", ".glb",
+            ".fbx", ".obj", ".mtl", ".gltf", ".glb", ".bin",
             ".png", ".jpg", ".jpeg", ".tga", ".tif", ".tiff", ".exr", ".hdr",
             ".wav", ".ogg",
         ],
@@ -113,6 +113,7 @@ internal static class Program
     {
         if (File.Exists(input))
         {
+            CyEngineHub.Core.Assets.PortableAssetSelection.ValidateSingleFile(input);
             var file = new FileInfo(input);
             return AllowedExtensions.Contains(file.Extension)
                 ? [new BridgeFile(file.FullName, file.Name, file.Length)]

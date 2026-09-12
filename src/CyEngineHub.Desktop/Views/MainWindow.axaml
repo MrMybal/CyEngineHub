@@ -436,7 +436,7 @@
                             <TextBlock Text="{Binding VersionLabel}" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" />
                           </Border>
                         </Grid>
-                        <TextBlock Grid.Row="1" Text="{Binding Path}" FontSize="9" Foreground="#718398" Margin="0,9,0,0" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Row="1" Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="9" Foreground="#718398" Margin="0,9,0,0" TextTrimming="CharacterEllipsis" />
                         <StackPanel Grid.Row="2" Margin="0,12,0,0">
                           <TextBlock Text="{Binding HealthLabel}" FontSize="10" FontWeight="Bold" Foreground="#65CCA9" />
                           <TextBlock Text="{Binding EffectiveSizeLabel}" FontSize="10" Foreground="#A8C9F2" Margin="0,5,0,0" />
@@ -463,7 +463,7 @@
                         </Grid>
                         <TextBlock Grid.Row="1" Text="{Binding Version}" FontSize="11" Foreground="#AAB7C5" Margin="0,9,0,0" />
                         <StackPanel Grid.Row="2" Margin="0,12,0,0">
-                          <TextBlock Text="{Binding Path}" FontSize="9" Foreground="#718398" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="9" Foreground="#718398" TextTrimming="CharacterEllipsis" />
                           <TextBlock Text="{Binding Source}" FontSize="10" Foreground="#9DACBB" TextWrapping="Wrap" Margin="0,8,0,0" />
                           <TextBlock Text="{Binding EffectiveSizeLabel}" FontSize="10" Foreground="#A8C9F2" Margin="0,6,0,0" />
                           <TextBlock Text="{Binding Organization.FolderLabel}" FontSize="9" Foreground="#D9A55C" Margin="0,8,0,0" />
@@ -493,7 +493,7 @@
                             <TextBlock Text="OFFICIEL EPIC" FontSize="9" FontWeight="Bold" Foreground="#65CCA9" />
                           </Border>
                         </StackPanel>
-                        <TextBlock Text="{Binding Path}" FontSize="11" Foreground="#718398" Margin="0,7,0,0" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="11" Foreground="#718398" Margin="0,7,0,0" TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding EffectiveSizeLabel}" FontSize="10" Foreground="#A8C9F2" Margin="0,5,0,0" />
                         <Grid ColumnDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="20" Margin="0,13,0,0">
                           <StackPanel>
@@ -548,7 +548,7 @@
                           <TextBlock Text="{Binding Version}" FontSize="10" Foreground="#70A8FA" VerticalAlignment="Center" />
                           <TextBlock Text="{Binding Organization.FolderLabel}" FontSize="9" Foreground="#D9A55C" VerticalAlignment="Center" />
                         </StackPanel>
-                        <TextBlock Text="{Binding Path}" FontSize="10" Foreground="#718398" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="10" Foreground="#718398" TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding Source}" FontSize="9" Foreground="#8294A8" />
                         <TextBlock Text="{Binding EffectiveSizeLabel}" FontSize="10" Foreground="#A8C9F2" />
                       </StackPanel>
@@ -877,7 +877,7 @@
                         <ComboBox Grid.Column="1" IsVisible="{Binding IsUnrealProjectCreation}" ItemsSource="{Binding ProjectCreationEngines}" SelectedItem="{Binding SelectedProjectCreationEngine}" PlaceholderText="Version Unreal installée">
                           <ComboBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:ProjectCreationEngineOptionViewModel">
-                              <StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold" /><TextBlock Text="{Binding Version}" FontSize="9" Foreground="#70A8FA" /><TextBlock Text="{Binding Path}" FontSize="8" Foreground="#65788D" TextTrimming="CharacterEllipsis" /></StackPanel>
+                              <StackPanel><TextBlock Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" FontWeight="SemiBold" /><TextBlock Text="{Binding Version}" FontSize="9" Foreground="#70A8FA" /><TextBlock Text="{Binding Path}" FontSize="8" Foreground="#65788D" TextTrimming="CharacterEllipsis" /></StackPanel>
                             </DataTemplate>
                           </ComboBox.ItemTemplate>
                         </ComboBox>
@@ -1025,7 +1025,7 @@
                           <Border Grid.Column="1" Background="#18283A" CornerRadius="5" Padding="7,3"><TextBlock Text="{Binding EngineLabel}" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" /></Border>
                         </Grid>
                         <StackPanel Grid.Row="2" Margin="0,7,0,0">
-                          <TextBlock Text="{Binding Path}" FontSize="9" Foreground="#718398" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="9" Foreground="#718398" TextTrimming="CharacterEllipsis" />
                           <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,7,0,0">
                             <TextBlock Text="{Binding ModuleCount, StringFormat='{}{0} module(s)'}" FontSize="9" Foreground="#AAB7C5" />
                             <TextBlock Text="{Binding PluginCount, StringFormat='{}{0} plugin(s)'}" FontSize="9" Foreground="#AAB7C5" />
@@ -1056,7 +1056,7 @@
                         <TextBlock Grid.Row="1" Text="{Binding Version}" FontSize="10" Foreground="#D9A55C" Margin="0,8,0,0" />
                         <StackPanel Grid.Row="2" Margin="0,12,0,0">
                           <TextBlock Text="{Binding Description}" FontSize="10" Foreground="#AAB7C5" TextWrapping="Wrap" MaxHeight="58" />
-                          <TextBlock Text="{Binding Path}" FontSize="9" Foreground="#718398" TextTrimming="CharacterEllipsis" Margin="0,8,0,0" />
+                          <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="9" Foreground="#718398" TextTrimming="CharacterEllipsis" Margin="0,8,0,0" />
                           <TextBlock Text="{Binding Organization.FolderLabel}" FontSize="9" Foreground="#D9A55C" Margin="0,8,0,0" />
                         </StackPanel>
                         <Grid Grid.Row="3" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="7">
@@ -1088,7 +1088,7 @@
                           <Border Background="#17251F" CornerRadius="5" Padding="7,3"><TextBlock Text="{Binding HealthLabel}" FontSize="10" FontWeight="Bold" Foreground="#65CCA9" /></Border>
                           <TextBlock Text="{Binding Organization.FolderLabel}" FontSize="9" Foreground="#D9A55C" VerticalAlignment="Center" />
                         </StackPanel>
-                        <TextBlock Text="{Binding Path}" FontSize="10" Foreground="#718398" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="10" Foreground="#718398" TextTrimming="CharacterEllipsis" />
                         <StackPanel Orientation="Horizontal" Spacing="20">
                           <TextBlock Text="{Binding ModuleCount, StringFormat='{}{0} module(s)'}" FontSize="10" Foreground="#AAB7C5" />
                           <TextBlock Text="{Binding PluginCount, StringFormat='{}{0} plugin(s) actif(s)'}" FontSize="10" Foreground="#AAB7C5" />
@@ -1125,7 +1125,7 @@
                           <TextBlock Text="{Binding Organization.FolderLabel}" FontSize="9" Foreground="#D9A55C" VerticalAlignment="Center" />
                         </StackPanel>
                         <TextBlock Text="{Binding Description}" FontSize="10" Foreground="#8294A8" />
-                        <TextBlock Text="{Binding Path}" FontSize="10" Foreground="#718398" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="10" Foreground="#718398" TextTrimming="CharacterEllipsis" />
                         <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="8">
                           <TextBox Classes="path" Text="{Binding Organization.Alias}" PlaceholderText="Libellé personnalisé" />
                           <TextBox Grid.Column="1" Classes="path" Text="{Binding Organization.FolderPath}" PlaceholderText="Dossier/Sous-dossier" />
@@ -1492,7 +1492,7 @@
                               </Border>
                             </StackPanel>
                             <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" FontSize="10" Foreground="#A7B5C4" TextWrapping="Wrap" />
-                            <TextBlock Text="{Binding Path}" FontSize="9" Foreground="#64778B" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="9" Foreground="#64778B" TextTrimming="CharacterEllipsis" />
                             <Grid ColumnDefinitions="1.1*,1.2*,1.3*" ColumnSpacing="16">
                               <TextBlock Text="{Binding Project, StringFormat='Projet · {0}'}" FontSize="10" Foreground="#8496A9" />
                               <TextBlock Grid.Column="1" Text="{Binding Source}" FontSize="10" Foreground="#8496A9" />
@@ -1632,7 +1632,7 @@
                             <TextBlock Text="SOURCE" FontSize="9" FontWeight="Bold" Foreground="#F2B84B" />
                           </Border>
                         </StackPanel>
-                        <TextBlock Text="{Binding Path}" FontSize="10" Foreground="#708398" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="10" Foreground="#708398" TextTrimming="CharacterEllipsis" />
                         <Grid ColumnDefinitions="1.2*,1.3*,1.4*,1.4*" ColumnSpacing="18">
                           <StackPanel>
                             <TextBlock Text="ORIGINE" FontSize="9" FontWeight="Bold" Foreground="#5F7287" />
@@ -2080,7 +2080,7 @@
                       </StackPanel>
                       <StackPanel Grid.Column="2">
                         <TextBlock Text="EMPLACEMENT" FontSize="9" FontWeight="Bold" Foreground="#5F7287" />
-                        <TextBlock Text="{Binding Path}" FontSize="9" Foreground="#8395A8" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="9" Foreground="#8395A8" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                       <StackPanel Grid.Column="3">
                         <TextBlock Text="SOURCE / ÉTAT" FontSize="9" FontWeight="Bold" Foreground="#5F7287" />
@@ -2100,7 +2100,7 @@
           <Border Classes="card" Margin="0" Padding="12" VerticalAlignment="Stretch">
             <StackPanel Spacing="8">
               <TextBlock Text="SOURCES" FontSize="10" FontWeight="Bold" Foreground="#65788D" Margin="6,2,0,6" />
-              <Button Classes="ghost" Command="{Binding ShowLibraryFabCommand}" IsVisible="{Binding IsDirectFabConnected}" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch" Padding="10">
+              <Button Classes="ghost" Command="{Binding ShowLibraryFabCommand}" IsVisible="{Binding IsFabLibrarySourceAvailable}" HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch" Padding="10">
                 <Grid ColumnDefinitions="4,*" ColumnSpacing="10">
                   <Border Width="4" CornerRadius="2" Background="#4D9BE8" IsVisible="{Binding IsLibraryFabSelected}" />
                   <StackPanel Grid.Column="1">
@@ -2127,6 +2127,16 @@
                   </StackPanel>
                 </Grid>
               </Button>
+              <Button Classes="ghost" Content="Packages locaux" Command="{Binding ShowLibraryLocalCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+              <ItemsControl ItemsSource="{Binding MarketplaceConnectors}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:MarketplaceConnectorViewModel">
+                    <Button Classes="ghost" IsVisible="{Binding IsEnabled}" Command="{Binding OpenLibraryCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,0,0,6">
+                      <StackPanel><TextBlock Text="{Binding Name}" TextWrapping="Wrap" /><TextBlock Text="{Binding LibrarySubtitle}" FontSize="9" Foreground="#8294A8" /></StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
               <Border Background="#0B121A" CornerRadius="7" Padding="10" Margin="0,8,0,0">
                 <TextBlock Text="Les connexions et dossiers par défaut se configurent uniquement dans Paramètres." FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
               </Border>
@@ -2137,6 +2147,8 @@
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,10" IsVisible="{Binding IsLibraryQuixelSelected}">
               <Button Classes="ghost view-mode" Classes.active="{Binding IsQuixelAssetsTabSelected}" Content="Mes assets" Command="{Binding ShowQuixelAssetsTabCommand}" />
               <Button Classes="ghost view-mode" Classes.active="{Binding IsQuixelCollectionsTabSelected}" Content="Collections Megascans" Command="{Binding ShowQuixelCollectionsTabCommand}" />
+              <Button Classes="accent" Content="Megascans via Fab" Command="{Binding OpenMegascansFabCommand}" ToolTip.Tip="Catalogue officiel Fab dans le hub. Connexion web Fab, indépendante de Quixel historique." />
+              <Button Classes="ghost" Content="Téléchargés via Fab" Command="{Binding ShowMegascansFabDownloadsCommand}" />
             </StackPanel>
             <Border Grid.Row="1" Classes="card" Margin="0,0,0,10" IsVisible="{Binding IsQuixelCollectionScopeVisible}">
               <Grid ColumnDefinitions="Auto,*" ColumnSpacing="16">
@@ -2150,6 +2162,9 @@
             </Border>
             <Grid Grid.Row="2">
               <views:QuixelCollectionsPanel IsVisible="{Binding IsQuixelCollectionsListVisible}" />
+              <Border IsVisible="{Binding IsConnectorLibrarySelected}">
+                <views:ConnectorLibraryPanel DataContext="{Binding SelectedConnectorLibrary}" />
+              </Border>
               <Grid IsVisible="{Binding IsRemoteMarketplaceContentVisible}">
               <Border Classes="card" IsVisible="{Binding !IsSelectedRemoteConnectionReady}">
                 <StackPanel>
@@ -2167,6 +2182,10 @@
                         <StackPanel>
                           <TextBlock Text="{Binding LibraryRemoteHeading}" FontSize="10" FontWeight="Bold" Foreground="#70A8FA" />
                           <TextBlock Text="{Binding LibraryRemoteAccount}" FontSize="10" Foreground="#65CCA9" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLibraryFabWebSelected}">
+                          <Button Content="Fichiers téléchargés" Command="{Binding ShowMegascansFabDownloadsCommand}" />
+                          <Button Classes="accent" Content="Connexion / Synchroniser Fab" Command="{Binding SyncFabWebCommand}" />
                         </StackPanel>
                         <Button Grid.Column="1" Classes="accent refresh-running" Command="{Binding RefreshDirectFabLibraryCommand}" IsVisible="{Binding IsLibraryFabSelected}" IsEnabled="{Binding !IsFabLibraryRefreshing}">
                           <StackPanel Orientation="Horizontal" Spacing="8">
@@ -2309,8 +2328,8 @@
                       <StackPanel Grid.Column="2" Spacing="8" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Right">
                           <Button Classes="ghost asset-action" Command="{Binding OpenSelectedRemoteFabListingCommand}" IsEnabled="{Binding HasSelectedRemoteFabListing}" ToolTip.Tip="Ouvrir la page web"><TextBlock Text="🌐" FontSize="14" /></Button>
-                          <Button Classes="ghost asset-action" Command="{Binding OpenFabDownloadOptionsCommand}" IsEnabled="{Binding SelectedRemoteFabAssetCard.CanDownload}" ToolTip.Tip="Choisir les versions à télécharger"><Viewbox Width="16" Height="16"><Canvas Width="24" Height="24"><Path Data="M 12,3 L 12,15 M 7,10 L 12,15 L 17,10 M 4,18 L 4,21 L 20,21 L 20,18" Stroke="#CFD9E5" StrokeThickness="2" /></Canvas></Viewbox></Button>
-                          <Button Classes="accent asset-action" Command="{Binding OpenFabInstallOptionsCommand}" IsEnabled="{Binding SelectedRemoteFabAssetCard.CanDownload}" ToolTip.Tip="Installer dans un ou plusieurs projets"><Viewbox Width="16" Height="16"><Canvas Width="24" Height="24"><Path Data="M 4,4 L 20,4 L 20,20 L 4,20 Z M 8,9 L 12,13 L 16,9 M 12,7 L 12,16" Stroke="#FFFFFF" StrokeThickness="2" /></Canvas></Viewbox></Button>
+                          <Button Classes="ghost asset-action" Command="{Binding SelectedRemoteFabAssetCard.DownloadCommand}" IsEnabled="{Binding SelectedRemoteFabAssetCard.CanDownload}" ToolTip.Tip="Choisir les versions à télécharger"><Viewbox Width="16" Height="16"><Canvas Width="24" Height="24"><Path Data="M 12,3 L 12,15 M 7,10 L 12,15 L 17,10 M 4,18 L 4,21 L 20,21 L 20,18" Stroke="#CFD9E5" StrokeThickness="2" /></Canvas></Viewbox></Button>
+                          <Button Classes="accent asset-action" Command="{Binding OpenFabInstallOptionsCommand}" IsEnabled="{Binding SelectedRemoteFabAssetCard.CanInstall}" ToolTip.Tip="Installer dans un ou plusieurs projets"><Viewbox Width="16" Height="16"><Canvas Width="24" Height="24"><Path Data="M 4,4 L 20,4 L 20,20 L 4,20 Z M 8,9 L 12,13 L 16,9 M 12,7 L 12,16" Stroke="#FFFFFF" StrokeThickness="2" /></Canvas></Viewbox></Button>
                           <Button Classes="ghost asset-action" Content="＋" Command="{Binding SelectedRemoteFabAssetCard.OpenCollectionsCommand}" ToolTip.Tip="Ajouter à des collections" />
                         </StackPanel>
                         <Button Classes="ghost" Content="{Binding SelectedFabAssetVisibilityLabel}" Command="{Binding HideSelectedFabAssetCommand}" IsVisible="{Binding !SelectedRemoteFabAssetCard.IsHidden}" />
@@ -2348,9 +2367,11 @@
                   </Border>
                   <Border Classes="card">
                     <StackPanel Spacing="9">
-                      <Grid ColumnDefinitions="*,224" ColumnSpacing="10">
+                      <Grid ColumnDefinitions="*,170,150,224" ColumnSpacing="10">
                         <TextBlock Text="VERSIONS DÉJÀ TÉLÉCHARGÉES" FontSize="10" FontWeight="Bold" Foreground="#65788D" VerticalAlignment="Center" />
-                        <Button Grid.Column="1" Classes="danger" Content="Supprimer toutes" Command="{Binding RequestDeleteAllFabDownloadsCommand}" IsVisible="{Binding HasSelectedFabStoredDownloads}" HorizontalAlignment="Stretch" />
+                        <Button Grid.Column="1" Classes="ghost" Content="Importer un dérivé" Command="{Binding OpenDerivedFolderImporterCommand}" HorizontalAlignment="Stretch" />
+                        <Button Grid.Column="2" Classes="accent" Content="Create Derived" Command="{Binding OpenDerivedWorkspaceCreatorCommand}" IsEnabled="{Binding HasSelectedFabStoredDownloads}" HorizontalAlignment="Stretch" />
+                        <Button Grid.Column="3" Classes="danger" Content="Supprimer toutes" Command="{Binding RequestDeleteAllFabDownloadsCommand}" IsVisible="{Binding HasSelectedFabStoredDownloads}" HorizontalAlignment="Stretch" />
                       </Grid>
                       <Border IsVisible="{Binding IsDeleteAllFabDownloadsConfirmationVisible}" Background="#321A1D" CornerRadius="6" Padding="9">
                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
@@ -2364,18 +2385,41 @@
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="vm:FabStoredDownloadViewModel">
                             <Border Background="#0D141C" BorderBrush="#202C39" BorderThickness="1" CornerRadius="7" Padding="10" Margin="0,0,0,6">
-                              <Grid ColumnDefinitions="1.2*,*,108,108" ColumnSpacing="8">
-                                <StackPanel><TextBlock Text="{Binding Version}" FontWeight="SemiBold" /><TextBlock Text="{Binding PackageSummary}" FontSize="9" Foreground="#65CCA9" /><TextBlock Text="{Binding ArtifactId}" FontSize="8" Foreground="#718398" TextTrimming="CharacterEllipsis" /></StackPanel>
+                              <Grid ColumnDefinitions="1.2*,*,80,80,80,80,90" ColumnSpacing="8">
+                                <StackPanel><TextBlock Text="{Binding Version}" FontWeight="SemiBold" /><TextBlock Text="{Binding PackageSummary}" FontSize="9" Foreground="#65CCA9" /><TextBlock Text="{Binding OriginLabel}" FontSize="8" Foreground="#8CC2FF" /><TextBlock Text="{Binding DerivationNotes}" FontSize="8" Foreground="#718398" TextTrimming="CharacterEllipsis" /><TextBlock Text="{Binding ArtifactId}" FontSize="8" Foreground="#718398" TextTrimming="CharacterEllipsis" /></StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="1"><TextBlock Text="{Binding RawSizeLabel}" FontSize="10" /><TextBlock Text="{Binding StoredSizeLabel}" FontSize="10" Foreground="#65CCA9" /><TextBlock Text="{Binding DownloadedAt}" FontSize="8" Foreground="#718398" /></StackPanel>
-                                <Button Grid.Column="2" Classes="ghost" Content="Dossier" Command="{Binding OpenFolderCommand}" ToolTip.Tip="{Binding Path}" HorizontalAlignment="Stretch" />
-                                <Button Grid.Column="3" Classes="danger" Content="Supprimer" Command="{Binding RequestDeleteCommand}" HorizontalAlignment="Stretch" />
-                                <Border Grid.ColumnSpan="4" IsVisible="{Binding IsDeleteConfirmationVisible}" Background="#321A1D" CornerRadius="5" Padding="7" VerticalAlignment="Center">
+                                <Button Grid.Column="2" Classes="accent" Content="Installer" Command="{Binding InstallDerivedCommand}" IsVisible="{Binding IsDerived}" HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="3" Classes="ghost" Content="Dériver" Command="{Binding CreateDerivedCommand}" HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="4" Classes="ghost" Content="Tester" Command="{Binding CreateTestCommand}" HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="5" Classes="ghost" Content="Dossier" Command="{Binding OpenFolderCommand}" ToolTip.Tip="{Binding Path}" HorizontalAlignment="Stretch" />
+                                <Button Grid.Column="6" Classes="danger" Content="Supprimer" Command="{Binding RequestDeleteCommand}" HorizontalAlignment="Stretch" />
+                                <Border Grid.ColumnSpan="7" IsVisible="{Binding IsDeleteConfirmationVisible}" Background="#321A1D" CornerRadius="5" Padding="7" VerticalAlignment="Center">
                                   <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                     <TextBlock Text="Supprimer cette version et tous ses fichiers ?" TextWrapping="Wrap" VerticalAlignment="Center" />
                                     <Button Grid.Column="1" Classes="danger" Content="Confirmer" Command="{Binding ConfirmDeleteCommand}" />
                                     <Button Grid.Column="2" Classes="ghost" Content="Annuler" Command="{Binding CancelDeleteCommand}" />
                                   </Grid>
                                 </Border>
+                              </Grid>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+                  <Border Classes="card" IsVisible="{Binding HasSelectedFabDerivedWorkspaces}">
+                    <StackPanel Spacing="9">
+                      <TextBlock Text="PROJETS TEMPORAIRES" FontSize="10" FontWeight="Bold" Foreground="#70A8FA" />
+                      <TextBlock Text="Les ateliers de dérivés peuvent être empaquetés. Les projets de test servent uniquement à ouvrir et valider une version avant leur suppression." FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" />
+                      <ItemsControl ItemsSource="{Binding SelectedFabDerivedWorkspaces}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:FabDerivedWorkspaceViewModel">
+                            <Border Background="#0D141C" BorderBrush="#26394C" BorderThickness="1" CornerRadius="7" Padding="10" Margin="0,0,0,6">
+                              <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                                <StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold" /><TextBlock Text="{Binding WorkspaceKindLabel}" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" /><TextBlock Text="{Binding EngineVersion, StringFormat='Unreal Engine {0}'}" FontSize="9" Foreground="#8CC2FF" /><TextBlock Text="{Binding ContentKindLabel}" FontSize="9" Foreground="#65CCA9" /><TextBlock Text="{Binding ProjectPath}" FontSize="8" Foreground="#718398" TextTrimming="CharacterEllipsis" /></StackPanel>
+                                <Button Grid.Column="1" Classes="ghost" Content="Ouvrir Unreal" Command="{Binding OpenCommand}" />
+                                <Button Grid.Column="2" Classes="accent" Content="Package Data" Command="{Binding PackageCommand}" IsVisible="{Binding CanPackage}" />
+                                <Button Grid.Column="3" Classes="danger" Content="Supprimer le projet" Command="{Binding RequestDeleteCommand}" />
                               </Grid>
                             </Border>
                           </DataTemplate>
@@ -2625,7 +2669,7 @@
                               </Border>
                             </StackPanel>
                             <TextBlock Text="{Binding Inventory}" FontSize="9" Foreground="#A6B4C3" Margin="0,5,0,0" />
-                            <TextBlock Text="{Binding Path}" FontSize="9" Foreground="#64768A" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="9" Foreground="#64768A" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding CollectionsLabel}" FontSize="9" Foreground="#65CFA1" Margin="0,3,0,0" TextWrapping="Wrap" />
                             <TextBlock Text="{Binding IssueSummary}" IsVisible="{Binding HasIssues}" FontSize="9" Foreground="#D9A55C" Margin="0,3,0,0" TextWrapping="Wrap" />
                           </StackPanel>
@@ -3045,7 +3089,7 @@
                       </StackPanel>
                       <StackPanel Grid.Column="3">
                         <TextBlock Text="EMPLACEMENT" FontSize="9" FontWeight="Bold" Foreground="#5F7287" />
-                        <TextBlock Text="{Binding Path}" FontSize="9" Foreground="#8395A8" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="9" Foreground="#8395A8" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                       <StackPanel Grid.Column="4">
                         <TextBlock Text="SOURCE" FontSize="9" FontWeight="Bold" Foreground="#5F7287" />
@@ -3182,7 +3226,7 @@
                           </Border>
                         </StackPanel>
                         <TextBlock Text="{Binding Name}" FontSize="10" Foreground="#8EA0B3" Margin="0,4,0,0" />
-                        <TextBlock Text="{Binding Path}" FontSize="9" Foreground="#687B90" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="9" Foreground="#687B90" Margin="0,3,0,0" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                       <StackPanel Grid.Column="1">
                         <TextBlock Text="TAILLE" FontSize="9" FontWeight="Bold" Foreground="#5F7287" />
@@ -3334,8 +3378,14 @@
                   <Grid ColumnDefinitions="*,140,100,Auto" ColumnSpacing="16">
                     <StackPanel>
                       <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold" />
-                      <TextBlock Text="{Binding Message}" FontSize="11" Foreground="#778A9F" Margin="0,5,0,0" />
+                      <TextBlock Text="{Binding Message}" FontSize="11" Foreground="#778A9F" Margin="0,5,0,0" TextWrapping="Wrap" ToolTip.Tip="{Binding Message}" />
                       <ProgressBar Value="{Binding ProgressPercent}" Maximum="100" Height="3" Margin="0,12,0,0" />
+                      <ItemsControl ItemsSource="{Binding Links}" Margin="0,8,0,0">
+                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:TaskLinkViewModel">
+                          <Button Classes="ghost" Content="{Binding Label}" Command="{Binding OpenCommand}" Margin="0,0,8,6" />
+                        </DataTemplate></ItemsControl.ItemTemplate>
+                      </ItemsControl>
                     </StackPanel>
                     <StackPanel Grid.Column="1">
                       <TextBlock Text="{Binding Category}" FontSize="9" FontWeight="Bold" Foreground="#607286" />
@@ -3544,6 +3594,8 @@
                           </StackPanel>
                         </Border>
                         <TextBlock Text="La session Quixel est stockée séparément dans le Gestionnaire d’identification Windows. Elle donne accès à /v1/assets/acquired puis résout les fiches du catalogue Megascans public." FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
+                        <Button Content="Utiliser Megascans via Fab" Classes="accent" Command="{Binding OpenMegascansFabCommand}" HorizontalAlignment="Left" />
+                        <TextBlock Text="Si Quixel refuse la connexion, utilisez votre compte sur le site Fab intégré. Le catalogue vendeur n’est pas une liste de possessions : Fab vérifie vos droits. Les fichiers téléchargés obtiennent une fiche locale ; votre cache historique est conservé." FontSize="10" Foreground="#A8C9F2" TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
                   </StackPanel>
@@ -3572,7 +3624,7 @@
                       <TextBlock Text="MOTEUR DE RÉFÉRENCE POUR LES PLUGINS" FontSize="10" FontWeight="Bold" Foreground="#70A8FA" />
                       <ComboBox ItemsSource="{Binding ProjectCreationEngines}" SelectedItem="{Binding SelectedProjectCreationEngine}" PlaceholderText="Choisir une version Unreal installée" HorizontalAlignment="Stretch">
                         <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:ProjectCreationEngineOptionViewModel">
-                          <StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold" /><TextBlock Text="{Binding Path}" FontSize="9" Foreground="#718398" TextTrimming="CharacterEllipsis" /></StackPanel>
+                          <StackPanel><TextBlock Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" FontWeight="SemiBold" /><TextBlock Text="{Binding Path}" FontSize="9" Foreground="#718398" TextTrimming="CharacterEllipsis" /></StackPanel>
                         </DataTemplate></ComboBox.ItemTemplate>
                       </ComboBox>
                       <TextBlock Text="{Binding ManagedProjectProfileEngineSummary}" Foreground="#8294A8" FontSize="10" TextWrapping="Wrap" />
@@ -3605,6 +3657,17 @@
                 </StackPanel>
 
                 <StackPanel IsVisible="{Binding IsSettingsLibrarySelected}" Spacing="14">
+                  <Border Classes="card"><StackPanel Spacing="10">
+                    <TextBlock Text="FILE DE TÉLÉCHARGEMENT PERSISTANTE" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="Fab et Megascans : demandes sauvegardées avant exécution. Les téléchargements seuls peuvent être parallèles ; les installations ne sont pas parallélisées. Plusieurs versions du même asset restent sérialisées." TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="*,140"><TextBlock Text="Téléchargements simultanés (1 à 16)" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="1" Maximum="16" FormatString="0" Value="{Binding DownloadConcurrency}" /></Grid>
+                    <CheckBox Content="Reprendre les téléchargements interrompus au lancement" IsChecked="{Binding ResumeDownloadsOnStartup}" />
+                    <StackPanel Orientation="Horizontal" Spacing="10"><Button Content="Enregistrer" Command="{Binding SaveDownloadQueueSettingsCommand}" /><Button Content="Reprendre / réessayer les échecs" Command="{Binding ResumeDownloadQueueCommand}" /></StackPanel>
+                    <TextBlock Text="{Binding DownloadQueueStatus}" TextWrapping="Wrap" Foreground="#55C7A6" />
+                    <TextBlock Text="Récupération d’une ancienne file : importer le JSON, puis cliquer sur Reprendre. Les variantes déjà présentes dans la bibliothèque sont ignorées." TextWrapping="Wrap" FontSize="11" />
+                    <TextBox Text="{Binding DownloadRecoveryPath}" PlaceholderText="Chemin du fichier download-recovery.json" />
+                    <Button Content="Importer la sauvegarde sans lancer" Command="{Binding ImportDownloadRecoveryCommand}" HorizontalAlignment="Left" />
+                  </StackPanel></Border>
                   <Border Classes="card">
                     <StackPanel Spacing="10">
                       <TextBlock Text="CACHE DES CATALOGUES ET MINIATURES" FontSize="16" FontWeight="SemiBold" />
@@ -3622,6 +3685,7 @@
                       <TextBlock Text="MARKETPLACES" FontSize="10" FontWeight="Bold" Foreground="#70A8FA" />
                       <TextBlock Text="Chaque marketplace conserve son propre catalogue, son actualisation et son profil de compression." FontSize="10" Foreground="#BCD0E6" TextWrapping="Wrap" />
                       <TextBlock Text="Le cache reste immédiatement disponible pendant que l’actualisation s’effectue en arrière-plan." FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" />
+                      <TextBlock Text="Désactiver un store masque sa source et bloque ses nouveaux téléchargements et actualisations. Les fichiers et tâches déjà lancées sont conservés. Enregistrez les marketplaces pour conserver vos choix." FontSize="10" Foreground="#BCD0E6" TextWrapping="Wrap" />
                     </StackPanel>
                   </Border>
                   <Border Classes="card">
@@ -3632,7 +3696,7 @@
                           <TextBlock Text="My Library · compte Epic/Fab" FontSize="10" Foreground="#70A8FA" />
                           <TextBlock Text="{Binding DirectFabStatusSummary}" FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoRefreshFabOnStartup}" OnContent="Actualisation automatique" OffContent="Actualisation manuelle" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Spacing="6"><ToggleSwitch IsChecked="{Binding FabMarketplaceEnabled}" OnContent="Marketplace activée" OffContent="Marketplace désactivée" /><ToggleSwitch IsChecked="{Binding AutoRefreshFabOnStartup}" IsEnabled="{Binding FabMarketplaceEnabled}" OnContent="Actualisation automatique" OffContent="Actualisation manuelle" /></StackPanel>
                       </Grid>
                       <Grid ColumnDefinitions="*,240" ColumnSpacing="18">
                         <StackPanel Spacing="3">
@@ -3646,9 +3710,9 @@
                       <Border Height="1" Background="#202C39" />
                       <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="8">
                         <TextBlock Text="Dossier de cache" FontSize="10" Foreground="#8294A8" VerticalAlignment="Center" />
-                        <TextBox Grid.Column="1" Classes="path" Text="{Binding FabCacheDirectory}" PlaceholderText="Cache Fab" />
+                        <TextBox Grid.Column="1" Classes="path" Text="{Binding FabCacheDirectory, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Cache Fab" />
                         <TextBlock Grid.Row="1" Text="Téléchargements temporaires" FontSize="10" Foreground="#8294A8" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Classes="path" Text="{Binding FabDownloadDirectory}" PlaceholderText="Téléchargements Fab" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Classes="path" Text="{Binding FabDownloadDirectory, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Téléchargements Fab" />
                       </Grid>
                       <Border Background="#0B121A" BorderBrush="#26394C" BorderThickness="1" CornerRadius="8" Padding="11">
                         <StackPanel Spacing="8">
@@ -3661,7 +3725,7 @@
                               <DataTemplate x:DataType="vm:MarketplaceNativeStoreSourceViewModel">
                                 <Border Background="#101922" BorderBrush="#202C39" BorderThickness="1" CornerRadius="7" Padding="9" Margin="0,0,0,6">
                                   <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                                    <StackPanel><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="{Binding ModeLabel}" FontSize="9" FontWeight="Bold" Foreground="#65CCA9" /><TextBlock Text="{Binding AvailabilityLabel}" FontSize="8" Foreground="#D9A55C" /></StackPanel><TextBlock Text="{Binding Path}" FontFamily="Consolas" FontSize="9" Foreground="#A8C9F2" TextTrimming="CharacterEllipsis" /><TextBlock Text="{Binding ModeDescription}" FontSize="8" Foreground="#718398" TextWrapping="Wrap" /></StackPanel>
+                                    <StackPanel><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="{Binding ModeLabel, UpdateSourceTrigger=PropertyChanged}" FontSize="9" FontWeight="Bold" Foreground="#65CCA9" /><TextBlock Text="{Binding AvailabilityLabel}" FontSize="8" Foreground="#D9A55C" /></StackPanel><TextBlock Text="{Binding Path}" FontFamily="Consolas" FontSize="9" Foreground="#A8C9F2" TextTrimming="CharacterEllipsis" /><TextBlock Text="{Binding ModeDescription}" FontSize="8" Foreground="#718398" TextWrapping="Wrap" /></StackPanel>
                                     <Button Grid.Column="1" Classes="ghost" Content="Dossier" Command="{Binding OpenFolderCommand}" />
                                     <Button Grid.Column="2" Classes="danger" Content="Retirer" Command="{Binding RemoveCommand}" />
                                   </Grid>
@@ -3689,8 +3753,8 @@
                             <Grid ColumnDefinitions="Auto,34,*,140,Auto,Auto,Auto" ColumnSpacing="7" Margin="0,0,0,6">
                               <CheckBox IsChecked="{Binding IsEnabled}" VerticalAlignment="Center" />
                               <TextBlock Grid.Column="1" Text="{Binding PriorityLabel}" Foreground="#70A8FA" VerticalAlignment="Center" />
-                              <TextBox Grid.Column="2" Classes="path" Text="{Binding Path}" PlaceholderText="Dossier de bibliothèque" />
-                              <TextBox Grid.Column="3" Text="{Binding MaximumGigabytes}" PlaceholderText="Quota Gio · illimité" />
+                              <TextBox Grid.Column="2" Classes="path" Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Dossier de bibliothèque" />
+                              <TextBox Grid.Column="3" Text="{Binding MaximumGigabytes, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Quota Gio · illimité" />
                               <Button Grid.Column="4" Classes="ghost" Content="↑" Command="{Binding MoveUpCommand}" />
                               <Button Grid.Column="5" Classes="ghost" Content="↓" Command="{Binding MoveDownCommand}" />
                               <Button Grid.Column="6" Classes="danger" Content="×" Command="{Binding RemoveCommand}" />
@@ -3708,7 +3772,7 @@
                           <TextBlock Text="Bibliothèque historique Quixel · compte Epic" FontSize="10" Foreground="#70A8FA" />
                           <TextBlock Text="{Binding QuixelStatusSummary}" FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoRefreshQuixelOnStartup}" OnContent="Actualisation automatique" OffContent="Actualisation manuelle" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Spacing="6"><ToggleSwitch IsChecked="{Binding QuixelMarketplaceEnabled}" OnContent="Marketplace activée" OffContent="Marketplace désactivée" /><ToggleSwitch IsChecked="{Binding AutoRefreshQuixelOnStartup}" IsEnabled="{Binding QuixelMarketplaceEnabled}" OnContent="Actualisation automatique" OffContent="Actualisation manuelle" /></StackPanel>
                       </Grid>
                       <Grid ColumnDefinitions="*,240" ColumnSpacing="18">
                         <StackPanel Spacing="3">
@@ -3722,9 +3786,9 @@
                       <Border Height="1" Background="#202C39" />
                       <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="8">
                         <TextBlock Text="Dossier de cache" FontSize="10" Foreground="#8294A8" VerticalAlignment="Center" />
-                        <TextBox Grid.Column="1" Classes="path" Text="{Binding QuixelCacheDirectory}" PlaceholderText="Cache Megascans" />
+                        <TextBox Grid.Column="1" Classes="path" Text="{Binding QuixelCacheDirectory, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Cache Megascans" />
                         <TextBlock Grid.Row="1" Text="Téléchargements temporaires" FontSize="10" Foreground="#8294A8" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Classes="path" Text="{Binding QuixelDownloadDirectory}" PlaceholderText="Téléchargements Megascans" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Classes="path" Text="{Binding QuixelDownloadDirectory, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Téléchargements Megascans" />
                       </Grid>
                       <Border Background="#0B121A" BorderBrush="#26394C" BorderThickness="1" CornerRadius="8" Padding="11">
                         <StackPanel Spacing="8">
@@ -3737,7 +3801,7 @@
                               <DataTemplate x:DataType="vm:MarketplaceNativeStoreSourceViewModel">
                                 <Border Background="#101922" BorderBrush="#202C39" BorderThickness="1" CornerRadius="7" Padding="9" Margin="0,0,0,6">
                                   <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
-                                    <StackPanel><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="{Binding ModeLabel}" FontSize="9" FontWeight="Bold" Foreground="#65CCA9" /><TextBlock Text="{Binding AvailabilityLabel}" FontSize="8" Foreground="#D9A55C" /></StackPanel><TextBlock Text="{Binding Path}" FontFamily="Consolas" FontSize="9" Foreground="#A8C9F2" TextTrimming="CharacterEllipsis" /><TextBlock Text="{Binding ModeDescription}" FontSize="8" Foreground="#718398" TextWrapping="Wrap" /></StackPanel>
+                                    <StackPanel><StackPanel Orientation="Horizontal" Spacing="8"><TextBlock Text="{Binding ModeLabel, UpdateSourceTrigger=PropertyChanged}" FontSize="9" FontWeight="Bold" Foreground="#65CCA9" /><TextBlock Text="{Binding AvailabilityLabel}" FontSize="8" Foreground="#D9A55C" /></StackPanel><TextBlock Text="{Binding Path}" FontFamily="Consolas" FontSize="9" Foreground="#A8C9F2" TextTrimming="CharacterEllipsis" /><TextBlock Text="{Binding ModeDescription}" FontSize="8" Foreground="#718398" TextWrapping="Wrap" /></StackPanel>
                                     <Button Grid.Column="1" Classes="ghost" Content="Dossier" Command="{Binding OpenFolderCommand}" />
                                     <Button Grid.Column="2" Classes="danger" Content="Retirer" Command="{Binding RemoveCommand}" />
                                   </Grid>
@@ -3757,8 +3821,8 @@
                             <Grid ColumnDefinitions="Auto,34,*,140,Auto,Auto,Auto" ColumnSpacing="7" Margin="0,0,0,6">
                               <CheckBox IsChecked="{Binding IsEnabled}" VerticalAlignment="Center" />
                               <TextBlock Grid.Column="1" Text="{Binding PriorityLabel}" Foreground="#70A8FA" VerticalAlignment="Center" />
-                              <TextBox Grid.Column="2" Classes="path" Text="{Binding Path}" PlaceholderText="Dossier de bibliothèque" />
-                              <TextBox Grid.Column="3" Text="{Binding MaximumGigabytes}" PlaceholderText="Quota Gio · illimité" />
+                              <TextBox Grid.Column="2" Classes="path" Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Dossier de bibliothèque" />
+                              <TextBox Grid.Column="3" Text="{Binding MaximumGigabytes, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Quota Gio · illimité" />
                               <Button Grid.Column="4" Classes="ghost" Content="↑" Command="{Binding MoveUpCommand}" />
                               <Button Grid.Column="5" Classes="ghost" Content="↓" Command="{Binding MoveDownCommand}" />
                               <Button Grid.Column="6" Classes="danger" Content="×" Command="{Binding RemoveCommand}" />
@@ -3776,7 +3840,7 @@
                           <TextBlock Text="Catalogue Unity isolé" FontSize="10" Foreground="#70A8FA" />
                           <TextBlock Text="L’option sera appliquée automatiquement dès que le connecteur de catalogue Unity sera actif." FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" />
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding AutoRefreshUnityOnStartup}" OnContent="Actualisation automatique" OffContent="Actualisation manuelle" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="1" Spacing="6"><ToggleSwitch IsChecked="{Binding UnityMarketplaceEnabled}" OnContent="Marketplace activée" OffContent="Marketplace désactivée" /><ToggleSwitch IsChecked="{Binding AutoRefreshUnityOnStartup}" IsEnabled="{Binding UnityMarketplaceEnabled}" OnContent="Actualisation automatique" OffContent="Actualisation manuelle" /></StackPanel>
                       </Grid>
                       <Grid ColumnDefinitions="*,240" ColumnSpacing="18">
                         <StackPanel Spacing="3">
@@ -3790,9 +3854,9 @@
                       <Border Height="1" Background="#202C39" />
                       <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="8">
                         <TextBlock Text="Dossier de cache" FontSize="10" Foreground="#8294A8" VerticalAlignment="Center" />
-                        <TextBox Grid.Column="1" Classes="path" Text="{Binding UnityCacheDirectory}" PlaceholderText="Cache Unity" />
+                        <TextBox Grid.Column="1" Classes="path" Text="{Binding UnityCacheDirectory, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Cache Unity" />
                         <TextBlock Grid.Row="1" Text="Téléchargements temporaires" FontSize="10" Foreground="#8294A8" VerticalAlignment="Center" />
-                        <TextBox Grid.Row="1" Grid.Column="1" Classes="path" Text="{Binding UnityDownloadDirectory}" PlaceholderText="Téléchargements Unity" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Classes="path" Text="{Binding UnityDownloadDirectory, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Téléchargements Unity" />
                       </Grid>
                       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
                         <StackPanel><TextBlock Text="BIBLIOTHÈQUES ORDONNÉES" FontSize="10" FontWeight="Bold" Foreground="#70A8FA" /><TextBlock Text="Le premier dossier actif disposant du quota et de l’espace requis est utilisé." FontSize="9" Foreground="#8294A8" /></StackPanel>
@@ -3804,8 +3868,8 @@
                             <Grid ColumnDefinitions="Auto,34,*,140,Auto,Auto,Auto" ColumnSpacing="7" Margin="0,0,0,6">
                               <CheckBox IsChecked="{Binding IsEnabled}" VerticalAlignment="Center" />
                               <TextBlock Grid.Column="1" Text="{Binding PriorityLabel}" Foreground="#70A8FA" VerticalAlignment="Center" />
-                              <TextBox Grid.Column="2" Classes="path" Text="{Binding Path}" PlaceholderText="Dossier de bibliothèque" />
-                              <TextBox Grid.Column="3" Text="{Binding MaximumGigabytes}" PlaceholderText="Quota Gio · illimité" />
+                              <TextBox Grid.Column="2" Classes="path" Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Dossier de bibliothèque" />
+                              <TextBox Grid.Column="3" Text="{Binding MaximumGigabytes, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Quota Gio · illimité" />
                               <Button Grid.Column="4" Classes="ghost" Content="↑" Command="{Binding MoveUpCommand}" />
                               <Button Grid.Column="5" Classes="ghost" Content="↓" Command="{Binding MoveDownCommand}" />
                               <Button Grid.Column="6" Classes="danger" Content="×" Command="{Binding RemoveCommand}" />
@@ -3816,9 +3880,89 @@
                     </StackPanel>
                   </Border>
                   <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                    <TextBlock Text="Ces options sont activées par défaut et n’empêchent jamais l’ouverture depuis le cache." FontSize="9" Foreground="#718398" VerticalAlignment="Center" TextWrapping="Wrap" />
+                    <StackPanel Spacing="4">
+                      <TextBlock Text="{Binding MarketplaceStorageSaveStatus}" FontSize="11" Foreground="#BCD0E6" TextWrapping="Wrap" />
+                      <TextBlock Text="Les chemins, quotas et l’ordre des bibliothèques sont enregistrés automatiquement. Enregistrez les autres options avec ce bouton." FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
+                    </StackPanel>
                     <Button Grid.Column="1" Classes="accent" Content="Enregistrer les marketplaces" Command="{Binding SaveMarketplaceSettingsCommand}" />
                   </Grid>
+                  <Border Classes="card">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="CONNECTEURS DE MARKETPLACES" FontWeight="SemiBold" />
+                      <TextBlock Text="Plugins d’accès aux assets possédés. L’inventaire s’ouvre dans le navigateur interne du hub, avec session conservée et téléchargements web. Pas de synchronisation automatique du catalogue." TextWrapping="Wrap" FontSize="11" Foreground="#8294A8" />
+                      <Button Content="Ajouter / gérer les plugins" Command="{Binding ShowHubExtensionsCommand}" HorizontalAlignment="Left" />
+                      <ItemsControl ItemsSource="{Binding MarketplaceConnectors}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:MarketplaceConnectorViewModel">
+                            <Border Classes="card" Margin="0,6,0,0">
+                              <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="*,Auto">
+                                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                  <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled}" OnContent="Activé" OffContent="Désactivé" />
+                                </Grid>
+                                <TextBlock Text="{Binding Description}" TextWrapping="Wrap" FontSize="11" Foreground="#8294A8" />
+                                <TextBlock Text="{Binding InventoryUrl}" TextWrapping="Wrap" FontSize="10" />
+                                <TextBlock Text="DOSSIER DE TÉLÉCHARGEMENT" FontSize="10" FontWeight="SemiBold" />
+                                <TextBox Text="{Binding DownloadDirectory, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Chemin absolu du dossier de téléchargement" />
+                                <TextBlock Text="Chemin enregistré automatiquement. Les fichiers déjà téléchargés ne sont pas déplacés." TextWrapping="Wrap" FontSize="10" Foreground="#8294A8" />
+                                <TextBlock Text="{Binding SaveStatus}" TextWrapping="Wrap" FontSize="11" />
+                                <Button Content="Enregistrer ce connecteur" Command="{Binding SaveCommand}" HorizontalAlignment="Left" />
+                                <Button Content="Ouvrir dans CyEngineHub" Command="{Binding OpenInventoryCommand}" HorizontalAlignment="Left" />
+                              </StackPanel>
+                            </Border>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+
+                <StackPanel IsVisible="{Binding IsSettingsAiSelected}" Spacing="14">
+                  <Border Classes="card"><StackPanel Spacing="10">
+                    <TextBlock Text="OPTIONS MCP · AUTONOMIE ET LIMITES" FontWeight="SemiBold" />
+                    <TextBlock Text="Sans validation : le client connecté peut lancer des téléchargements et modifier les projets via leurs scripts d’installation. Activez uniquement les actions souhaitées puis enregistrez. Les validations propres à Fab et au client IA restent indépendantes." TextWrapping="Wrap" Foreground="#D9A55C" />
+                    <CheckBox Content="Catégoriser sans validation" IsChecked="{Binding McpAutoCategorize}" />
+                    <CheckBox Content="Télécharger sans validation" IsChecked="{Binding McpAutoDownload}" />
+                    <CheckBox Content="Installer sans validation (scripts configurés inclus)" IsChecked="{Binding McpAutoInstall}" />
+                    <Grid ColumnDefinitions="*,180"><TextBlock Text="Résultats par défaut (0 = illimité)" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpDefaultPageSize}" /></Grid>
+                    <Grid ColumnDefinitions="*,180"><TextBlock Text="Maximum de résultats par requête (0 = illimité)" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpMaximumPageSize}" /></Grid>
+                    <Grid ColumnDefinitions="*,180"><TextBlock Text="Longueur des descriptions de recherche (0 = illimité)" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpDescriptionLength}" /></Grid>
+                    <Grid ColumnDefinitions="*,180"><TextBlock Text="Fichiers inspectés par requête (0 = illimité)" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpScanLimit}" /></Grid>
+                    <Grid ColumnDefinitions="*,180"><TextBlock Text="Chemins de versions inspectés (0 = illimité)" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpRegisteredPathsLimit}" /></Grid>
+                    <Grid ColumnDefinitions="*,180"><TextBlock Text="Tâches retournées (0 = illimité)" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpTaskHistoryLimit}" /></Grid>
+                    <Grid ColumnDefinitions="*,180"><TextBlock Text="Propositions en attente (0 = illimité)" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpPendingProposalLimit}" /></Grid>
+                    <Grid ColumnDefinitions="*,180"><TextBlock Text="Historique des propositions terminées (0 = illimité)" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpProposalHistoryLimit}" /></Grid>
+                    <TextBlock Text="Illimité peut produire de très grosses réponses et consommer beaucoup de mémoire. La protection des archives, des identifiants et des chemins reste active." TextWrapping="Wrap" FontSize="11" />
+                    <TextBlock Text="{Binding McpOptionsStatus}" TextWrapping="Wrap" />
+                    <Button Content="Enregistrer les options MCP" Command="{Binding SaveMcpOptionsCommand}" HorizontalAlignment="Left" />
+                  </StackPanel></Border>
+                  <Border Classes="card">
+                    <StackPanel Spacing="12">
+                      <TextBlock Text="ASSISTANTS IA · MCP LOCAL" FontSize="18" FontWeight="SemiBold" />
+                      <TextBlock Text="Connectez votre client Codex, Claude ou OpenCode au hub. Recherche dans les packs possédés, fichiers locaux, collections et propositions d’installation. Aucun achat, aucun accès aux mots de passe, aucune commande système libre." TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding McpStatus}" Foreground="#55C7A6" TextWrapping="Wrap" />
+                      <Button Content="Activer / désactiver MCP" Command="{Binding ToggleMcpCommand}" HorizontalAlignment="Left" />
+                      <TextBlock Text="L’activation autorise le client IA connecté à consulter les métadonnées et noms de fichiers de vos packs. Ces données peuvent être transmises au fournisseur de votre client. Les changements exigent votre validation sauf pour les actions explicitement autorisées dans les options MCP enregistrées. Fermer le hub coupe la connexion ; le mode tray la conserve." TextWrapping="Wrap" Foreground="#8294A8" FontSize="12" />
+                    </StackPanel>
+                  </Border>
+                  <Border Classes="card">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="PROPOSITIONS ET ACTIONS MCP" FontWeight="SemiBold" />
+                      <TextBlock Text="Catégoriser ajoute des collections personnelles sans remplacer le classement du fournisseur. Pour télécharger ou installer, valider ouvre le popup de confirmation final avec la variante proposée." TextWrapping="Wrap" FontSize="12" />
+                      <ListBox ItemsSource="{Binding AiProposals}" SelectedItem="{Binding SelectedAiProposal}" MaxHeight="240">
+                        <ListBox.ItemTemplate><DataTemplate x:DataType="vm:AiProposalViewModel"><StackPanel Spacing="4"><TextBlock Text="{Binding Title}" TextWrapping="Wrap" /><TextBlock Text="{Binding Status}" Foreground="#55C7A6" FontSize="11" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
+                      </ListBox>
+                      <TextBlock Text="{Binding SelectedAiProposal.Details}" TextWrapping="Wrap" MaxHeight="180" />
+                      <StackPanel Orientation="Horizontal" Spacing="10"><Button Content="Valider / préparer" Command="{Binding ApproveAiProposalCommand}" /><Button Content="Refuser" Command="{Binding RejectAiProposalCommand}" /></StackPanel>
+                    </StackPanel>
+                  </Border>
+                  <Border Classes="card">
+                    <StackPanel Spacing="10">
+                      <TextBlock Text="CONNEXION DES CLIENTS" FontWeight="SemiBold" />
+                      <TextBlock Text="Fusionnez uniquement le bloc de votre client dans sa configuration existante, puis reconnectez le serveur MCP. Ne remplacez pas vos autres serveurs. Le hub doit rester ouvert et MCP activé. L’authentification à l’IA reste dans son client." TextWrapping="Wrap" FontSize="12" />
+                      <TextBox Text="{Binding McpConnectionConfigurations}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="240" MaxHeight="480" />
+                    </StackPanel>
+                  </Border>
                 </StackPanel>
 
                 <StackPanel IsVisible="{Binding IsSettingsStorageSelected}" Spacing="14">
@@ -4052,7 +4196,7 @@
                   <ComboBox Grid.Column="1" IsVisible="{Binding IsUnrealProjectCreation}" ItemsSource="{Binding ProjectCreationEngines}" SelectedItem="{Binding SelectedProjectCreationEngine}" PlaceholderText="Version Unreal installée">
                     <ComboBox.ItemTemplate>
                       <DataTemplate x:DataType="vm:ProjectCreationEngineOptionViewModel">
-                        <StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold" /><TextBlock Text="{Binding Version}" FontSize="9" Foreground="#70A8FA" /><TextBlock Text="{Binding Path}" FontSize="8" Foreground="#65788D" TextTrimming="CharacterEllipsis" /></StackPanel>
+                        <StackPanel><TextBlock Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" FontWeight="SemiBold" /><TextBlock Text="{Binding Version}" FontSize="9" Foreground="#70A8FA" /><TextBlock Text="{Binding Path}" FontSize="8" Foreground="#65788D" TextTrimming="CharacterEllipsis" /></StackPanel>
                       </DataTemplate>
                     </ComboBox.ItemTemplate>
                   </ComboBox>
@@ -4282,7 +4426,7 @@
                   <DataTemplate x:DataType="vm:ProjectCardViewModel">
                     <StackPanel>
                       <TextBlock Text="{Binding SelectionLabel}" FontWeight="SemiBold" />
-                      <TextBlock Text="{Binding Path}" FontSize="8" Foreground="#718398" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" FontSize="8" Foreground="#718398" TextTrimming="CharacterEllipsis" />
                     </StackPanel>
                   </DataTemplate>
                 </ComboBox.ItemTemplate>
@@ -4383,6 +4527,78 @@
     </Border>
   </Grid>
 
+  <Grid IsVisible="{Binding IsDerivedWorkspaceCreatorVisible}" Panel.ZIndex="1980">
+    <Border Background="#D0080C11" />
+    <Border MaxWidth="820" Margin="52" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#111820" BorderBrush="#438ED1" BorderThickness="1" CornerRadius="14" Padding="24">
+      <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="14">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel>
+            <TextBlock Text="CREATE DERIVED" FontSize="20" FontWeight="SemiBold" />
+            <TextBlock Text="Crée un projet Unreal temporaire, installe la version locale sans modifier l’original, puis l’ouvre pour édition." FontSize="10" Foreground="#8294A8" Margin="0,5,0,0" TextWrapping="Wrap" />
+          </StackPanel>
+          <Button Grid.Column="1" Classes="history" Content="✕" Command="{Binding CloseDerivedWorkspaceCreatorCommand}" />
+        </Grid>
+        <StackPanel Grid.Row="1" Spacing="5">
+          <TextBlock Text="VERSION LOCALE SOURCE" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" />
+          <ComboBox ItemsSource="{Binding SelectedFabStoredDownloads}" SelectedItem="{Binding SelectedDerivedSource}">
+            <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FabStoredDownloadViewModel"><StackPanel><TextBlock Text="{Binding Version}" /><TextBlock Text="{Binding PackageSummary}" FontSize="8" Foreground="#718398" /></StackPanel></DataTemplate></ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+        <Grid Grid.Row="2" ColumnDefinitions="*,*" ColumnSpacing="12">
+          <StackPanel Spacing="5"><TextBlock Text="VERSION UNREAL DE L’ATELIER" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" /><ComboBox ItemsSource="{Binding Engines}" SelectedItem="{Binding SelectedDerivedEngine}"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:EngineCardViewModel"><TextBlock Text="{Binding DisplayName}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+          <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="TYPE DU PACKAGE FINAL" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" /><ComboBox ItemsSource="{Binding DerivedContentKinds}" SelectedItem="{Binding SelectedDerivedContentKind}"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:DerivedContentKindOptionViewModel"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+        </Grid>
+        <StackPanel Grid.Row="3" Spacing="5"><TextBlock Text="NOM DU DÉRIVÉ" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" /><TextBox Text="{Binding DerivedName, UpdateSourceTrigger=PropertyChanged}" /></StackPanel>
+        <StackPanel Grid.Row="4" Spacing="5"><TextBlock Text="MODIFICATIONS PRÉVUES / NOTES" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" /><TextBox Text="{Binding DerivedNotes, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="82" TextWrapping="Wrap" /></StackPanel>
+        <Grid Grid.Row="5" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="9">
+          <TextBlock Text="Le projet sera conservé jusqu’à sa suppression explicite. Package Data peut être relancé pour créer plusieurs révisions." FontSize="9" Foreground="#D9A55C" TextWrapping="Wrap" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="ghost" Content="Annuler" Command="{Binding CloseDerivedWorkspaceCreatorCommand}" />
+          <Button Grid.Column="2" Classes="accent" Content="Créer et ouvrir dans Unreal" Command="{Binding CreateDerivedWorkspaceCommand}" IsEnabled="{Binding !IsDerivedWorkspaceBusy}" />
+        </Grid>
+      </Grid>
+    </Border>
+  </Grid>
+
+  <Grid IsVisible="{Binding IsDerivedFolderImporterVisible}" Panel.ZIndex="1985">
+    <Border Background="#D0080C11" />
+    <Border MaxWidth="820" Margin="52" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#111820" BorderBrush="#438ED1" BorderThickness="1" CornerRadius="14" Padding="24">
+      <StackPanel Spacing="14">
+        <Grid ColumnDefinitions="*,Auto"><StackPanel><TextBlock Text="IMPORTER UN DOSSIER COMME DÉRIVÉ" FontSize="20" FontWeight="SemiBold" /><TextBlock Text="Enregistre un dossier déjà préparé comme nouvelle variante locale, sans modifier son contenu d’origine." FontSize="10" Foreground="#8294A8" Margin="0,5,0,0" TextWrapping="Wrap" /></StackPanel><Button Grid.Column="1" Classes="history" Content="✕" Command="{Binding CloseDerivedFolderImporterCommand}" /></Grid>
+        <StackPanel Spacing="5"><TextBlock Text="DOSSIER SOURCE" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" /><Grid ColumnDefinitions="*,Auto" ColumnSpacing="8"><TextBox Text="{Binding DerivedSourceFolder, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Dossier contenant Content, Plugins ou les fichiers RAW…" /><Button Grid.Column="1" Classes="ghost" Content="Parcourir…" Click="BrowseDerivedSourceFolder" /></Grid></StackPanel>
+        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+          <StackPanel Spacing="5"><TextBlock Text="VERSION UNREAL ASSOCIÉE" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" /><ComboBox ItemsSource="{Binding Engines}" SelectedItem="{Binding SelectedDerivedEngine}"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:EngineCardViewModel"><TextBlock Text="{Binding DisplayName}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+          <StackPanel Grid.Column="1" Spacing="5"><TextBlock Text="TYPE DU PACKAGE" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" /><ComboBox ItemsSource="{Binding DerivedContentKinds}" SelectedItem="{Binding SelectedDerivedContentKind}"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:DerivedContentKindOptionViewModel"><TextBlock Text="{Binding Label}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+        </Grid>
+        <StackPanel Spacing="5"><TextBlock Text="NOM DU DÉRIVÉ" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" /><TextBox Text="{Binding DerivedName, UpdateSourceTrigger=PropertyChanged}" /></StackPanel>
+        <StackPanel Spacing="5"><TextBlock Text="NOTES" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" /><TextBox Text="{Binding DerivedNotes, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" MinHeight="72" TextWrapping="Wrap" /></StackPanel>
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="9"><TextBlock Text="Le dossier choisi reste intact. CyEngineHub crée son propre package dérivé dans le stockage configuré." FontSize="9" Foreground="#D9A55C" TextWrapping="Wrap" VerticalAlignment="Center" /><Button Grid.Column="1" Classes="ghost" Content="Annuler" Command="{Binding CloseDerivedFolderImporterCommand}" /><Button Grid.Column="2" Classes="accent" Content="Importer le dérivé" Command="{Binding ImportDerivedFolderCommand}" IsEnabled="{Binding !IsDerivedWorkspaceBusy}" /></Grid>
+      </StackPanel>
+    </Border>
+  </Grid>
+
+  <Grid IsVisible="{Binding IsPackTestCreatorVisible}" Panel.ZIndex="1987">
+    <Border Background="#D0080C11" />
+    <Border MaxWidth="720" Margin="52" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#111820" BorderBrush="#438ED1" BorderThickness="1" CornerRadius="14" Padding="24">
+      <StackPanel Spacing="16">
+        <Grid ColumnDefinitions="*,Auto"><StackPanel><TextBlock Text="TESTER UNE VERSION DU PACK" FontSize="20" FontWeight="SemiBold" /><TextBlock Text="Crée un projet isolé, installe cette version puis l’ouvre dans Unreal. Vous pourrez supprimer le test depuis la fiche produit." FontSize="10" Foreground="#8294A8" Margin="0,5,0,0" TextWrapping="Wrap" /></StackPanel><Button Grid.Column="1" Classes="history" Content="✕" Command="{Binding ClosePackTestCreatorCommand}" /></Grid>
+        <StackPanel Spacing="5"><TextBlock Text="VERSION LOCALE À TESTER" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" /><ComboBox ItemsSource="{Binding SelectedFabStoredDownloads}" SelectedItem="{Binding SelectedTestSource}"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:FabStoredDownloadViewModel"><StackPanel><TextBlock Text="{Binding Version}" /><TextBlock Text="{Binding PackageSummary}" FontSize="8" Foreground="#718398" /></StackPanel></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+        <StackPanel Spacing="5"><TextBlock Text="VERSION UNREAL DU TEST" FontSize="9" FontWeight="Bold" Foreground="#70A8FA" /><ComboBox ItemsSource="{Binding Engines}" SelectedItem="{Binding SelectedTestEngine}"><ComboBox.ItemTemplate><DataTemplate x:DataType="vm:EngineCardViewModel"><TextBlock Text="{Binding DisplayName}" /></DataTemplate></ComboBox.ItemTemplate></ComboBox></StackPanel>
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="9"><TextBlock Text="Le test est distinct du pack d’origine et des dérivés déjà créés." FontSize="9" Foreground="#D9A55C" VerticalAlignment="Center" /><Button Grid.Column="1" Classes="ghost" Content="Annuler" Command="{Binding ClosePackTestCreatorCommand}" /><Button Grid.Column="2" Classes="accent" Content="Créer, installer et ouvrir" Command="{Binding CreatePackTestCommand}" IsEnabled="{Binding !IsDerivedWorkspaceBusy}" /></Grid>
+      </StackPanel>
+    </Border>
+  </Grid>
+
+  <Grid IsVisible="{Binding IsDerivedWorkspaceDeletionVisible}" Panel.ZIndex="1990">
+    <Border Background="#D0080C11" />
+    <Border MaxWidth="650" Margin="52" HorizontalAlignment="Center" VerticalAlignment="Center" Background="#111820" BorderBrush="#B84D5C" BorderThickness="1" CornerRadius="14" Padding="24">
+      <StackPanel Spacing="15">
+        <TextBlock Text="SUPPRIMER LE PROJET TEMPORAIRE" FontSize="19" FontWeight="SemiBold" Foreground="#F0B4B7" />
+        <TextBlock Text="Le projet d’atelier et ses fichiers seront supprimés définitivement. Les dérivés déjà créés avec Package Data resteront dans la Bibliothèque." TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="9"><Button Classes="ghost" Content="Annuler" Command="{Binding CancelDerivedWorkspaceDeletionCommand}" /><Button Classes="danger" Content="Supprimer le projet temporaire" Command="{Binding ConfirmDerivedWorkspaceDeletionCommand}" /></StackPanel>
+      </StackPanel>
+    </Border>
+  </Grid>
+
   <Grid IsVisible="{Binding IsFabOptionsModalVisible}" Panel.ZIndex="2000">
     <Border Background="#C9080C11" />
     <Border MaxWidth="980" MaxHeight="720" MinHeight="360" Margin="64" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Background="#111820" BorderBrush="#438ED1" BorderThickness="1" CornerRadius="14" Padding="24" ClipToBounds="True">
@@ -4413,7 +4629,7 @@
           </Border>
           <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="12">
             <TextBlock Text="Les variantes sélectionnées seront téléchargées et préparées selon les paramètres de package de la Bibliothèque." FontSize="9" Foreground="#718398" VerticalAlignment="Center" TextWrapping="Wrap" />
-            <Button Grid.Column="1" Classes="accent" Content="Télécharger les versions sélectionnées" Command="{Binding DownloadSelectedFabVersionsCommand}" />
+            <Button Grid.Column="1" Classes="accent" Content="{Binding FabDownloadActionLabel}" Command="{Binding DownloadSelectedFabVersionsCommand}" />
           </Grid>
         </Grid>
 
@@ -4422,12 +4638,15 @@
             <StackPanel>
               <TextBlock Text="INSTALLER DANS DES CIBLES" FontSize="20" FontWeight="SemiBold" />
               <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
-                <Border Background="#123122" CornerRadius="5" Padding="7,3">
-                  <TextBlock Text="{Binding SelectedRemoteFabAssetCard.ContentKindLabel}" FontSize="10" FontWeight="Bold" Foreground="#5BDBA5" />
+                <Border Background="#123122" CornerRadius="5" Padding="7,3" IsVisible="{Binding !HasActiveDerivedInstall}">
+                  <TextBlock Text="{Binding FabInstallContentKindLabel}" FontSize="10" FontWeight="Bold" Foreground="#5BDBA5" />
                 </Border>
-                <TextBlock Text="{Binding SelectedRemoteFabAssetCard.ContentKindReason}" FontSize="10" Foreground="#8294A8" VerticalAlignment="Center" />
+                <Border Background="#1A3550" CornerRadius="5" Padding="7,3" IsVisible="{Binding HasActiveDerivedInstall}">
+                  <TextBlock Text="VERSION LOCALE DÉRIVÉE" FontSize="10" FontWeight="Bold" Foreground="#8CC2FF" />
+                </Border>
+                <TextBlock Text="{Binding FabInstallContentKindReason}" FontSize="10" Foreground="#8294A8" VerticalAlignment="Center" />
               </StackPanel>
-              <TextBlock Text="{Binding SelectedRemoteFabAssetCard.InstallModeGuidance}" FontSize="10" Foreground="#9EB0C4" Margin="0,6,0,0" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding FabInstallModeGuidance}" FontSize="10" Foreground="#9EB0C4" Margin="0,6,0,0" TextWrapping="Wrap" />
             </StackPanel>
             <Button Grid.Column="1" Classes="history" Content="✕" Command="{Binding CloseFabInstallOptionsCommand}" ToolTip.Tip="Fermer" VerticalAlignment="Top" />
           </Grid>
@@ -4523,7 +4742,7 @@
           </ListBox>
           <Grid Grid.Row="4" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
             <TextBlock Text="Le script et sa configuration sont mémorisés par projet et par type d’asset. La sélection multiple est autorisée." FontSize="9" Foreground="#718398" VerticalAlignment="Center" TextWrapping="Wrap" />
-            <Button Grid.Column="1" Classes="ghost" Content="Télécharger seulement" Command="{Binding DownloadSelectedFabVersionsCommand}" />
+            <Button Grid.Column="1" Classes="ghost" Content="Télécharger seulement" Command="{Binding DownloadSelectedFabVersionsCommand}" IsVisible="{Binding !HasActiveDerivedInstall}" />
             <Button Grid.Column="2" Classes="accent" Content="Installer dans les cibles" Command="{Binding InstallSelectedFabVersionsCommand}" />
           </Grid>
         </Grid>

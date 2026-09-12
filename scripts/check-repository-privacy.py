@@ -8,6 +8,9 @@ import sys
 PROFILE_PATH = re.compile(rb"(?i)[a-z]:[\\/]+Users[\\/]+(?!Public\b|Default\b|<)[A-Za-z0-9_.-]+")
 LOCAL_PROJECT = re.compile(rb"(?i)[a-z]:[\\/]+_Project[\\/]+")
 PRIVATE_KEY = re.compile(rb"-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----")
+# Match the removed Bridge key family without preserving its full value in tests,
+# reports, allowlists or the scanner itself (ASCII and UTF-16 are both inspected).
+REMOVED_BRIDGE_KEY = re.compile(rb"(?i)a417[0-9a-f]{24}3161")
 NATIVE_SOURCE = re.compile(rb"[A-Za-z]:[\\/][\x20-\x7e]+[\\/]Source[\\/][\x20-\x7e]+\.(?:cpp|h|hpp|inl)\x00")
 
 def git(*args):
@@ -26,9 +29,9 @@ def inspect(path,data):
     issues = []
     if forbidden_path(path):issues.append('private/local file')
     texts = [data]
-    if b'\0' in data[:8192]:
-        texts.append(b'\n'.join(s[::2] for s in re.findall(rb'(?:[\x20-\x7e]\x00){6,}',data)))
-    for rule,pattern in [('Windows user profile path',PROFILE_PATH),('local project path',LOCAL_PROJECT),('private key',PRIVATE_KEY)]:
+    if b'\0' in data:
+        texts.append(data.replace(b'\0', b''))
+    for rule,pattern in [('Windows user profile path',PROFILE_PATH),('local project path',LOCAL_PROJECT),('private key',PRIVATE_KEY),('removed Bridge credential',REMOVED_BRIDGE_KEY)]:
         if any(pattern.search(t) for t in texts):issues.append(rule)
     if data.startswith(b'MZ') and NATIVE_SOURCE.search(data):issues.append('native diagnostic source path')
     return issues

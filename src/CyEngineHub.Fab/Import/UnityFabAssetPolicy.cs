@@ -3,7 +3,7 @@ namespace CyEngineHub.Fab.Import;
 public static class UnityFabAssetPolicy
 {
     private static readonly HashSet<string> SupportedExtensions = new([
-        ".fbx", ".obj", ".gltf", ".glb", ".usd", ".usda", ".usdc", ".abc",
+        ".fbx", ".obj", ".mtl", ".gltf", ".glb", ".bin", ".usd", ".usda", ".usdc", ".abc",
         ".png", ".jpg", ".jpeg", ".tga", ".bmp", ".exr", ".hdr", ".dds", ".tif", ".tiff", ".psd",
         ".wav", ".ogg", ".mp3", ".flac", ".json", ".csv", ".txt", ".md", ".xml", ".yaml", ".yml",
         ".asset", ".prefab", ".mat", ".anim", ".controller", ".overridecontroller", ".unity",

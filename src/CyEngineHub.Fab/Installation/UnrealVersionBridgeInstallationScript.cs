@@ -13,6 +13,7 @@ public static class UnrealVersionBridgeSettings
     public const string ConversionProfile = "plugins.unrealVersionBridge.profile.v1";
     public const string KeepStaging = "plugins.unrealVersionBridge.keepStaging.v1";
     public const string ValidateOutput = "plugins.unrealVersionBridge.validateOutput.v1";
+    public const string AssetProfileFile = "plugins.unrealVersionBridge.assetProfileFile.v1";
 }
 
 public sealed record UnrealVersionBridgeVariantManifest(
@@ -26,27 +27,33 @@ public sealed record UnrealVersionBridgeVariantManifest(
     int UnsupportedAssetCount,
     IReadOnlyList<string> UnsupportedAssets,
     string ContentDirectory,
-    DateTimeOffset GeneratedAt);
+    DateTimeOffset GeneratedAt,
+    string ConversionMode = "portable");
 
 public sealed class UnrealVersionBridgeInstallationScript(
     IEngineCatalog engineCatalog,
     ISettingsStore settings,
     IProcessRunner processRunner,
     IFabProjectContentImportService contentImport,
-    string defaultStorageRoot) : IFabInstallationScript
+    string defaultStorageRoot,
+    string? nativePluginRoot = null) : IFabInstallationScript
 {
     public const string ScriptId = "unreal.version-bridge";
 
     public FabInstallationScriptDescriptor Descriptor { get; } = new(
         ScriptId,
         "Unreal · Convertir puis installer",
-        "Exporte avec le moteur source, reconstruit avec la version cible, crée une variante locale puis l’installe.",
+        "Analyse par type/version. Bridge natif Texture2D BGRA8/G8 expérimental, sauvegarde et comparaison après réouverture cible. Autres types natifs non implémentés ; portable sur accord explicite.",
         "CyEngineHub",
         [LibraryPackageContentKind.ContentPack, LibraryPackageContentKind.RawAsset, LibraryPackageContentKind.Unknown],
         [FabInstallationTargetKind.Project],
         [
+            new("conversionMode", "Méthode", "Natif : Texture2D BGRA8/G8 et propriétés prises en charge, contrôle C++ obligatoire. Portable : export/import expérimental, pas un resave natif.", FabInstallationOptionKind.Choice, "native", ["native", "portable"]),
+            new("assetProfileFile", "Profils par type (JSON)", "Vide : profils intégrés UE 5.6 vers 5.5. Un fichier personnalisé remplace le catalogue sans activer de code non implémenté.", FabInstallationOptionKind.Text, string.Empty, []),
+            new("analyzeOnly", "Analyser seulement", "Produit un rapport par asset sans convertir, publier ni installer. Les diagnostics sont conservés.", FabInstallationOptionKind.Boolean, "false", []),
+            new("allowLossyConversion", "Accepter les pertes du mode portable", "Consentement explicite à l'export/import : propriétés et données dérivées non garanties. Les assets non pris en charge restent bloquants.", FabInstallationOptionKind.Boolean, "false", []),
             new("sourceVersion", "Version Unreal source", "Auto choisit la version la plus récente déclarée par le pack.", FabInstallationOptionKind.Text, "auto", []),
-            new("profile", "Profil de conversion", "Sûr limite les types; étendu tente aussi skeletal meshes, animations, sons et tables.", FabInstallationOptionKind.Choice, "safe", ["safe", "extended"]),
+            new("profile", "Ancien préréglage d'export", "Les profils par type gardent la priorité. Les exports squelettiques et animations non validés restent bloqués.", FabInstallationOptionKind.Choice, "safe", ["safe", "extended"]),
             new("variantStorageRoot", "Stockage des variantes", "Vide utilise le dossier défini dans l’interface du plugin.", FabInstallationOptionKind.Text, string.Empty, []),
             new("conflictPolicy", "Fichiers déjà présents", "Le remplacement avec sauvegarde autorise le rollback.", FabInstallationOptionKind.Choice, "backup-replace", ["backup-replace", "fail"]),
             new("keepStaging", "Conserver les projets temporaires", "Utile pour diagnostiquer un échec.", FabInstallationOptionKind.Boolean, "false", []),
@@ -70,8 +77,11 @@ public sealed class UnrealVersionBridgeInstallationScript(
         var sourceEngine = SelectSourceEngine(engines, sourceVersion)
             ?? throw new InvalidOperationException(
                 $"Unreal Engine {FormatVersion(sourceVersion)} doit être installé pour lire ce pack.");
+        var analyzeOnly = bool.TryParse(context.Configuration.GetValueOrDefault("analyzeOnly"), out var analyze) && analyze;
         if (Compare(sourceEngine.Version, targetEngine.Version) <= 0)
         {
+            if (analyzeOnly)
+                throw new InvalidOperationException("L'analyse par profils concerne les conversions vers une version antérieure. Aucune installation effectuée.");
             progress?.Report(new(0, "Le pack n’est pas plus récent : installation standard."));
             return await InstallContentAsync(context.SourceDirectory, project.FilePath, context.Configuration, progress, cancellationToken)
                 .ConfigureAwait(false);
@@ -90,7 +100,10 @@ public sealed class UnrealVersionBridgeInstallationScript(
             .ConfigureAwait(false);
         var validateOutput = await ResolveBooleanAsync(context.Configuration, "validateOutput", UnrealVersionBridgeSettings.ValidateOutput, true, cancellationToken)
             .ConfigureAwait(false);
-        var service = new UnrealVersionBridgeService(processRunner);
+        var service = new UnrealVersionBridgeService(processRunner, nativePluginRoot);
+        var assetProfileFile = context.Configuration.GetValueOrDefault("assetProfileFile");
+        if (string.IsNullOrWhiteSpace(assetProfileFile))
+            assetProfileFile = await settings.GetAsync(UnrealVersionBridgeSettings.AssetProfileFile, cancellationToken).ConfigureAwait(false);
         var converted = await service.ConvertAsync(
                 new(
                     context.Asset.AssetId,
@@ -101,10 +114,18 @@ public sealed class UnrealVersionBridgeInstallationScript(
                     storageRoot,
                     profile,
                     keepStaging,
-                    validateOutput),
+                    validateOutput,
+                    context.Configuration.GetValueOrDefault("conversionMode", "native"),
+                    assetProfileFile,
+                    bool.TryParse(context.Configuration.GetValueOrDefault("allowLossyConversion"), out var allowLosses) && allowLosses,
+                    analyzeOnly),
                 progress,
                 cancellationToken)
             .ConfigureAwait(false);
+        if (converted.AnalysisOnly)
+            return new(Descriptor.Id,
+                $"Analyse préliminaire : {converted.UnsupportedAssetCount:N0} asset(s) bloquant(s). Contrôles C++ supplémentaires requis en natif. Aucune conversion ni installation. Rapport : {converted.ReportPath}",
+                new Dictionary<string, string> { ["report"] = converted.ReportPath });
         var installed = await InstallContentAsync(converted.VariantDirectory, project.FilePath, context.Configuration, progress, cancellationToken)
             .ConfigureAwait(false);
         return new(

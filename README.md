@@ -3,7 +3,7 @@
 Hub de développement multi-moteur, local-first, pour Windows. Unreal Engine est
 le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers locaux.
 
-**Version de test : `0.1.0-alpha.1`.** Sauvegardez vos projets avant d'essayer les
+**Version de test : `0.1.0-alpha.3`.** Sauvegardez vos projets avant d'essayer les
 opérations d'installation, de déplacement ou de conversion d'assets.
 
 ## Télécharger
@@ -29,6 +29,8 @@ un certificat Authenticode et Windows peut afficher un avertissement.
 - Compression ZIP configurable par marketplace, métadonnées JSON accessibles séparément,
   dossiers de cache/téléchargement et bibliothèques multiples avec quotas et ordre de priorité.
 - Collections, packages locaux et scripts d'installation configurables par cible.
+- Ateliers de dérivés Fab/Unreal : projet temporaire avec la version moteur choisie,
+  correction dans l’éditeur, `Package Data`, versions locales installables et suppression contrôlée.
 - Création de projets Unreal Blueprint/C++, profils éditables, packs de fonctionnalités,
   sélection des plugins du moteur et aperçu/édition des overrides INI.
 - Éditeur de profils indépendant dans les paramètres, accessible aussi depuis Projets.
@@ -103,6 +105,7 @@ et les notices embarquées dans les binaires.
 
 - [Connexion Epic / Fab : automatique et manuelle](docs/fab-login.md)
 - [Collections officielles Megascans](docs/megascan-collections.md)
+- [Dérivés de packages Unreal](docs/derived-packages.md)
 - [Profils et création de projets](docs/project-creation-profiles.md)
 - [Mises à jour et publication](docs/application-updates.md)
 - [Extensions](docs/extensions.md)

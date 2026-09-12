@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "cyenginehub.marketplace-cosmos",
+  "displayName": "Cosmos · mes assets",
+  "version": "0.3.1",
+  "publisher": "CyEngineHub · connecteur non officiel",
+  "description": "Bibliothèque native des fichiers téléchargés sur Cosmos, avec fiches locales. Téléchargement depuis l’inventaire officiel dans le navigateur intégré, session conservée et dossier configurable. Ajout de fichiers existants. Aucun inventaire ni image du site extrait automatiquement.",
+  "kind": "Marketplace",
+  "executionKind": "WebLink",
+  "capabilities": "OwnedInventory",
+  "supportedEngines": [ "Unreal", "Unity", "Custom" ],
+  "website": "https://cosmos.leartesstudios.com/inventory",
+  "marketplace": { "inventoryUrl": "https://cosmos.leartesstudios.com/inventory" }
+}

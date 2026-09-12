@@ -187,6 +187,13 @@ public sealed partial class App : Application, IDisposable
                 new GitHubReleaseUpdateService(_updateHttpClient),
                 appData);
             viewModel.UpdateInstallerReady += OnUpdateInstallerReady;
+            var launchArguments = Environment.GetCommandLineArgs();
+            var recoveryArgument = Array.IndexOf(launchArguments, "--restore-download-queue");
+            if (recoveryArgument >= 0 && recoveryArgument + 1 < launchArguments.Length)
+            {
+                viewModel.DownloadRecoveryPath = launchArguments[recoveryArgument + 1];
+                viewModel.ImportDownloadRecoveryOnStartup = true;
+            }
             _mainWindow = new MainWindow
             {
                 DataContext = viewModel,
@@ -194,6 +201,7 @@ public sealed partial class App : Application, IDisposable
             _mainWindow.Closing += OnMainWindowClosing;
             desktop.MainWindow = _mainWindow;
             ConfigureTrayIcon(viewModel);
+            Program.InstanceHost?.SetActivationHandler(ShowMainWindow);
             if (OperatingSystem.IsWindows() && Environment.GetCommandLineArgs().Any(argument =>
                     string.Equals(argument, "--background", StringComparison.OrdinalIgnoreCase)))
             {
@@ -348,6 +356,13 @@ public sealed partial class App : Application, IDisposable
         }
 
         _disposed = true;
+        if (_mainWindow?.DataContext is MainWindowViewModel settingsViewModel)
+        {
+            // These tasks only write immutable snapshots off the UI context; wait before process exit.
+            try { settingsViewModel.FlushMarketplaceSettingsWritesAsync().GetAwaiter().GetResult(); }
+            catch (Exception exception) { Debug.WriteLine("Marketplace settings not saved: " + exception.Message); }
+        }
+        (_mainWindow?.DataContext as MainWindowViewModel)?.StopMcp();
         _isExplicitShutdown = true;
         var trayIcons = TrayIcon.GetIcons(this);
         if (trayIcons is not null)

@@ -909,6 +909,7 @@ public sealed class HubExtensionCardViewModel
     {
         HubExtensionKind.AssetProcessor => "ASSET PROCESSOR",
         HubExtensionKind.EngineIntegration => "INTÉGRATION MOTEUR",
+        HubExtensionKind.Marketplace => "MARKETPLACE · INVENTAIRE",
         _ => "OUTIL",
     };
 
@@ -1733,7 +1734,14 @@ public sealed class FabStoredDownloadViewModel : ObservableObject
         long? storedBytes,
         Func<string, Task> openFolder,
         Func<FabStoredDownloadViewModel, Task> delete,
-        Action<Exception> onError)
+        Action<Exception> onError,
+        string? derivationName = null,
+        string? derivationNotes = null,
+        string? sourceArtifactId = null,
+        Func<FabStoredDownloadViewModel, Task>? installDerived = null,
+        Action<FabStoredDownloadViewModel>? createDerived = null,
+        Action<FabStoredDownloadViewModel>? createTest = null,
+        IReadOnlyList<string>? engineVersions = null)
     {
         AssetId = assetId;
         Version = version;
@@ -1749,6 +1757,10 @@ public sealed class FabStoredDownloadViewModel : ObservableObject
         PackageKind = packageKind;
         StorageMode = storageMode;
         ManifestPath = manifestPath;
+        DerivationName = derivationName;
+        DerivationNotes = derivationNotes;
+        SourceArtifactId = sourceArtifactId;
+        EngineVersions = engineVersions ?? [];
         OpenFolderCommand = new AsyncRelayCommand(() => openFolder(path), onError: onError);
         RequestDeleteCommand = new RelayCommand(() => IsDeleteConfirmationVisible = true);
         CancelDeleteCommand = new RelayCommand(() => IsDeleteConfirmationVisible = false);
@@ -1759,6 +1771,14 @@ public sealed class FabStoredDownloadViewModel : ObservableObject
                 IsDeleteConfirmationVisible = false;
             },
             onError: onError);
+        InstallDerivedCommand = new AsyncRelayCommand(
+            () => installDerived?.Invoke(this) ?? Task.CompletedTask,
+            () => IsDerived,
+            onError);
+        CreateDerivedCommand = new RelayCommand(
+            () => createDerived?.Invoke(this));
+        CreateTestCommand = new RelayCommand(
+            () => createTest?.Invoke(this));
     }
 
     public string AssetId { get; }
@@ -1773,6 +1793,16 @@ public sealed class FabStoredDownloadViewModel : ObservableObject
     public string PackageKind { get; }
     public string StorageMode { get; }
     public string? ManifestPath { get; }
+    public string? DerivationName { get; }
+    public string? DerivationNotes { get; }
+    public string? SourceArtifactId { get; }
+    public IReadOnlyList<string> EngineVersions { get; }
+    public bool IsDerived => !string.IsNullOrWhiteSpace(SourceArtifactId) ||
+                             ArtifactId.StartsWith("derived:", StringComparison.OrdinalIgnoreCase) ||
+                             StorageMode.Equals("DerivedVariant", StringComparison.OrdinalIgnoreCase);
+    public string OriginLabel => IsDerived
+        ? $"Dérivé de {SourceArtifactId ?? "une version locale"}"
+        : "Version fournisseur";
     public string PackageSummary => $"{FormatPackageKind(PackageKind)} · {FormatStorageMode(StorageMode)}";
     public bool IsCompressed => StorageMode.StartsWith("Zip", StringComparison.OrdinalIgnoreCase);
     public string RawSizeLabel => $"Non compressé : {RawSize}";
@@ -1782,6 +1812,9 @@ public sealed class FabStoredDownloadViewModel : ObservableObject
     public ICommand RequestDeleteCommand { get; }
     public ICommand CancelDeleteCommand { get; }
     public ICommand ConfirmDeleteCommand { get; }
+    public ICommand InstallDerivedCommand { get; }
+    public ICommand CreateDerivedCommand { get; }
+    public ICommand CreateTestCommand { get; }
 
     public bool IsDeleteConfirmationVisible
     {
@@ -2926,7 +2959,7 @@ public sealed class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
             () => download is not null && CanDownload);
         OpenInstallCommand = new RelayCommand(
             () => openInstall?.Invoke(this),
-            () => openInstall is not null && CanDownload);
+            () => openInstall is not null && Asset.PreferredProjectVersion is not null);
         OpenCollectionsCommand = new RelayCommand(
             () => openCollections?.Invoke(this),
             () => openCollections is not null);
@@ -3015,6 +3048,8 @@ public sealed class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
     {
         get
         {
+            if (Asset.WebLibraryItemId is not null)
+                return Asset.WebCanDownload ? "Acquis sur Fab · formats à choisir sur la page officielle" : "Acquis sur Fab · téléchargement indisponible";
             if (Asset.ProjectVersions.Count == 0) return "Aucun téléchargement disponible";
             var rawCount = Asset.ProjectVersions.Count(version =>
                 version.ArtifactId.StartsWith("quixel-raw:", StringComparison.OrdinalIgnoreCase));
@@ -3060,7 +3095,8 @@ public sealed class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
         private set => SetProperty(ref _isThumbnailLoading, value);
     }
 
-    public bool CanDownload => Asset.PreferredProjectVersion is not null;
+    public bool CanDownload => Asset.PreferredProjectVersion is not null || Asset.WebCanDownload;
+    public bool CanInstall => Asset.PreferredProjectVersion is not null;
 
     public LibraryPackageContentKind ContentKind =>
         RemoteFabAssetClassifier.Classify(Asset).Kind;
@@ -3558,19 +3594,32 @@ public sealed class GitLogItemViewModel
     public string Text { get; }
 }
 
-public sealed class TaskItemViewModel
+public sealed class TaskItemViewModel : ObservableObject
 {
-    public TaskItemViewModel(HubTaskSnapshot snapshot, Action<Guid> cancel)
+    private HubTaskSnapshot _snapshot;
+
+    public TaskItemViewModel(HubTaskSnapshot snapshot, Action<Guid> cancel, Action<HubTaskLink> navigate)
     {
+        _snapshot = snapshot;
         Id = snapshot.Id;
         Category = snapshot.Category;
         Title = snapshot.Title;
-        Status = snapshot.Status.ToString();
-        Message = snapshot.Error ?? snapshot.Message ?? string.Empty;
-        ProgressPercent = (snapshot.Progress ?? 0) * 100;
-        Duration = FormatDuration(snapshot);
-        CanCancel = snapshot.Status is HubTaskStatus.Queued or HubTaskStatus.Running;
         CancelCommand = new RelayCommand(() => cancel(snapshot.Id), () => CanCancel);
+        Links = snapshot.Links.Select(link => new TaskLinkViewModel(link, navigate)).ToArray();
+    }
+
+    public IReadOnlyList<TaskLinkViewModel> Links { get; }
+
+    public void ApplySnapshot(HubTaskSnapshot snapshot)
+    {
+        if (_snapshot == snapshot) return;
+        _snapshot = snapshot;
+        OnPropertyChanged(nameof(Status));
+        OnPropertyChanged(nameof(Message));
+        OnPropertyChanged(nameof(ProgressPercent));
+        OnPropertyChanged(nameof(Duration));
+        OnPropertyChanged(nameof(CanCancel));
+        ((RelayCommand)CancelCommand).NotifyCanExecuteChanged();
     }
 
     public Guid Id { get; }
@@ -3579,15 +3628,23 @@ public sealed class TaskItemViewModel
 
     public string Title { get; }
 
-    public string Status { get; }
+    public string Status => _snapshot.Status switch
+    {
+        HubTaskStatus.Queued => "En attente",
+        HubTaskStatus.Running => "En cours",
+        HubTaskStatus.Completed => "Terminé",
+        HubTaskStatus.Failed => "Échec",
+        HubTaskStatus.Canceled => "Annulé",
+        _ => _snapshot.Status.ToString(),
+    };
 
-    public string Message { get; }
+    public string Message => _snapshot.Error ?? _snapshot.Message ?? string.Empty;
 
-    public double ProgressPercent { get; }
+    public double ProgressPercent => (_snapshot.Progress ?? 0) * 100;
 
-    public string Duration { get; }
+    public string Duration => FormatDuration(_snapshot);
 
-    public bool CanCancel { get; }
+    public bool CanCancel => _snapshot.Status is HubTaskStatus.Queued or HubTaskStatus.Running;
 
     public ICommand CancelCommand { get; }
 

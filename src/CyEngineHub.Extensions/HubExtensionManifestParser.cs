@@ -113,6 +113,24 @@ public sealed partial class HubExtensionManifestParser : IHubExtensionManifestPa
             throw InvalidManifest(manifestPath);
         }
 
+        if (manifest.Kind == HubExtensionKind.Marketplace)
+        {
+            if (manifest.ExecutionKind != HubExtensionExecutionKind.WebLink ||
+                !manifest.Capabilities.HasFlag(HubExtensionCapability.OwnedInventory) ||
+                manifest.Marketplace is null ||
+                !TryGetHttpsUri(manifest.Marketplace.InventoryUrl, out var inventoryUri) ||
+                !TryGetHttpsUri(manifest.Website, out var websiteUri) ||
+                inventoryUri!.Host != websiteUri!.Host ||
+                !string.IsNullOrEmpty(inventoryUri.UserInfo) ||
+                !string.IsNullOrEmpty(inventoryUri.Query) ||
+                !string.IsNullOrEmpty(inventoryUri.Fragment))
+                throw InvalidManifest(manifestPath);
+        }
+        else if (manifest.Marketplace is not null)
+        {
+            throw InvalidManifest(manifestPath);
+        }
+
         var contributionIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var contribution in manifest.UiContributions)
         {

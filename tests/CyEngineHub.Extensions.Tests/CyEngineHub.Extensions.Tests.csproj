@@ -2,6 +2,7 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <NoWarn>$(NoWarn);CS8892</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/CyEngineHub.Core/CyEngineHub.Core.csproj" />
@@ -15,5 +16,9 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../src/CyEngineHub.AssetBridge.Tool/Program.cs" Link="BridgeTool/Program.cs" />
+    <Content Include="../../extensions/builtin/**/extension.json" Link="BuiltInManifests/%(RecursiveDir)extension.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -19,12 +19,26 @@ public sealed record HubTaskSnapshot(
     DateTimeOffset CreatedAt,
     DateTimeOffset? StartedAt,
     DateTimeOffset? FinishedAt,
-    string? Error);
+    string? Error)
+{
+    public IReadOnlyList<HubTaskLink> Links { get; init; } = [];
+
+}
+
+public sealed record HubTaskLink(string Kind, string Id, string Label, string? Source = null);
 
 public sealed record HubTaskDefinition(
     string Category,
     string Title,
-    Func<HubTaskContext, CancellationToken, Task> ExecuteAsync);
+    Func<HubTaskContext, CancellationToken, Task> ExecuteAsync)
+{
+    public bool IsDownload { get; init; }
+    public IReadOnlyList<HubTaskLink> Links { get; init; } = [];
+
+    public HubTaskDefinition(string category, string title, IReadOnlyList<HubTaskLink> links,
+        Func<HubTaskContext, CancellationToken, Task> executeAsync)
+        : this(category, title, executeAsync) => Links = links.ToArray();
+}
 
 public sealed class HubTaskContext
 {
@@ -73,4 +87,3 @@ public sealed class HubTaskChangedEventArgs : EventArgs
 
     public HubTaskSnapshot Task { get; }
 }
-

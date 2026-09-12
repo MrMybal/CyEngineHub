@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 1,
+  "profiles": [
+    {
+      "id": "ue56-55-staticmesh",
+      "revision": 1,
+      "assetType": "StaticMesh",
+      "sourceVersion": "5.6",
+      "targetVersion": "5.5",
+      "nativeAdapter": "",
+      "portableAdapter": "portable-static-mesh-v1",
+      "checks": [
+        "Géométrie et topologie",
+        "UV, LOD, matériaux, collisions",
+        "Nanite et références après réouverture"
+      ],
+      "losses": [
+        "LOD, collisions et paramètres de build non garantis"
+      ],
+      "notes": "Reconstruction native MeshDescription et dépendances à implémenter."
+    },
+    {
+      "id": "ue56-55-texture2d",
+      "revision": 2,
+      "assetType": "Texture2D",
+      "sourceVersion": "5.6",
+      "targetVersion": "5.5",
+      "nativeAdapter": "native-texture-v1",
+      "portableAdapter": "portable-texture-v1",
+      "checks": [
+        "Dimensions et données source",
+        "sRGB, compression, mipmaps",
+        "Virtual texturing"
+      ],
+      "losses": [
+        "TGA : HDR, précision, compression et réglages non garantis"
+      ],
+      "notes": "Natif expérimental : pixels BGRA8/G8, une couche/bloc/slice/mip source, propriétés contrôlées. Réouverture cible et comparaison obligatoires. Formats et propriétés non pris en charge refusés."
+    },
+    {
+      "id": "ue56-55-soundwave",
+      "revision": 1,
+      "assetType": "SoundWave",
+      "sourceVersion": "5.6",
+      "targetVersion": "5.5",
+      "nativeAdapter": "",
+      "portableAdapter": "portable-sound-v1",
+      "checks": [
+        "Durée, canaux, fréquence",
+        "Données audio et paramètres"
+      ],
+      "losses": [
+        "Réglages audio Unreal non garantis"
+      ],
+      "notes": "Transfert natif audio à implémenter."
+    },
+    {
+      "id": "ue56-55-skeletalmesh",
+      "revision": 1,
+      "assetType": "SkeletalMesh",
+      "sourceVersion": "5.6",
+      "targetVersion": "5.5",
+      "nativeAdapter": "",
+      "portableAdapter": "",
+      "checks": [
+        "Squelette, skinning, morph targets",
+        "LOD, matériaux et physique"
+      ],
+      "losses": [],
+      "notes": "Export étendu bloqué après crash du test UE 5.6 ; adaptateur spécialisé nécessaire."
+    },
+    {
+      "id": "ue56-55-skeleton",
+      "revision": 1,
+      "assetType": "Skeleton",
+      "sourceVersion": "5.6",
+      "targetVersion": "5.5",
+      "nativeAdapter": "",
+      "portableAdapter": "",
+      "checks": [
+        "Hiérarchie des os",
+        "Sockets et retargeting"
+      ],
+      "losses": [],
+      "notes": "Reconstruction du squelette et remappage à implémenter."
+    },
+    {
+      "id": "ue56-55-animsequence",
+      "revision": 1,
+      "assetType": "AnimSequence",
+      "sourceVersion": "5.6",
+      "targetVersion": "5.5",
+      "nativeAdapter": "",
+      "portableAdapter": "",
+      "checks": [
+        "Squelette, pistes et durée",
+        "Courbes, notifies et root motion"
+      ],
+      "losses": [],
+      "notes": "Adaptateur d'animation et liaison au squelette à implémenter."
+    },
+    {
+      "id": "ue56-55-material",
+      "revision": 1,
+      "assetType": "Material",
+      "sourceVersion": "5.6",
+      "targetVersion": "5.5",
+      "nativeAdapter": "",
+      "portableAdapter": "",
+      "checks": [
+        "Expressions et propriétés",
+        "Connexions et compilation"
+      ],
+      "losses": [],
+      "notes": "Reconstruction des graphes et traduction des expressions à implémenter."
+    },
+    {
+      "id": "ue56-55-materialinstanceconstant",
+      "revision": 1,
+      "assetType": "MaterialInstanceConstant",
+      "sourceVersion": "5.6",
+      "targetVersion": "5.5",
+      "nativeAdapter": "",
+      "portableAdapter": "",
+      "checks": [
+        "Parent et paramètres",
+        "Références et compilation"
+      ],
+      "losses": [],
+      "notes": "Transfert des overrides et liaison au parent à implémenter."
+    },
+    {
+      "id": "ue56-55-blueprint",
+      "revision": 1,
+      "assetType": "Blueprint",
+      "sourceVersion": "5.6",
+      "targetVersion": "5.5",
+      "nativeAdapter": "",
+      "portableAdapter": "",
+      "checks": [
+        "Classes, propriétés et composants",
+        "Nœuds, références et compilation"
+      ],
+      "losses": [],
+      "notes": "Adaptation par classe et reconstruction des graphes à implémenter."
+    },
+    {
+      "id": "ue56-55-world",
+      "revision": 1,
+      "assetType": "World",
+      "sourceVersion": "5.6",
+      "targetVersion": "5.5",
+      "nativeAdapter": "",
+      "portableAdapter": "",
+      "checks": [
+        "Acteurs et composants",
+        "Sous-niveaux, références et World Partition"
+      ],
+      "losses": [],
+      "notes": "Reconstruction de la scène et dépendances à implémenter."
+    },
+    {
+      "id": "ue56-55-datatable",
+      "revision": 1,
+      "assetType": "DataTable",
+      "sourceVersion": "5.6",
+      "targetVersion": "5.5",
+      "nativeAdapter": "",
+      "portableAdapter": "",
+      "checks": [
+        "Struct source et champs",
+        "Valeurs et références"
+      ],
+      "losses": [],
+      "notes": "CSV seul insuffisant : transfert de la structure requis."
+    }
+  ]
+}

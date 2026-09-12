@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><EnableNETAnalyzers>false</EnableNETAnalyzers></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../../src/CyEngineHub.Desktop/CyEngineHub.Desktop.csproj" /></ItemGroup>
+  <ItemGroup><Content Include="scripts/*.py" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
+  <ItemGroup>
+    <Content Include="../../../artifacts/native-texture-adapters/**/CyHubNativeBridge.uplugin;../../../artifacts/native-texture-adapters/**/*.dll;../../../artifacts/native-texture-adapters/**/*.modules" Exclude="../../../artifacts/native-texture-adapters/**/HostProject/**;../../../artifacts/native-texture-adapters/**/Intermediate/**" Link="Extensions/cyenginehub.unreal-version-bridge/native-binaries/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../../src/CyEngineHub.AssetBridge.Tool/bin/$(Configuration)/net8.0/CyEngineHub.AssetBridge.Tool.*" Link="Extensions/cyenginehub.asset-bridge/tools/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../extensions/builtin/cyenginehub.asset-bridge/extension.json" Link="Extensions/cyenginehub.asset-bridge/extension.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../../extensions/builtin/cyenginehub.unreal-relocated-install/scripts/*.py" Link="Extensions/cyenginehub.unreal-relocated-install/scripts/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../extensions/builtin/cyenginehub.unreal-version-bridge/profiles/*.json" Link="Extensions/cyenginehub.unreal-version-bridge/profiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../extensions/builtin/cyenginehub.unreal-version-bridge/scripts/*.py" Link="Extensions/cyenginehub.unreal-version-bridge/scripts/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="UseWebView2CoreOnly" BeforeTargets="ResolveAssemblyReferences"><ItemGroup><Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf' Or '%(Reference.Filename)' == 'Microsoft.Web.WebView2.WinForms'" /></ItemGroup></Target>
+</Project>

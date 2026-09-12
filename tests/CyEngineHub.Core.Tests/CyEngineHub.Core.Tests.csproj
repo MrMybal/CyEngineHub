@@ -4,7 +4,15 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/Commands.cs" Link="Desktop/Commands.cs" />
+    <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/ObservableObject.cs" Link="Desktop/ObservableObject.cs" />
+    <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/MarketplaceConnectorViewModel.cs" Link="Desktop/MarketplaceConnectorViewModel.cs" />
+    <ProjectReference Include="../../src/CyEngineHub.Extensions/CyEngineHub.Extensions.csproj" />
+    <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/ConnectorLibraryViewModel.cs" Link="Desktop/ConnectorLibraryViewModel.cs" />
+    <Compile Include="../../src/CyEngineHub.Desktop/Views/MarketplaceBrowserPolicy.cs" Link="Desktop/MarketplaceBrowserPolicy.cs" />
+    <Compile Include="../../src/CyEngineHub.Desktop/Views/MarketplaceDownloadStorage.cs" Link="Desktop/MarketplaceDownloadStorage.cs" />
     <ProjectReference Include="../../src/CyEngineHub.Core/CyEngineHub.Core.csproj" />
+    <ProjectReference Include="../../src/CyEngineHub.Mcp/CyEngineHub.Mcp.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../../src/CyEngineHub.Infrastructure/CyEngineHub.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>
@@ -15,5 +23,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
   </ItemGroup>
+  <Target Name="CopyMcpSmokeHost" AfterTargets="Build">
+    <ItemGroup><McpSmokeFiles Include="../../src/CyEngineHub.Mcp/bin/$(Configuration)/net8.0/*" /></ItemGroup>
+    <Copy SourceFiles="@(McpSmokeFiles)" DestinationFolder="$(OutDir)McpSmoke" />
+  </Target>
 </Project>
-

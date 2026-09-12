@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../CyEngineHub.Core/CyEngineHub.Core.csproj" />
+    <ProjectReference Include="../CyEngineHub.Mcp/CyEngineHub.Mcp.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../CyEngineHub.Engines/CyEngineHub.Engines.csproj" />
     <ProjectReference Include="../CyEngineHub.Extensions/CyEngineHub.Extensions.csproj" />
     <ProjectReference Include="../CyEngineHub.AssetBridge.Tool/CyEngineHub.AssetBridge.Tool.csproj" ReferenceOutputAssembly="false" />
@@ -43,6 +44,8 @@
     </ItemGroup>
   </Target>
   <Target Name="CopyBuiltInHubExtensions" AfterTargets="Build" Condition="'$(SkipBuiltInExtensionCopy)' != 'true'">
+    <ItemGroup><HubMcpFiles Include="../CyEngineHub.Mcp/bin/$(Configuration)/net8.0/*" /></ItemGroup>
+    <Copy SourceFiles="@(HubMcpFiles)" DestinationFolder="$(OutDir)Mcp" />
     <RemoveDir Directories="$(OutDir)Extensions/cyenginehub.unreal-asset-downgrader" />
     <ItemGroup>
       <AssetBridgeToolFiles Include="../CyEngineHub.AssetBridge.Tool/bin/$(Configuration)/net8.0/**/*" />
@@ -55,15 +58,23 @@
         DestinationFolder="$(OutDir)Extensions/cyenginehub.asset-bridge" />
     <ItemGroup>
       <UnrealVersionBridgeFiles Include="../../extensions/builtin/cyenginehub.unreal-version-bridge/**/*" />
+      <NativeTextureAdapterFiles Include="../../artifacts/native-texture-adapters/**/CyHubNativeBridge.uplugin;../../artifacts/native-texture-adapters/**/*.dll;../../artifacts/native-texture-adapters/**/*.modules" Exclude="../../artifacts/native-texture-adapters/**/HostProject/**;../../artifacts/native-texture-adapters/**/Intermediate/**" />
       <UnrealRelocatedInstallFiles Include="../../extensions/builtin/cyenginehub.unreal-relocated-install/**/*" />
+      <MarketplaceConnectorFiles Include="../../extensions/builtin/cyenginehub.marketplace-cosmos/**/*" />
+      <MegascansFabConnectorFiles Include="../../extensions/builtin/cyenginehub.marketplace-megascans-fab/**/*" />
       <UpdaterFiles Include="../CyEngineHub.Updater/bin/$(Configuration)/net8.0/**/*" />
     </ItemGroup>
     <Copy
         SourceFiles="@(UnrealVersionBridgeFiles)"
         DestinationFiles="@(UnrealVersionBridgeFiles->'$(OutDir)Extensions/cyenginehub.unreal-version-bridge/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(NativeTextureAdapterFiles)" DestinationFiles="@(NativeTextureAdapterFiles->'$(OutDir)Extensions/cyenginehub.unreal-version-bridge/native-binaries/%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy
         SourceFiles="@(UnrealRelocatedInstallFiles)"
         DestinationFiles="@(UnrealRelocatedInstallFiles->'$(OutDir)Extensions/cyenginehub.unreal-relocated-install/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy
+        SourceFiles="@(MarketplaceConnectorFiles)"
+        DestinationFiles="@(MarketplaceConnectorFiles->'$(OutDir)Extensions/cyenginehub.marketplace-cosmos/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(MegascansFabConnectorFiles)" DestinationFiles="@(MegascansFabConnectorFiles->'$(OutDir)Extensions/cyenginehub.marketplace-megascans-fab/%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy
         SourceFiles="@(UpdaterFiles)"
         DestinationFiles="@(UpdaterFiles->'$(OutDir)Updater/%(RecursiveDir)%(Filename)%(Extension)')" />

@@ -8,6 +8,85 @@ namespace CyEngineHub.Epic.Tests;
 public sealed class LibraryPackageServiceTests
 {
     [Fact]
+    public async Task DerivedPackagePreservesSourceAndRecordsLineage()
+    {
+        var temporaryRoot = Path.Combine(Path.GetTempPath(), "CyEngineHub-derived-test-" + Guid.NewGuid().ToString("N"));
+        var sourceRoot = Path.Combine(temporaryRoot, "Source");
+        var stagingRoot = Path.Combine(temporaryRoot, "Staging");
+        Directory.CreateDirectory(Path.Combine(sourceRoot, "Content", "Environment"));
+        await File.WriteAllTextAsync(Path.Combine(sourceRoot, "Content", "Environment", "Rock.uasset"), "asset-data");
+        var asset = new RemoteFabAsset("asset-derived", "ue", "Rock Pack", string.Empty, "Fab", "ASSET_PACK", null, null, [], []);
+        var version = new RemoteFabProjectVersion("supplier-artifact", [], ["5.5"], ["Windows"]);
+        try
+        {
+            var packagedSource = await LibraryPackageService.PackageAsync(
+                asset,
+                version,
+                new DirectFabDownloadResult(asset.AssetId, asset.Title, sourceRoot, 1, 10, DateTimeOffset.UtcNow),
+                LibraryPackageStorageMode.ZipFastest);
+            var sourceArchiveHash = Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(
+                    Path.Combine(sourceRoot, LibraryPackageService.ArchiveFileName))));
+
+            var derived = await DerivedLibraryPackageService.CreateAsync(new DerivedLibraryPackageRequest(
+                asset,
+                version,
+                packagedSource.DestinationDirectory,
+                stagingRoot,
+                "Rock Pack optimisé",
+                "Nanite corrigé",
+                LibraryPackageContentKind.ContentPack,
+                LibraryPackageStorageMode.ZipFastest,
+                "derived:test"));
+
+            Assert.True(File.Exists(Path.Combine(sourceRoot, LibraryPackageService.ArchiveFileName)));
+            Assert.Equal(sourceArchiveHash, Convert.ToHexString(
+                System.Security.Cryptography.SHA256.HashData(await File.ReadAllBytesAsync(
+                    Path.Combine(sourceRoot, LibraryPackageService.ArchiveFileName)))));
+            var manifestJson = await File.ReadAllTextAsync(derived.ManifestPath!);
+            Assert.Contains("\"schemaVersion\": 2", manifestJson, StringComparison.Ordinal);
+            Assert.Contains("\"sourceArtifactId\": \"supplier-artifact\"", manifestJson, StringComparison.Ordinal);
+            using var manifest = System.Text.Json.JsonDocument.Parse(manifestJson);
+            Assert.Equal(
+                "Rock Pack optimisé",
+                manifest.RootElement.GetProperty("derivation").GetProperty("name").GetString());
+            using var archive = ZipFile.OpenRead(Path.Combine(derived.DestinationDirectory, LibraryPackageService.ArchiveFileName));
+            Assert.Contains(archive.Entries, entry => entry.FullName == "Content/Environment/Rock.uasset");
+        }
+        finally
+        {
+            if (Directory.Exists(temporaryRoot)) Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task ContentPackFromWorkspaceExcludesGeneratedProjectData()
+    {
+        var temporaryRoot = Path.Combine(Path.GetTempPath(), "CyEngineHub-derived-project-test-" + Guid.NewGuid().ToString("N"));
+        var projectRoot = Path.Combine(temporaryRoot, "Workspace");
+        Directory.CreateDirectory(Path.Combine(projectRoot, "Content", "Pack"));
+        Directory.CreateDirectory(Path.Combine(projectRoot, "Saved", "Logs"));
+        await File.WriteAllTextAsync(Path.Combine(projectRoot, "Content", "Pack", "Mesh.uasset"), "mesh");
+        await File.WriteAllTextAsync(Path.Combine(projectRoot, "Saved", "Logs", "Editor.log"), "private-log");
+        var asset = new RemoteFabAsset("asset-workspace", "ue", "Workspace", string.Empty, "Fab", "ASSET_PACK", null, null, [], []);
+        var version = new RemoteFabProjectVersion("source", [], ["5.6"], ["Windows"]);
+        try
+        {
+            var result = await DerivedLibraryPackageService.CreateAsync(new DerivedLibraryPackageRequest(
+                asset, version, projectRoot, Path.Combine(temporaryRoot, "Output"), "Optimized", string.Empty,
+                LibraryPackageContentKind.ContentPack, LibraryPackageStorageMode.ZipStore));
+            using var archive = ZipFile.OpenRead(Path.Combine(result.DestinationDirectory, LibraryPackageService.ArchiveFileName));
+            Assert.Contains(archive.Entries, entry => entry.FullName == "Content/Pack/Mesh.uasset");
+            Assert.DoesNotContain(archive.Entries, entry => entry.FullName.Contains("Saved", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(archive.Entries, entry => entry.FullName.Contains("Editor.log", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            if (Directory.Exists(temporaryRoot)) Directory.Delete(temporaryRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task StorageRouterUsesTheFirstOrderedLibraryWithEnoughQuota()
     {
         var temporaryRoot = Path.Combine(
