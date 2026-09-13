@@ -119,12 +119,14 @@ try {
         $_.Extension -in @('.db', '.log', '.pyc', '.pdb', '.pfx') -or $_.Name -eq 'portable.flag'
     })
     if ($unexpected.Count -gt 0) { throw 'Private/generated files unexpectedly present in the package.' }
+    & (Join-Path $PSScriptRoot 'check-windows-icon.ps1') -Executable (Join-Path $appStage 'CyEngineHub.Desktop.exe')
 
     & python (Join-Path $repoRoot 'scripts/check-release-privacy.py') --directory $appStage
     if ($LASTEXITCODE -ne 0) { throw 'Release privacy check failed before packaging.' }
 
     & $InnoCompiler '/Qp' "/DAppVersion=$version" "/DAppSource=$appStage" "/DReleaseOutput=$assets" (Join-Path $PSScriptRoot 'CyEngineHub.iss')
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+    & (Join-Path $PSScriptRoot 'check-windows-icon.ps1') -Executable (Join-Path $assets "CyEngineHub-$version-Setup-win-x64.exe")
 
     # The standalone archive uses the same per-user data directory as the installer.
     # Creating portable.flag beside the executable remains an explicit user choice.

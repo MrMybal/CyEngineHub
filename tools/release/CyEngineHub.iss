@@ -11,6 +11,7 @@
 [Setup]
 AppId={{082080E4-0B96-4ABD-ADE7-347C932F01BC}
 AppName=CyEngineHub
+SetupIconFile=..\..\assets\branding\cyenginehub.ico
 AppVersion={#AppVersion}
 AppVerName=CyEngineHub {#AppVersion}
 AppPublisher=CyberAlien

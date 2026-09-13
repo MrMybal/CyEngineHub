@@ -3,7 +3,7 @@
 Hub de développement multi-moteur, local-first, pour Windows. Unreal Engine est
 le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers locaux.
 
-**Version de test : `0.1.0-alpha.3`.** Sauvegardez vos projets avant d'essayer les
+**Version de test : `0.1.0-alpha.4`.** Sauvegardez vos projets avant d'essayer les
 opérations d'installation, de déplacement ou de conversion d'assets.
 
 ## Télécharger

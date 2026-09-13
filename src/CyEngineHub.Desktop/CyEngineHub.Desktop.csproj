@@ -3,6 +3,7 @@
     <OutputType>WinExe</OutputType>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>../../assets/branding/cyenginehub.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../CyEngineHub.Core/CyEngineHub.Core.csproj" />
