@@ -3,7 +3,7 @@
 Hub de développement multi-moteur, local-first, pour Windows. Unreal Engine est
 le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers locaux.
 
-**Version de test : `2.0.0-alpha.1`.** Sauvegardez vos projets avant d'essayer les
+**Version de test : `2.0.0-alpha.3`.** Sauvegardez vos projets avant d'essayer les
 opérations d'installation, de déplacement ou de conversion d'assets.
 
 ## Interface V2
@@ -12,6 +12,12 @@ L’interface utilise Dear ImGui : panneaux anthracite, listes compactes à colo
 redimensionnables, inspecteur latéral, recherche et formulaires à onglets. La densité
 est réglable et mémorisée. Les téléchargements, profils, scripts d’installation,
 connexions et outils MCP utilisent les services existants.
+
+Les moteurs et projets disposent de modes Cartes/Liste mémorisés séparément. Les
+cartes d’assets gardent une taille fixe ; un clic sélectionne la carte entière,
+un double-clic ouvre sa fiche et les boutons d’action restent indépendants. Les
+panneaux Sources et Paramètres occupent toute la hauteur, avec l’onglet actif
+surligné. Cliquez sur la source active pour revenir de sa fiche à son catalogue.
 
 Avalonia assure les fenêtres natives, le rendu GPU, les sélecteurs de fichiers et
 l’hébergement de WebView2. Les pages web restent affichées par WebView2 ; les

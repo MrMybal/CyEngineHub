@@ -5,6 +5,42 @@ namespace CyEngineHub.Core.Tests;
 
 public sealed class ImGuiInterfaceTests
 {
+    [Theory]
+    [InlineData("IsLibraryVisible")]
+    [InlineData("IsSettingsVisible")]
+    public void PersistentSectionsExposeContentIndependentlyOfTheirNavigation(string section)
+    {
+        var page = UiDocument.Load("Main").Pages.Single(node => UiBinding.Path(node["IsVisible"]) == section);
+        var body = section == "IsSettingsVisible" ? page.Children.Single(node => node["Grid.Row"] == "1") : page;
+        Assert.Single(body.Children, node => node["Grid.Column"] == "1");
+        Assert.Contains(body.Children, node => node["Grid.Column"] is null);
+    }
+
+    [Theory]
+    [InlineData(300, 1)]
+    [InlineData(619, 1)]
+    [InlineData(630, 2)]
+    [InlineData(1400, 4)]
+    public void CardDimensionsStayConstantWhileColumnsReflow(float available, int columns)
+    {
+        var grid = UiCardGrid.Create(available, 310, 350);
+        Assert.Equal(columns, grid.Columns);
+        Assert.Equal(310, grid.Width);
+        Assert.Equal(350, grid.Height);
+        Assert.Equal(360, grid.RowStride);
+    }
+
+    [Fact]
+    public void CardGridOnlyRealizesVisibleRowsAndHandlesEmptyCatalogs()
+    {
+        var grid = UiCardGrid.Create(1000, 310, 350);
+        var range = grid.VisibleRows(20000, 45000, 600);
+        Assert.InRange(range.End - range.Start, 1, 5);
+        Assert.Equal((0, 0), grid.VisibleRows(0, 45000, 600));
+        Assert.Equal(1, grid.Rows(1));
+        Assert.Equal(1.15f, UiCardGrid.InterfaceScale);
+    }
+
     private sealed class Model
     {
         public string Name { get; set; } = "Projet";

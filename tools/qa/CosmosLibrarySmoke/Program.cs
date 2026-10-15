@@ -89,7 +89,13 @@ static class Program
             await Call(vm, "ShowConnectorLibraryAsync", manifest.Id, file);
             await Task.Delay(250);
             Check(vm.SelectedConnectorLibrary!.IsProductVisible, "Imported file opens native product detail");
-            vm.SelectedConnectorLibrary.BackCommand.Execute(null);
+            if (ImGuiDiagnostics.IsHosted(window))
+            {
+                await ImGuiDiagnostics.FramesAsync(window);
+                Check(ImGuiDiagnostics.Elements(window).Contains("section-selected/source/" + manifest.Id), "Connector source has the same selected-tab indicator");
+                await ImGuiDiagnostics.ClickAsync(window, "section-tab/source/" + manifest.Id);
+            }
+            else vm.SelectedConnectorLibrary.BackCommand.Execute(null);
             await Task.Delay(100);
             if (ImGuiDiagnostics.IsHosted(window))
             {

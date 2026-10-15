@@ -174,10 +174,10 @@ internal sealed class ImGuiSurface : OpenGlControlBase
         {
             ushort[] ranges = [0x20, 0x17F, 0x2000, 0x27FF, 0];
             var pinned = GCHandle.Alloc(ranges, GCHandleType.Pinned);
-            try { io.Fonts.AddFontFromFileTTF(font, 14 * (float)scale, default, pinned.AddrOfPinnedObject()); io.Fonts.Build(); }
+            try { io.Fonts.AddFontFromFileTTF(font, 14 * UiCardGrid.InterfaceScale * (float)scale, default, pinned.AddrOfPinnedObject()); io.Fonts.Build(); }
             finally { pinned.Free(); }
         }
-        else { io.Fonts.AddFontDefault(); io.FontGlobalScale = 1; }
+        else { io.Fonts.AddFontDefault(); io.FontGlobalScale = UiCardGrid.InterfaceScale; }
     }
     protected override void OnOpenGlRender(GlInterface gl, int fb)
     {

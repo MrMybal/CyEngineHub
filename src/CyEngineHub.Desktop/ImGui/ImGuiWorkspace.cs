@@ -39,6 +39,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
     public void FocusField(string binding) => _focusRequests.Add(binding);
 
     public IReadOnlyCollection<string> VisitedNodes => _visited;
+    internal float RenderedFontSize { get; private set; }
 
     public ImGuiWorkspace(string layout, Func<Bitmap, nint> image, Action<string>? nativeAction)
     {
@@ -56,6 +57,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
     public void Draw(object? model, Vector2 size)
     {
         _root = model;
+        RenderedFontSize = Gui.GetFontSize();
         if (model is MainWindowViewModel preferences) _compact = preferences.UseCompactInterface;
         VisibleRows.Clear();
         Elements.Clear();
@@ -65,8 +67,8 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         _seen.Clear();
         _seenCollections.Clear();
         var style = Gui.GetStyle();
-        style.ItemSpacing = _compact ? new(7, 4) : new(9, 8);
-        style.FramePadding = _compact ? new(7, 3) : new(10, 7);
+        style.ItemSpacing = (_compact ? new Vector2(7, 4) : new Vector2(9, 8)) * UiCardGrid.InterfaceScale;
+        style.FramePadding = (_compact ? new Vector2(7, 3) : new Vector2(10, 7)) * UiCardGrid.InterfaceScale;
         Gui.SetNextWindowPos(Vector2.Zero);
         Gui.SetNextWindowSize(size);
         Gui.Begin("CyEngineHub###hub", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoBringToFrontOnFocus);
@@ -156,6 +158,9 @@ internal sealed partial class ImGuiWorkspace : IDisposable
     }
 
     private static bool Visible(UiNode node, object? context) => UiBinding.Boolean(context, node["IsVisible"]);
+    private bool RedundantBack(UiNode node, object? context) => node.Kind == "Button" && _root is MainWindowViewModel { IsLibraryVisible: true } &&
+        (UiBinding.Path(node["Command"]) == "CloseRemoteFabProductCommand" ||
+         context is ConnectorLibraryViewModel && UiBinding.Path(node["Command"]) == "BackCommand");
     private static string Text(object? context, string? expression) => UiBinding.Text(context, expression);
     private void Set(object? context, string? expression, object? value) => _actions.Enqueue(() => UiBinding.Write(context, expression, value));
     private void Execute(object? context, string? expression)
@@ -167,6 +172,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
     private void DrawNode(UiNode node, object? context)
     {
         if (node.IsModal || !Visible(node, context)) return;
+        if (RedundantBack(node, context)) return;
         if (_focusCompilation && node["Name"] == "EngineCompilationPanel")
         { Gui.Dummy(new(1, 1)); Gui.SetScrollHereY(0); _focusCompilation = false; }
         if (node["DataContext"] is { } dataContext) context = UiBinding.Read(context, dataContext);
@@ -271,8 +277,14 @@ internal sealed partial class ImGuiWorkspace : IDisposable
     private static string Elide(string text, float width)
     {
         if (Gui.CalcTextSize(text).X <= width) return text;
-        var length = Math.Clamp((int)(width / 8), 1, text.Length);
-        return text[..length] + "…";
+        var min = 0; var max = text.Length;
+        while (min < max)
+        {
+            var mid = (min + max + 1) / 2;
+            if (Gui.CalcTextSize(text[..mid] + "…").X <= width) min = mid;
+            else max = mid - 1;
+        }
+        return text[..min] + "…";
     }
 
     private void DrawInput(UiNode node, object? context)
@@ -306,14 +318,21 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         Gui.BeginDisabled(command is not null && !command.CanExecute(null));
         var accent = node["Classes"]?.Contains("accent", StringComparison.Ordinal) == true;
         var danger = node["Classes"]?.Contains("danger", StringComparison.Ordinal) == true;
-        if (accent || danger) Gui.PushStyleColor(ImGuiCol.Button, danger ? new Vector4(.48f, .15f, .22f, 1) : new(.1f, .37f, .48f, 1));
+        var selected = node["Classes"]?.Split(' ').Contains("active", StringComparer.Ordinal) == true ||
+            UiBinding.Path(node["Command"]) switch
+            {
+                "ShowQuixelAssetsTabCommand" => Flag(_root, "IsQuixelAssetsTabSelected"),
+                "ShowQuixelCollectionsTabCommand" => Flag(_root, "IsQuixelCollectionsTabSelected"),
+                _ => false,
+            };
+        if (selected || accent || danger) Gui.PushStyleColor(ImGuiCol.Button, selected ? ImGuiTheme.Rgb(0x51445F) : danger ? new Vector4(.48f, .15f, .22f, 1) : ImGuiTheme.Rgb(0x5A497E));
         if (Gui.Button(NormalizeLabel(label) + "###button"))
         {
             if (node["Click"] is { } action) _actions.Enqueue(() => _nativeAction?.Invoke(action));
             else Execute(context, node["Command"]);
         }
         Record("command/" + (UiBinding.Path(node["Command"]) ?? node["Click"] ?? node.Id) + "/" + node.Id);
-        if (accent || danger) Gui.PopStyleColor();
+        if (selected || accent || danger) Gui.PopStyleColor();
         Gui.EndDisabled();
     }
 
@@ -370,9 +389,10 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         var horizontal = node.Kind == "WrapPanel" || node["Orientation"] == "Horizontal";
         if (!horizontal) { DrawChildren(node, context); return; }
         var first = true;
+        var right = Gui.GetCursorScreenPos().X + Gui.GetContentRegionAvail().X;
         foreach (var child in node.Children.Where(child => !child.IsModal && Visible(child, context)))
         {
-            if (!first && Gui.GetContentRegionAvail().X > 100) Gui.SameLine();
+            if (!first && Gui.GetItemRectMax().X + Gui.GetStyle().ItemSpacing.X + NaturalWidth(child, context) <= right) Gui.SameLine();
             DrawNode(child, context);
             first = false;
         }
@@ -380,7 +400,9 @@ internal sealed partial class ImGuiWorkspace : IDisposable
 
     private void DrawGrid(UiNode node, object? context)
     {
-        var children = node.Children.Where(child => !child.IsModal && Visible(child, context)).ToArray();
+        var children = node.Children.Where(child => !child.IsModal && Visible(child, context) && !RedundantBack(child, context)).ToArray();
+        if (children.Length == 1 && node.Children.Any(child => RedundantBack(child, context)))
+        { DrawNode(children[0], context); return; }
         var columns = node["ColumnDefinitions"]?.Split(',') ?? [];
         if (columns.Length <= 1) { foreach (var child in children.OrderBy(child => child.Number("Grid.Row", 0))) DrawNode(child, context); return; }
         float AutoWidth(int column)
@@ -478,6 +500,11 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         var selected = UiBinding.Read(context, node["SelectedItem"]);
         var scroll = node.Kind == "ListBox";
         var binding = UiBinding.Path(node["ItemsSource"]) ?? node.Id;
+        if (binding == "PagedRemoteFabRows")
+        {
+            DrawAssetCatalog(values.Cast<RemoteFabAssetRowViewModel>().ToArray(), binding);
+            return;
+        }
         if (scroll)
         {
             var height = node.Number("MaxHeight", node.Number("Height", 0));

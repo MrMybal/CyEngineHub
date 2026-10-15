@@ -2896,6 +2896,7 @@ public sealed class RemoteFabAssetRowViewModel : IDisposable
     }
 
     public BulkObservableCollection<RemoteFabAssetCardViewModel> Cards { get; } = [];
+    public int AssetCount => _assets.Length;
 
     public void Realize()
     {

@@ -37,7 +37,7 @@ internal sealed partial class ImGuiWorkspace
     }
     private void StudioNav(string label, string command, string active)
     {
-        if (Gui.Selectable(label, Flag(_root, active), ImGuiSelectableFlags.None, new(0, 29)))
+        if (Gui.Selectable(label, Flag(_root, active), ImGuiSelectableFlags.None, new(0, 29 * UiScale)))
         {
             _resourceQuery = ""; _selectedResource = null;
             _showAdvancedResources = false;
@@ -48,8 +48,8 @@ internal sealed partial class ImGuiWorkspace
     private void DrawStudioShell(Vector2 size)
     {
         // Fixed chrome, independent scroll regions, no scrolling the entire app.
-        Gui.BeginChild("studio-body", new(0, -27), ImGuiChildFlags.None, ImGuiWindowFlags.NoScrollbar);
-        Gui.BeginChild("studio-sidebar", new(180, 0), ImGuiChildFlags.Borders, ImGuiWindowFlags.NoScrollbar);
+        Gui.BeginChild("studio-body", new(0, -27 * UiScale), ImGuiChildFlags.None, ImGuiWindowFlags.NoScrollbar);
+        Gui.BeginChild("studio-sidebar", new(180 * UiScale, 0), ImGuiChildFlags.Borders, ImGuiWindowFlags.NoScrollbar);
         if (_logo is not null) { Gui.Image(_image(_logo), new(28)); Gui.SameLine(); }
         Gui.BeginGroup(); Gui.TextUnformatted("CYENGINEHUB"); Gui.TextColored(ImGuiTheme.Accent, "STUDIO  /  V2 ALPHA"); Gui.EndGroup();
         Gui.TextDisabled(Value(_root, "ApplicationVersion"));
@@ -73,8 +73,11 @@ internal sealed partial class ImGuiWorkspace
         Gui.TextDisabled("Dear ImGui / GPU");
         Gui.EndChild(); Gui.SameLine();
         Gui.BeginChild("studio-workspace", new(0, 0), ImGuiChildFlags.None, ImGuiWindowFlags.NoScrollbar);
-        ActionButton(_root, "<", "NavigateBackCommand"); Gui.SameLine();
-        ActionButton(_root, ">", "NavigateForwardCommand"); Gui.SameLine();
+        if (!Flag(_root, "IsLibraryVisible") && !Flag(_root, "IsSettingsVisible"))
+        {
+            ActionButton(_root, "<", "NavigateBackCommand"); Gui.SameLine();
+            ActionButton(_root, ">", "NavigateForwardCommand"); Gui.SameLine();
+        }
         Gui.TextUnformatted(Value(_root, "HeaderTitle"));
         var available = Gui.GetContentRegionAvail().X;
         if (available > 650) Gui.SameLine(Math.Max(Gui.GetCursorPosX(), available - 295));
@@ -115,6 +118,7 @@ internal sealed partial class ImGuiWorkspace
         }
         if (vm.IsStorageVisible) { DrawStorage(vm, page); return true; }
         if (vm.IsTasksVisible) { DrawTasks(vm); return true; }
+        if (vm.IsLibraryVisible || vm.IsSettingsVisible) { DrawSection(vm, page, vm.IsSettingsVisible); return true; }
         // The advanced forms use the same ImGui controls and command pipeline.
         // They are not hidden legacy Avalonia windows.
         return false;
@@ -169,13 +173,13 @@ internal sealed partial class ImGuiWorkspace
             Gui.SameLine();
         }
         Gui.NewLine();
-        Gui.SetNextItemWidth(Math.Max(140, Gui.GetContentRegionAvail().X - 480));
+        Gui.SetNextItemWidth(Math.Max(140, Gui.GetContentRegionAvail().X - 480 * UiScale));
         Gui.InputTextWithHint("###resource-search", "Rechercher par nom, version ou chemin…", ref _resourceQuery, 4096);
         Record("resource-search");
         Gui.SameLine();
         if (engines)
         {
-            Gui.SetNextItemWidth(145);
+            Gui.SetNextItemWidth(145 * UiScale);
             if (Gui.BeginCombo("###engine-sort", vm.SelectedEngineSort))
             {
                 foreach (var sort in vm.EngineSortOptions)
@@ -195,12 +199,24 @@ internal sealed partial class ImGuiWorkspace
         var items = values.Where(item => string.IsNullOrWhiteSpace(_resourceQuery) ||
             (ResourceName(item) + " " + ResourceVersion(item) + " " + Value(item, "Path"))
             .Contains(_resourceQuery.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray();
-        Gui.TextDisabled(items.Length + (engines ? " moteur(s)" : " projet(s)") + "  ·  double-clic pour ouvrir la fiche");
+        var cards = engines ? vm.EngineCardsView : vm.ProjectCardsView;
+        foreach (var view in new[] { (Label: "Cartes", Cards: true), (Label: "Liste", Cards: false) })
+        {
+            if (cards == view.Cards) Gui.PushStyleColor(ImGuiCol.Button, ImGuiTheme.Rgb(0x51445F));
+            if (Gui.Button(view.Label)) Set(vm, engines ? "{Binding EngineCardsView}" : "{Binding ProjectCardsView}", view.Cards);
+            Record("resource-view/" + view.Label);
+            if (cards == view.Cards) Gui.PopStyleColor();
+            Gui.SameLine();
+        }
+        Gui.TextDisabled(items.Length + (engines ? " moteur(s)" : " projet(s)"));
+        if (_selectedResource is not null && !items.Contains(_selectedResource)) _selectedResource = null;
         if (Gui.BeginTable("resource-split", 2, ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp))
         {
             Gui.TableSetupColumn("Liste", ImGuiTableColumnFlags.WidthStretch, 3);
             Gui.TableSetupColumn("Inspecteur", ImGuiTableColumnFlags.WidthStretch, 1);
-            Gui.TableNextColumn(); DrawResourceTable(items, engines, "resources", Math.Max(180, Gui.GetContentRegionAvail().Y - 12));
+            Gui.TableNextColumn();
+            if (cards) DrawResourceCards(items, engines);
+            else DrawResourceTable(items, engines, "resources", Math.Max(180, Gui.GetContentRegionAvail().Y - 12));
             Gui.TableNextColumn();
             Gui.BeginChild("resource-inspector", new(0, 0), ImGuiChildFlags.Borders);
             Gui.TextDisabled("INSPECTEUR"); Gui.Separator();
@@ -235,12 +251,13 @@ internal sealed partial class ImGuiWorkspace
         Gui.TableSetupColumn("Emplacement", ImGuiTableColumnFlags.WidthStretch, 3);
         Gui.TableSetupColumn(engines ? "Taille" : "Type", ImGuiTableColumnFlags.WidthFixed, 105);
         Gui.TableSetupScrollFreeze(0, 1); Gui.TableHeadersRow();
-        Clipped(items.Length, 30, index =>
+        var rowHeight = Math.Max(30 * UiScale, Gui.GetFrameHeight() + Gui.GetStyle().CellPadding.Y * 2);
+        Clipped(items.Length, rowHeight, index =>
         {
-            var item = items[index]; Gui.PushID(index); Gui.TableNextRow(ImGuiTableRowFlags.None, 30);
+            var item = items[index]; Gui.PushID(index); Gui.TableNextRow(ImGuiTableRowFlags.None, rowHeight);
             Gui.TableNextColumn();
             if (Gui.Selectable(ResourceName(item) + "###item", ReferenceEquals(item, _selectedResource),
-                ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick, new(0, 26)))
+                ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick, new(0, rowHeight - Gui.GetStyle().CellPadding.Y * 2)))
             {
                 _selectedResource = item;
                 if (Gui.IsMouseDoubleClicked(ImGuiMouseButton.Left)) Execute(item, "{Binding OpenDetailsCommand}");

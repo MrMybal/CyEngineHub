@@ -7,6 +7,7 @@
     <Compile Include="../../src/CyEngineHub.Desktop/ImGui/UiBinding.cs" Link="ImGui/UiBinding.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/ImGui/UiDocument.cs" Link="ImGui/UiDocument.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/ImGui/UiListViewport.cs" Link="ImGui/UiListViewport.cs" />
+    <Compile Include="../../src/CyEngineHub.Desktop/ImGui/UiCardGrid.cs" Link="ImGui/UiCardGrid.cs" />
     <EmbeddedResource Include="../../src/CyEngineHub.Desktop/ImGui/Layouts/*.xml" LogicalName="CyEngineHub.Desktop.ImGui.Layouts.%(Filename)%(Extension)" />
     <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/Commands.cs" Link="Desktop/Commands.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/ObservableObject.cs" Link="Desktop/ObservableObject.cs" />

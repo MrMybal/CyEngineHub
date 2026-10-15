@@ -39,5 +39,6 @@ internal static class ImGuiTheme
         s.Colors[(int)ImGuiCol.TabSelected] = Rgb(0x3A344D);
         s.Colors[(int)ImGuiCol.Separator] = Rgb(0x343943);
         s.Colors[(int)ImGuiCol.ModalWindowDimBg] = new(.025f, .03f, .04f, .82f);
+        s.ScaleAllSizes(UiCardGrid.InterfaceScale);
     }
 }

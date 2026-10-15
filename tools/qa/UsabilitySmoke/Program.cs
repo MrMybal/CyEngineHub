@@ -13,6 +13,7 @@ using CyEngineHub.Desktop.ViewModels;
 using CyEngineHub.Desktop.Views;
 using CyEngineHub.Desktop.ImGui;
 using CyEngineHub.Engines;
+using CyEngineHub.Fab.Remote;
 using CyEngineHub.Infrastructure.AppData;
 using CyEngineHub.Infrastructure.Persistence;
 using CyEngineHub.Projects.Models;
@@ -39,6 +40,17 @@ sealed class RecordingLauncher : IPlatformLauncher
     { Launches.Add((fileName, arguments ?? [])); return Task.FromResult<int?>(123); }
     public Task OpenFolderAsync(string path, CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task OpenUriAsync(Uri uri, CancellationToken cancellationToken = default) => Task.CompletedTask;
+}
+sealed class FixtureFab : IDirectFabClient
+{
+    public Uri AuthorizationUri => new("https://example.invalid/fixture");
+    public Task<DirectFabStatus> GetStatusAsync(CancellationToken cancellationToken = default) => Task.FromResult(new DirectFabStatus(DirectFabConnectionState.Connected, "Fixture"));
+    public Task<DirectFabStatus> ConnectAsync(string code, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task DisconnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task<IReadOnlyList<RemoteFabAsset>> GetLibraryAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<RemoteFabAsset>>([]);
+    public Task<RemoteFabProductDetails> GetProductDetailsAsync(RemoteFabAsset asset, CancellationToken cancellationToken = default) => Task.FromResult(new RemoteFabProductDetails("Fixture", []));
+    public Task<DirectFabDownloadResult> DownloadAsync(RemoteFabAsset asset, string root, IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<DirectFabDownloadResult> DownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version, string root, IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
 static class Program
 {
@@ -72,7 +84,8 @@ static class Program
             "database" or "settings" or "engineCatalog" => (object)store,
             "engineModules" => new EngineModuleRegistry([new UnrealEngineModule()]),
             "engineRegistration" => new FixtureRegistration(), "taskScheduler" => scheduler,
-            "appData" => paths, "platformLauncher" => launcher, _ => null,
+            "appData" => paths, "platformLauncher" => launcher,
+            "directFabClient" => new FixtureFab(), _ => null,
         }).ToArray());
         var engineRoot = Path.Combine(Output, "UE_5.5");
         var editor = Path.Combine(engineRoot, "Engine", "Binaries", "Win64", "UnrealEditor.exe");
@@ -173,12 +186,43 @@ static class Program
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-home.png"));
         await ImGuiDiagnostics.ClickAsync(window, "nav/Moteurs");
         Check(vm.IsEnginesVisible, "ImGui pointer input activates engine navigation");
-        await ImGuiDiagnostics.ClickAsync(window, "row/Unreal 5.5 · QA");
+        Check(ImGuiDiagnostics.FontSize(window) >= 16, "Global text size increased from 14 by 15 percent");
+        Check(ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("resource/card/", StringComparison.Ordinal)), "Engines default to fixed cards");
+        await ImGuiDiagnostics.ClickAsync(window, "resource-view/Liste");
+        Check(!vm.EngineCardsView && !ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("resource/card/", StringComparison.Ordinal)), "Engine list mode remains available");
+        await ImGuiDiagnostics.ClickAsync(window, "resource-view/Cartes");
+        await ImGuiDiagnostics.ClickAsync(window, "card/body/resource/Unreal 5.5 · QA", horizontal: .8f, vertical: .82f);
+        Check(ImGuiDiagnostics.Elements(window).Contains("card/selected/resource/Unreal 5.5 · QA") && !vm.IsEngineDetailsVisible,
+            "Engine card whitespace selects without opening or launching");
+        await ImGuiDiagnostics.ClickAsync(window, "card/body/resource/Unreal 5.5 · QA", clicks: 2, horizontal: .8f, vertical: .82f);
+        Check(vm.IsEngineDetailsVisible && launcher.Launches.Count == 0, "Engine double-click opens its details, never launches the engine");
+        vm.ShowEnginesCommand.Execute(null);
+        await ImGuiDiagnostics.FramesAsync(window, 3);
         await ImGuiDiagnostics.ClickAsync(window, "action/LaunchCommand");
         Check(launcher.Launches.Count == 1 && launcher.Launches[0].Arguments.SequenceEqual(["-norecentproject"]), "ImGui engine launch uses real command binding");
+        await ImGuiDiagnostics.ClickAsync(window, "card/body/resource/Unreal 5.5 · QA", clicks: 2, vertical: .2f);
+        Check(vm.IsEngineDetailsVisible, "Double-clicking an engine image also opens its details");
+        vm.ShowEnginesCommand.Execute(null);
+        await ImGuiDiagnostics.FramesAsync(window, 3);
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-engines.png"));
         await ImGuiDiagnostics.ClickAsync(window, "nav/Projets");
         Check(vm.IsProjectsVisible, "ImGui pointer input activates project navigation");
+        Check(vm.ProjectCardsView && ImGuiDiagnostics.Elements(window).Contains("resource/card/Fixture"), "Projects have their own card mode");
+        await ImGuiDiagnostics.ClickAsync(window, "card/body/resource/Fixture", horizontal: .8f, vertical: .82f);
+        Check(ImGuiDiagnostics.Elements(window).Contains("card/selected/resource/Fixture") && !vm.IsProjectDetailsVisible, "Project whitespace uses the same selection behavior");
+        await ImGuiDiagnostics.ClickAsync(window, "card/body/resource/Fixture", clicks: 2, horizontal: .8f, vertical: .82f);
+        Check(vm.IsProjectDetailsVisible && launcher.Launches.Count == 1, "Project double-click opens its details, never launches the editor");
+        vm.ShowProjectsCommand.Execute(null);
+        await ImGuiDiagnostics.FramesAsync(window, 3);
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-project-cards.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "resource-view/Liste");
+        Check(!vm.ProjectCardsView && vm.EngineCardsView, "Project and engine display preferences are independent");
+        await vm.FlushMarketplaceSettingsWritesAsync();
+        typeof(MainWindowViewModel).GetField("_engineCardsView", Private)!.SetValue(vm, false);
+        typeof(MainWindowViewModel).GetField("_projectCardsView", Private)!.SetValue(vm, true);
+        await (Task)typeof(MainWindowViewModel).GetMethod("LoadInterfaceAsync", Private)!.Invoke(vm, null)!;
+        Check(vm.EngineCardsView && !vm.ProjectCardsView, "Independent display modes restore from saved settings");
+        await ImGuiDiagnostics.ClickAsync(window, "resource-view/Cartes");
         await ImGuiDiagnostics.ClickAsync(window, "resource-search");
         await ImGuiDiagnostics.TextAsync(window, "nonexistent-project");
         Check(!ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("row/", StringComparison.Ordinal)), "ImGui text input filters the project list");
@@ -191,6 +235,18 @@ static class Program
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-storage.png"));
         await ImGuiDiagnostics.ClickAsync(window, "nav/Paramètres");
         Check(vm.IsSettingsVisible, "ImGui pointer input activates settings navigation");
+        CheckFullHeight(window, "settings");
+        var sidebar = ImGuiDiagnostics.ElementBounds(window, "pane/settings/navigation");
+        window.Height = 1000;
+        await ImGuiDiagnostics.FramesAsync(window, 3);
+        CheckFullHeight(window, "settings");
+        var taller = ImGuiDiagnostics.ElementBounds(window, "pane/settings/navigation");
+        Check(taller.W - taller.Y > sidebar.W - sidebar.Y + 150, "Sidebar grows with the window instead of retaining a fixed list height");
+        window.Height = 820;
+        await ImGuiDiagnostics.FramesAsync(window, 3);
+        Check(!ImGuiDiagnostics.Elements(window).Contains("action/NavigateBackCommand"), "Persistent settings navigation has no redundant back button");
+        await ImGuiDiagnostics.ClickAsync(window, "section-tab/settings/project-profiles");
+        Check(vm.IsSettingsProjectProfilesSelected && ImGuiDiagnostics.Elements(window).Contains("section-selected/settings/project-profiles"), "Settings tabs share a visible selected state");
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-settings.png"));
         await ImGuiDiagnostics.ClickAsync(window, "nav/Vue d’ensemble");
         Check(vm.IsHomeVisible, "ImGui navigation remains functional after settings and tabs");
@@ -215,10 +271,69 @@ static class Program
         Check(vm.IsSettingsVisible, "Closed ImGui modal releases navigation input");
         await ImGuiDiagnostics.ClickAsync(window, "nav/Téléchargements");
         Check(vm.IsTasksVisible, "Download queue remains accessible through ImGui navigation");
+        await TestAssetCards(window, vm);
         await ImGuiDiagnostics.ClickAsync(window, "nav/Moteurs");
         await ImGuiDiagnostics.ClickAsync(window, "action/ToggleEngineImporterCommand");
         Check(vm.IsEngineImporterVisible, "Add engine action exposes the complete engine importer");
         Console.WriteLine("OUTPUT " + Output);
+    }
+    static void CheckFullHeight(Window window, string section)
+    {
+        var nav = ImGuiDiagnostics.ElementBounds(window, "pane/" + section + "/navigation");
+        var content = ImGuiDiagnostics.ElementBounds(window, "pane/" + section + "/content");
+        Check(Math.Abs(nav.Y - content.Y) < 2 && Math.Abs(nav.W - content.W) < 2 && nav.W - nav.Y > window.Height - 140,
+            section + " navigation and content occupy the same full height");
+    }
+    static async Task TestAssetCards(Window window, MainWindowViewModel vm)
+    {
+        var assets = Enumerable.Range(0, 120).Select(index => new RemoteFabAsset("card-" + index, "fab",
+            index.ToString("D3") + (index % 2 == 0 ? " Asset with a deliberately very long name to verify that a title never changes card dimensions" : " Short asset"),
+            "Fixture", "fab", "assetPack", null, null, ["Simulation"],
+            index % 2 == 0 ? [new("fixture", [], Enumerable.Range(0, 20).Select(n => "5." + n).ToArray(), ["Windows"])] : [])).ToArray();
+        typeof(MainWindowViewModel).GetField("_remoteFabCatalog", Private)!.SetValue(vm, assets);
+        Call(vm, "ApplyDirectFabStatus", new DirectFabStatus(DirectFabConnectionState.Connected, "Fixture catalog"));
+        vm.ShowLibraryFabCommand.Execute(null);
+        Call(vm, "ShowCachedRemoteFabPreview");
+        await ImGuiDiagnostics.FramesAsync(window, 4);
+        CheckFullHeight(window, "library");
+        Check(ImGuiDiagnostics.Elements(window).Contains("section-selected/source/Fab"), "The selected marketplace is visibly highlighted");
+        await ImGuiDiagnostics.ClickAsync(window, "section-tab/source/Local");
+        Check(vm.IsLibraryLocalSelected && ImGuiDiagnostics.Elements(window).Contains("section-selected/source/Local"), "Marketplace tabs switch content and selected styling together");
+        await ImGuiDiagnostics.ClickAsync(window, "section-tab/source/Fab");
+        await ImGuiDiagnostics.FramesAsync(window, 4);
+        var first = ImGuiDiagnostics.ElementBounds(window, "asset/card/card-0");
+        var second = ImGuiDiagnostics.ElementBounds(window, "asset/card/card-1");
+        Check(Math.Abs(first.Z - first.X - (second.Z - second.X)) < 1 && Math.Abs(first.W - first.Y - (second.W - second.Y)) < 1,
+            "Long titles and twenty engine versions cannot change asset card dimensions");
+        Check(first.W - first.Y < 410 && first.Z - first.X > 350, "Large asset cards keep bounded fixed dimensions");
+        Check(ImGuiDiagnostics.VisibleRows(window, "PagedRemoteFabRows") is > 0 and < 10, "Catalog only realizes visible card rows");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-asset-cards.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "card/body/asset/card-0", horizontal: .9f, vertical: .67f);
+        Check(!vm.IsRemoteFabProductVisible && ImGuiDiagnostics.Elements(window).Contains("card/selected/asset/card-0"), "Asset metadata selects the entire card without opening it");
+        await ImGuiDiagnostics.ClickAsync(window, "card/body/asset/card-0", clicks: 2, horizontal: .9f, vertical: .67f);
+        Check(vm.IsRemoteFabProductVisible && vm.SelectedRemoteFabAsset?.AssetId == "card-0", "Asset double-click follows the same details behavior");
+        Check(!ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("command/CloseRemoteFabProductCommand", StringComparison.Ordinal) || key == "action/NavigateBackCommand"), "Persistent source navigation replaces redundant product back buttons");
+        await ImGuiDiagnostics.ClickAsync(window, "section-tab/source/Fab");
+        Check(!vm.IsRemoteFabProductVisible && vm.IsRemoteFabCatalogVisible, "Clicking the active source returns from product details to its catalog");
+        await ImGuiDiagnostics.ClickAsync(window, "asset/image/card-0");
+        Check(!vm.IsRemoteFabProductVisible, "Single-clicking an asset image follows the same select-only rule");
+        await ImGuiDiagnostics.ClickAsync(window, "asset/image/card-0", clicks: 2);
+        Check(vm.IsRemoteFabProductVisible, "Double-clicking an asset image opens its details");
+        await ImGuiDiagnostics.ClickAsync(window, "section-tab/source/Fab");
+        window.Width = 1050;
+        await ImGuiDiagnostics.FramesAsync(window, 4);
+        var resized = ImGuiDiagnostics.ElementBounds(window, "asset/card/card-0");
+        Check(Math.Abs(resized.Z - resized.X - (first.Z - first.X)) < 1, "Resizing reflows columns without stretching asset cards");
+        window.Width = 1280;
+        vm.ShowCompactLibraryCardsCommand.Execute(null);
+        await ImGuiDiagnostics.FramesAsync(window, 4);
+        var small = ImGuiDiagnostics.ElementBounds(window, "asset/card/card-0");
+        Check(small.Z - small.X < first.Z - first.X && small.W - small.Y < first.W - first.Y, "Small card mode remains fixed and compact");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-asset-small-cards.png"));
+        ImGuiDiagnostics.ScrollListToEnd(window, "PagedRemoteFabRows");
+        await ImGuiDiagnostics.FramesAsync(window, 4);
+        Check(ImGuiDiagnostics.Elements(window).Contains("asset/card/card-119"), "Fixed card catalog scrolls to the last asset");
+        vm.ShowLargeLibraryCardsCommand.Execute(null);
     }
     static async Task Capture(Window window, string name)
     {

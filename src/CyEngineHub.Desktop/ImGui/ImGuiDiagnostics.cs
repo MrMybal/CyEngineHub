@@ -18,6 +18,8 @@ public static class ImGuiDiagnostics
     public static string BrowserText(Window window) => string.Join('\n', window.GetVisualDescendants().OfType<ImGuiHost>()
         .SelectMany(host => host.Surface.DrawnBrowserText));
     public static int VisibleRows(Window window, string binding) => Host(window).Surface.Workspace?.VisibleRows.GetValueOrDefault(binding) ?? 0;
+    public static Vector4 ElementBounds(Window window, string element) => Host(window).Surface.Workspace!.Elements[element];
+    public static float FontSize(Window window) => Host(window).Surface.Workspace?.RenderedFontSize ?? 0;
     public static void ScrollListToEnd(Window window, string binding) => Host(window).Surface.Workspace?.ScrollToEnd(binding);
     public static async Task FramesAsync(Window window, int frames = 2)
     {
@@ -32,7 +34,7 @@ public static class ImGuiDiagnostics
         }
         if (surface.RenderFailure is { } failure) throw new InvalidOperationException("ImGui render failed.", failure);
     }
-    public static async Task ClickAsync(Window window, string element, bool leadingEdge = false)
+    public static async Task ClickAsync(Window window, string element, bool leadingEdge = false, int clicks = 1, float horizontal = .5f, float vertical = .5f)
     {
         await FramesAsync(window).ConfigureAwait(true);
         var host = window.GetVisualDescendants().OfType<ImGuiHost>().FirstOrDefault(host => host.IsEffectivelyVisible &&
@@ -42,14 +44,19 @@ public static class ImGuiDiagnostics
         var key = elements.Keys.FirstOrDefault(key => key == element || key.StartsWith(element + "/", StringComparison.Ordinal))
             ?? throw new InvalidOperationException("ImGui element not visible: " + element);
         var rect = elements[key];
-        var position = new Point(leadingEdge ? rect.X + 1 : (rect.X + rect.Z) / 2, (rect.Y + rect.W) / 2);
+        var position = new Point(leadingEdge ? rect.X + 1 : rect.X + (rect.Z - rect.X) * horizontal, rect.Y + (rect.W - rect.Y) * vertical);
         if (!ReferenceEquals(host.InputHitTest(position), host))
             throw new InvalidOperationException("The GPU host does not receive pointer hit tests.");
         host.Focus();
-        host.Surface.Input(io => { io.AddFocusEvent(true); io.AddMousePosEvent((float)position.X, (float)position.Y); io.AddMouseButtonEvent(0, true); });
-        await FramesAsync(window, 3).ConfigureAwait(true);
-        host.Surface.Input(io => io.AddMouseButtonEvent(0, false));
-        await FramesAsync(window, 3).ConfigureAwait(true);
+        if (clicks > 1) await Task.Delay(400).ConfigureAwait(true);
+        for (var click = 0; click < clicks; click++)
+        {
+            host.Surface.Input(io => { io.AddFocusEvent(true); io.AddMousePosEvent((float)position.X, (float)position.Y); io.AddMouseButtonEvent(0, true); });
+            await FramesAsync(window, clicks > 1 ? 1 : 3).ConfigureAwait(true);
+            host.Surface.Input(io => io.AddMouseButtonEvent(0, false));
+            await FramesAsync(window, clicks > 1 ? 1 : 3).ConfigureAwait(true);
+        }
+        await FramesAsync(window).ConfigureAwait(true);
     }
     public static async Task TextAsync(Window window, string text)
     {
