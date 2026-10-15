@@ -11,6 +11,7 @@ using Avalonia.VisualTree;
 using CyEngineHub.Core.Tasks;
 using CyEngineHub.Desktop.ViewModels;
 using CyEngineHub.Desktop.Views;
+using CyEngineHub.Desktop.ImGui;
 using CyEngineHub.Engines;
 using CyEngineHub.Fab.Remote;
 using CyEngineHub.Infrastructure.AppData;
@@ -244,9 +245,14 @@ static class Program
                 Check(controller.Bounds.Width < 800 && controller.Bounds.Height > 100, "Native browser follows window resize");
                 // Simulate an unavailable runtime/browser, then use the actual manual button.
                 typeof(FabAuthorizationWindow).GetMethod("ShowFailure", Private)!.Invoke(window, ["Fixture: navigateur indisponible"]);
-                var manualButton = window.GetVisualDescendants().OfType<Button>().Single(button => Equals(button.Content, "Mode manuel"));
-                Check(manualButton.IsEffectivelyEnabled, "Manual button stays available after browser failure");
-                manualButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                if (ImGuiDiagnostics.IsHosted(window))
+                    await ImGuiDiagnostics.ClickAsync(window, "native/Mode manuel");
+                else
+                {
+                    var manualButton = window.GetVisualDescendants().OfType<Button>().Single(button => Equals(button.Content, "Mode manuel"));
+                    Check(manualButton.IsEffectivelyEnabled, "Manual button stays available after browser failure");
+                    manualButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                }
             }
             var result = await resultTask.WaitAsync(TimeSpan.FromSeconds(25));
             Check(cancel ? result?.UseManualMode == true : result?.Code == FakeFab.Code,
@@ -259,6 +265,7 @@ static class Program
 
     static async Task ScrollToSignIn(Window window)
     {
+        if (ImGuiDiagnostics.IsHosted(window)) { await ImGuiDiagnostics.FramesAsync(window); return; }
         await Task.Delay(150);
         window.GetVisualDescendants().OfType<FabSignInPanel>().Single(panel => panel.IsEffectivelyVisible).BringIntoView();
         await Task.Delay(150);
@@ -266,6 +273,7 @@ static class Program
 
     static async Task Capture(Window window, string name)
     {
+        if (ImGuiDiagnostics.IsHosted(window)) { await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, name + ".png")); return; }
         await Task.Delay(250);
         using var bitmap = new RenderTargetBitmap(new PixelSize((int)window.Width, (int)window.Height));
         bitmap.Render(window);

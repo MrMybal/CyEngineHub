@@ -63,6 +63,15 @@ public sealed class FabAuthorizationWindow : Window
         footer.Children.Add(cancel);
         Grid.SetRow(footer, 2);
         layout.Children.Add(footer);
+        if (!Environment.GetCommandLineArgs().Contains("--classic", StringComparer.Ordinal))
+        {
+            layout.Children.Remove(header);
+            layout.Children.Remove(footer);
+            var headerHost = CyEngineHub.Desktop.ImGui.ImGuiBrowserChrome.Create(header, 140);
+            var footerHost = CyEngineHub.Desktop.ImGui.ImGuiBrowserChrome.Create(footer, 85);
+            layout.Children.Add(headerHost);
+            Grid.SetRow(footerHost, 2); layout.Children.Add(footerHost);
+        }
         Content = layout;
         Opened += OnOpened;
         Closed += (_, _) => { _timeout.Stop(); _browser?.Dispose(); };
@@ -102,7 +111,9 @@ public sealed class FabAuthorizationWindow : Window
         _browser = null;
         _status.Text = "Connexion automatique indisponible";
         _browserContainer.Background = Brush.Parse("#162330");
-        _browserContainer.Child = new TextBlock { Text = message, Margin = new Thickness(28),
+        var explanation = new TextBlock { Text = message, Margin = new Thickness(28),
             TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, FontSize = 16 };
+        _browserContainer.Child = Environment.GetCommandLineArgs().Contains("--classic", StringComparer.Ordinal)
+            ? explanation : CyEngineHub.Desktop.ImGui.ImGuiBrowserChrome.Create(explanation, Math.Max(120, _browserContainer.Bounds.Height));
     }
 }

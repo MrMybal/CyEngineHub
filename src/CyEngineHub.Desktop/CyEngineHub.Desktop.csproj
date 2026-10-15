@@ -4,6 +4,7 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>../../assets/branding/cyenginehub.ico</ApplicationIcon>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../CyEngineHub.Core/CyEngineHub.Core.csproj" />
@@ -28,11 +29,14 @@
     <ProjectReference Include="../CyEngineHub.Updater/CyEngineHub.Updater.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="ImGui.NET" />
+    <PackageReference Include="Silk.NET.OpenGLES" />
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <PackageReference Include="Avalonia.Themes.Fluent" />
     <PackageReference Include="Microsoft.Web.WebView2" />
   </ItemGroup>
+  <ItemGroup><EmbeddedResource Include="ImGui/Layouts/*.xml" /></ItemGroup>
   <ItemGroup>
     <AvaloniaResource
         Include="../../assets/branding/cyenginehub-logo.png"

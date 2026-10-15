@@ -28,7 +28,27 @@ public sealed partial class MainWindow : Window
 
     public MainWindow()
     {
-        AvaloniaXamlLoader.Load(this);
+        if (Environment.GetCommandLineArgs().Contains("--classic", StringComparer.Ordinal)) AvaloniaXamlLoader.Load(this);
+        else
+        {
+            NameScope.SetNameScope(this, new NameScope());
+            Title = "CyEngineHub V2 · Alpha";
+            Width = 1440; Height = 900; MinWidth = 960; MinHeight = 640;
+            Icon = new WindowIcon(Avalonia.Platform.AssetLoader.Open(new Uri("avares://CyEngineHub.Desktop/Assets/Branding/cyenginehub-logo.png")));
+            Content = new CyEngineHub.Desktop.ImGui.ImGuiHost("Main", name =>
+            {
+                switch (name)
+                {
+                    case "BrowseDerivedSourceFolder": BrowseDerivedSourceFolder(this, new()); break;
+                    case "BrowseManualEnginePath": BrowseManualEnginePath(this, new()); break;
+                    case "BrowseSourceEngineTarget": BrowseSourceEngineTarget(this, new()); break;
+                    case "BrowseEpicEngineTarget": BrowseEpicEngineTarget(this, new()); break;
+                    case "BrowseNativeStoreSource": BrowseNativeStoreSource(this, new()); break;
+                    case "FocusEngineCompilation":
+                        (Content as CyEngineHub.Desktop.ImGui.ImGuiHost)?.Surface.Workspace?.FocusCompilation(); break;
+                }
+            });
+        }
         DataContextChanged += OnDataContextChanged;
         Closed += OnClosed;
     }
@@ -165,6 +185,8 @@ public sealed partial class MainWindow : Window
     {
         Dispatcher.UIThread.Post(() =>
         {
+            if (Content is CyEngineHub.Desktop.ImGui.ImGuiHost host)
+            { host.Surface.Workspace?.ScrollToEnd("RawLogLines"); return; }
             var list = this.FindControl<ListBox>("RawLogList");
             if (list is not null && list.ItemCount > 0)
             {

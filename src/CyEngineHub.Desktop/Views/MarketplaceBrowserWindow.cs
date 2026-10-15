@@ -128,6 +128,8 @@ public sealed class MarketplaceBrowserWindow : Window
             try { note.Text = "Dossier : " + request.GetDownloadDirectory() + " · Réglable dans Paramètres → Marketplaces. Un sous-dossier par transfert, sans écrasement."; }
             catch (Exception) { note.Text = "Dossier non disponible ou marketplace désactivée : vérifiez Paramètres → Marketplaces."; }
         };
+        if (!Environment.GetCommandLineArgs().Contains("--classic", StringComparer.Ordinal))
+            CyEngineHub.Desktop.ImGui.ImGuiBrowserChrome.Convert(layout, browserRow: 3);
         Content = layout;
         _browser.StatusChanged += (_, message) => _status.Text = message;
         _browser.BrowserStateChanged += (_, _) => UpdateButtons();

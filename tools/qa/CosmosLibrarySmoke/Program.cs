@@ -11,6 +11,7 @@ using Avalonia.VisualTree;
 using CyEngineHub.Core.Tasks;
 using CyEngineHub.Desktop.ViewModels;
 using CyEngineHub.Desktop.Views;
+using CyEngineHub.Desktop.ImGui;
 using CyEngineHub.Engines;
 using CyEngineHub.Extensions;
 using CyEngineHub.Infrastructure.AppData;
@@ -90,8 +91,16 @@ static class Program
             Check(vm.SelectedConnectorLibrary!.IsProductVisible, "Imported file opens native product detail");
             vm.SelectedConnectorLibrary.BackCommand.Execute(null);
             await Task.Delay(100);
-            var panel = window.GetVisualDescendants().OfType<ConnectorLibraryPanel>().Single();
-            Check(panel.IsEffectivelyVisible && panel.GetVisualDescendants().OfType<ListBoxItem>().Count() == 1, "Downloaded file rendered in real ListBox");
+            if (ImGuiDiagnostics.IsHosted(window))
+            {
+                await ImGuiDiagnostics.FramesAsync(window);
+                Check(ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("list/Assets/", StringComparison.Ordinal)), "Downloaded file rendered in ImGui list");
+            }
+            else
+            {
+                var panel = window.GetVisualDescendants().OfType<ConnectorLibraryPanel>().Single();
+                Check(panel.IsEffectivelyVisible && panel.GetVisualDescendants().OfType<ListBoxItem>().Count() == 1, "Downloaded file rendered in real ListBox");
+            }
             vm.ShowLibraryFabCommand.Execute(null);
             await Call(vm, "ShowConnectorLibraryAsync", manifest.Id, null);
             await Task.Delay(100);
@@ -145,16 +154,25 @@ static class Program
             Check(Path.GetDirectoryName(Path.GetDirectoryName(path)) == Path.Combine(Output, "downloads"), "Browser download uses configured root");
             Check(vm.SelectedConnectorLibrary!.Assets.Count == 2, "Completed WebView download creates native record");
             await Task.Delay(150);
-            var stats = string.Join("\n", browserWindow.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
+            if (ImGuiDiagnostics.IsHosted(browserWindow)) await ImGuiDiagnostics.FramesAsync(browserWindow);
+            var stats = ImGuiDiagnostics.IsHosted(browserWindow) ? ImGuiDiagnostics.BrowserText(browserWindow)
+                : string.Join("\n", browserWindow.GetVisualDescendants().OfType<TextBlock>().Select(block => block.Text));
             Check(stats.Contains("%") && stats.Contains("Vitesse :") && stats.Contains("Restant estimé :") && stats.Contains("Écoulé :"),
                 "Native browser renders percentage, size, speed, ETA and elapsed time");
-            var detail = browserWindow.GetVisualDescendants().OfType<Button>().Single(b => Equals(b.Content, "Voir la fiche du dernier téléchargement"));
-            Check(detail.IsEnabled, "Completed download enables native detail button");
-            detail.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if (ImGuiDiagnostics.IsHosted(browserWindow)) await ImGuiDiagnostics.ClickAsync(browserWindow, "native/Voir la fiche du dernier téléchargement");
+            else
+            {
+                var detail = browserWindow.GetVisualDescendants().OfType<Button>().Single(b => Equals(b.Content, "Voir la fiche du dernier téléchargement"));
+                Check(detail.IsEnabled, "Completed download enables native detail button"); detail.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }
             await Task.Delay(500);
             Check(vm.SelectedConnectorLibrary.SelectedAsset?.Asset.FilePath == path, "Browser button opens downloaded asset detail");
-            var back = browserWindow.GetVisualDescendants().OfType<Button>().Single(b => Equals(b.Content, "Mes assets téléchargés"));
-            back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            if (ImGuiDiagnostics.IsHosted(browserWindow)) await ImGuiDiagnostics.ClickAsync(browserWindow, "native/Mes assets téléchargés");
+            else
+            {
+                var back = browserWindow.GetVisualDescendants().OfType<Button>().Single(b => Equals(b.Content, "Mes assets téléchargés"));
+                back.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            }
             await Task.Delay(500);
             Check(vm.IsConnectorLibrarySelected, "Browser toolbar returns to native library");
             rejectDownload = true;

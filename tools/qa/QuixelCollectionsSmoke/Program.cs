@@ -12,6 +12,7 @@ using Avalonia.VisualTree;
 using CyEngineHub.Core.Tasks;
 using CyEngineHub.Desktop.ViewModels;
 using CyEngineHub.Desktop.Views;
+using CyEngineHub.Desktop.ImGui;
 using CyEngineHub.Engines;
 using CyEngineHub.Fab.Remote;
 using CyEngineHub.Infrastructure.AppData;
@@ -129,9 +130,18 @@ static class Program
             Check(live ? vm.QuixelCollectionCards.Count > 0 : vm.QuixelCollectionCards.Count == 208, "Paginated collections catalog loaded");
             await Task.Delay(live ? 3000 : 250);
             await Capture(window, "collections");
-            var panel = window.GetVisualDescendants().OfType<QuixelCollectionsPanel>().Single();
-            var list = panel.GetVisualDescendants().OfType<ListBox>().Single();
-            Check(list.GetVisualDescendants().OfType<ListBoxItem>().Count() < 25, "Only visible collection rows are built");
+            ListBox? list = null;
+            if (ImGuiDiagnostics.IsHosted(window))
+            {
+                await ImGuiDiagnostics.FramesAsync(window);
+                Check(ImGuiDiagnostics.VisibleRows(window, "QuixelCollectionCards") is > 0 and < 25, "Only visible ImGui collection rows are built");
+            }
+            else
+            {
+                var panel = window.GetVisualDescendants().OfType<QuixelCollectionsPanel>().Single();
+                list = panel.GetVisualDescendants().OfType<ListBox>().Single();
+                Check(list.GetVisualDescendants().OfType<ListBoxItem>().Count() < 25, "Only visible collection rows are built");
+            }
             if (live)
             {
                 Check(vm.QuixelCollectionCards.Any(c => c.HasThumbnail), "Live publisher cover images loaded asynchronously");
@@ -145,9 +155,11 @@ static class Program
             vm.QuixelCollectionsSearch = "no-such-collection";
             Check(vm.HasNoQuixelCollections, "Empty search result state");
             vm.QuixelCollectionsSearch = "";
-            list.ScrollIntoView(vm.QuixelCollectionCards[^1]);
+            if (ImGuiDiagnostics.IsHosted(window)) ImGuiDiagnostics.ScrollListToEnd(window, "QuixelCollectionCards");
+            else list!.ScrollIntoView(vm.QuixelCollectionCards[^1]);
             await Task.Delay(250);
-            Check(list.GetVisualDescendants().OfType<ListBoxItem>().Count() < 25, "Scrolling keeps realization bounded");
+            Check(ImGuiDiagnostics.IsHosted(window) ? ImGuiDiagnostics.VisibleRows(window, "QuixelCollectionCards") < 25
+                : list!.GetVisualDescendants().OfType<ListBoxItem>().Count() < 25, "Scrolling keeps realization bounded");
             await Call(vm, "OpenQuixelCollectionAsync", "collection-0");
             Check(vm.IsQuixelCollectionScopeVisible && vm.IsRemoteMarketplaceContentVisible, "Collection opens regular asset catalog");
             Check(SourceAssets(vm).Select(a => a.AssetId).SequenceEqual(["owned0001", "owned0002"]), "Only owned collection assets shown");
@@ -188,6 +200,7 @@ static class Program
     }
     static async Task Capture(Window window, string name)
     {
+        if (ImGuiDiagnostics.IsHosted(window)) { await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, name + ".png")); return; }
         await Task.Delay(250);
         using var bitmap = new RenderTargetBitmap(new PixelSize(1380, 870));
         bitmap.Render(window);

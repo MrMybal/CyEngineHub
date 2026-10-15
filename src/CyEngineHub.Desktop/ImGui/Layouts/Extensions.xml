@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Interface Name="Extensions">
+  <Grid RowDefinitions="Auto,Auto,*">
+    <Grid ColumnDefinitions="*,Auto">
+      <StackPanel>
+        <TextBlock Text="Extensions CyEngineHub" FontSize="24" Foreground="#F3F7FB" />
+        <TextBlock Text="Catalogue isolé, outils externes confirmés et interfaces dédiées." FontSize="11" Foreground="#75869A" />
+      </StackPanel>
+      <Button Grid.Column="1" Classes="accent" Content="Actualiser" Command="{Binding RefreshHubExtensionsCommand}" />
+    </Grid>
+    <Border Grid.Row="1" Classes="card">
+      <StackPanel>
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox Classes="path" Text="{Binding ManualHubExtensionPackage}" PlaceholderText="Dossier d’extension contenant extension.json" />
+          <Button Grid.Column="1" Classes="ghost" Content="Préparer l’installation" Command="{Binding PrepareHubExtensionInstallCommand}" />
+        </Grid>
+        <Grid IsVisible="{Binding HasPendingHubExtensionInstall}" ColumnDefinitions="*,Auto">
+          <TextBlock Text="{Binding PendingHubExtensionInstallSummary}" Foreground="#E2D2A6" FontSize="10" TextWrapping="Wrap" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal">
+            <Button Classes="accent" Content="Installer" Command="{Binding ConfirmHubExtensionInstallCommand}" />
+            <Button Classes="ghost" Content="Annuler" Command="{Binding CancelHubExtensionInstallCommand}" />
+          </StackPanel>
+        </Grid>
+      </StackPanel>
+    </Border>
+    <Grid Grid.Row="2" ColumnDefinitions="390,*">
+      <Border Classes="card">
+        <Grid RowDefinitions="Auto,*">
+          <StackPanel>
+            <TextBlock Text="EXTENSIONS DISPONIBLES" FontSize="10" Foreground="#65788D" />
+            <TextBlock Text="{Binding HubExtensionStatus}" FontSize="10" Foreground="#8294A8" TextWrapping="Wrap" />
+          </StackPanel>
+          <ListBox Grid.Row="1" Classes="catalog" ItemsSource="{Binding HubExtensions}" SelectedItem="{Binding SelectedHubExtension}">
+            <ListBox.ItemTemplate>
+              <DataTemplate>
+                <Border Classes="card extension-card">
+                  <StackPanel>
+                    <StackPanel Orientation="Horizontal">
+                      <TextBlock Text="{Binding Name}" FontSize="14" />
+                      <TextBlock Text="{Binding Version}" FontSize="9" Foreground="#70A8FA" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding Publisher}" FontSize="9" Foreground="#718398" />
+                    <TextBlock Text="{Binding Description}" FontSize="10" Foreground="#AAB8C6" TextWrapping="Wrap" MaxHeight="48" />
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Text="{Binding Kind}" FontSize="9" Foreground="#6C91B7" />
+                      <TextBlock Grid.Column="1" Text="{Binding Health}" FontSize="9" Foreground="#65CCA9" />
+                    </Grid>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Grid>
+      </Border>
+      <Border Grid.Column="1" Classes="card">
+        <ScrollViewer>
+          <StackPanel>
+            <StackPanel>
+              <TextBlock Text="INTERFACE DE L’EXTENSION" FontSize="10" Foreground="#65788D" />
+              <TextBlock Text="{Binding SelectedHubExtension.Name}" FontSize="22" />
+              <TextBlock Text="{Binding SelectedHubExtension.Description}" FontSize="11" Foreground="#AAB8C6" TextWrapping="Wrap" />
+            </StackPanel>
+            <Grid ColumnDefinitions="*,*,*">
+              <StackPanel>
+                <TextBlock Text="MOTEURS" FontSize="9" Foreground="#596B7E" />
+                <TextBlock Text="{Binding SelectedHubExtension.Engines}" FontSize="10" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="1">
+                <TextBlock Text="CAPACITÉS" FontSize="9" Foreground="#596B7E" />
+                <TextBlock Text="{Binding SelectedHubExtension.Capabilities}" FontSize="10" TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="FORMATS" FontSize="9" Foreground="#596B7E" />
+                <TextBlock Text="{Binding SelectedHubExtension.Formats}" FontSize="10" TextWrapping="Wrap" />
+              </StackPanel>
+            </Grid>
+            <Border IsVisible="{Binding !IsUnrealVersionBridgeSelected}">
+              <StackPanel>
+                <TextBlock Text="OUTIL / CONVERSION" FontSize="10" Foreground="#65788D" />
+                <Grid ColumnDefinitions="*,*">
+                  <ComboBox ItemsSource="{Binding HubExtensionEngineFamilies}" SelectedItem="{Binding HubExtensionSourceEngine}" PlaceholderText="Moteur source" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding HubExtensionEngineFamilies}" SelectedItem="{Binding HubExtensionTargetEngine}" PlaceholderText="Moteur cible" />
+                </Grid>
+                <TextBox Classes="path" Text="{Binding HubExtensionInputPath}" PlaceholderText="Fichier ou dossier source exporté" />
+                <TextBox Classes="path" Text="{Binding HubExtensionOutputPath}" PlaceholderText="Projet ou dossier de sortie" />
+                <WrapPanel>
+                  <Button Classes="accent" Content="Préparer l’action" Command="{Binding PrepareHubExtensionExecutionCommand}" IsVisible="{Binding CanRunSelectedHubExtension}" />
+                  <Button Classes="ghost" Content="Ouvrir la page officielle" Command="{Binding OpenHubExtensionWebsiteCommand}" IsVisible="{Binding CanOpenSelectedHubExtensionWebsite}" />
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+            <StackPanel IsVisible="{Binding IsUnrealVersionBridgeSelected}">
+              <Border>
+                <StackPanel>
+                  <TextBlock Text="CONVERSION CONTRÔLÉE — PAS DE PATCH AVEUGLE DES .UASSET" FontSize="10" Foreground="#F0B95F" />
+                  <TextBlock Text="Chaque asset est analysé dans une copie temporaire. Natif expérimental : Texture2D BGRA8/G8, pixels bruts et propriétés contrôlées, sans import d'image. Les données GPU sont régénérées par le moteur cible. Réouverture et comparaison obligatoires avant installation. Les autres types natifs restent bloqués." FontSize="10" Foreground="#D7C39C" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+              <Grid ColumnDefinitions="*,*,*">
+                <Border Classes="card">
+                  <StackPanel>
+                    <TextBlock Text="1 · ANALYSE" FontSize="10" Foreground="#70A8FA" />
+                    <TextBlock Text="Inventaire des types, fonctionnalités et dépendances. Rapport par asset avant tout export." FontSize="9" Foreground="#AAB8C6" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Classes="card">
+                  <StackPanel>
+                    <TextBlock Text="2 · CIBLE" FontSize="10" Foreground="#70A8FA" />
+                    <TextBlock Text="La version du projet reconstruit, recharge et sauvegarde ses propres packages natifs." FontSize="9" Foreground="#AAB8C6" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Classes="card">
+                  <StackPanel>
+                    <TextBlock Text="3 · VARIANTE" FontSize="10" Foreground="#70A8FA" />
+                    <TextBlock Text="Publication après contrôles, avec rapport et copie des profils utilisés. Aucun pack partiel si un type n'est pas pris en charge." FontSize="9" Foreground="#AAB8C6" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </Grid>
+              <Border>
+                <StackPanel>
+                  <TextBlock Text="PARAMÈTRES DU PLUGIN" FontSize="10" Foreground="#65788D" />
+                  <StackPanel>
+                    <TextBlock Text="Stockage des variantes converties" />
+                    <TextBox Classes="path" Text="{Binding UnrealVersionBridgeStorageRoot}" PlaceholderText="Dossier des variantes UE reconstruites" />
+                  </StackPanel>
+                  <Grid ColumnDefinitions="*,*">
+                    <StackPanel>
+                      <TextBlock Text="Ancien préréglage d'export" />
+                      <ComboBox ItemsSource="{Binding UnrealVersionBridgeProfiles}" SelectedItem="{Binding UnrealVersionBridgeProfile}" />
+                      <TextBlock Text="Les profils par type ont priorité. Les exports squelettiques et animations non validés restent bloqués, même en extended." FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                      <ToggleSwitch IsChecked="{Binding UnrealVersionBridgeValidateOutput}" />
+                      <ToggleSwitch IsChecked="{Binding UnrealVersionBridgeKeepStaging}" />
+                    </StackPanel>
+                  </Grid>
+                  <TextBlock Text="Catalogue de profils personnalisé (JSON, facultatif)" />
+                  <TextBox Classes="path" Text="{Binding UnrealVersionBridgeAssetProfileFile}" PlaceholderText="Vide : catalogue intégré UE 5.6 → 5.5" />
+                  <TextBlock Text="Éditable en JSON. Un catalogue ne peut pas activer un adaptateur absent du code. Les options du script permettent de choisir natif/portable et Analyser seulement." FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" />
+                  <Button Classes="accent" Content="Enregistrer / recharger les profils" Command="{Binding SaveUnrealVersionBridgeSettingsCommand}" />
+                  <Expander Header="Profils par type : adaptations et contrôles prévus">
+                    <TextBlock Text="{Binding UnrealVersionBridgeAssetProfilesSummary}" FontSize="11" TextWrapping="Wrap" />
+                  </Expander>
+                </StackPanel>
+              </Border>
+              <Grid ColumnDefinitions="*,*">
+                <Border Classes="card">
+                  <StackPanel>
+                    <TextBlock Text="PORTABLE EXPÉRIMENTAL" FontSize="10" Foreground="#65CCA9" />
+                    <TextBlock Text="Static Mesh · Texture2D · SoundWave" FontSize="10" TextWrapping="Wrap" />
+                    <TextBlock Text="Accord explicite sur les pertes requis. Nanite, LOD multiples, virtual texturing et dépendances projet/plugin non gérés sont bloquants." FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Classes="card">
+                  <StackPanel>
+                    <TextBlock Text="RAPPORT OBLIGATOIRE" FontSize="10" Foreground="#E6A94B" />
+                    <TextBlock Text="Blueprints · graphes de matériaux · Niagara · Control Rig · niveaux et types de plugins spécifiques ne sont jamais déclarés convertis sans reconstruction dédiée." FontSize="9" Foreground="#B9A77E" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+              </Grid>
+              <TextBlock Text="Pour l’utiliser : ouvrez un produit Fab/Megascans, choisissez un projet Unreal plus ancien puis sélectionnez le script « Unreal · Convertir puis installer ». Ses options peuvent surcharger ces valeurs pour ce projet." FontSize="10" Foreground="#8CC2FF" TextWrapping="Wrap" />
+            </StackPanel>
+            <Border IsVisible="{Binding HasPendingHubExtensionExecution}">
+              <StackPanel>
+                <TextBlock Text="EXÉCUTION À CONFIRMER" FontSize="10" Foreground="#70A8FA" />
+                <TextBlock Text="{Binding PendingHubExtensionExecutionSummary}" FontSize="10" Foreground="#B6CCE3" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal">
+                  <Button Classes="accent" Content="Exécuter" Command="{Binding ConfirmHubExtensionExecutionCommand}" />
+                  <Button Classes="ghost" Content="Annuler" Command="{Binding CancelHubExtensionExecutionCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+            <TextBlock Text="{Binding SelectedHubExtension.ExecutionPolicy}" FontSize="10" Foreground="#D9A55C" TextWrapping="Wrap" />
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+  </Grid>
+</Interface>

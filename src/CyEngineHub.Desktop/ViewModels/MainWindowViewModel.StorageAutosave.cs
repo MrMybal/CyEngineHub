@@ -100,7 +100,7 @@ public sealed partial class MainWindowViewModel
     }
 
     public Task FlushMarketplaceSettingsWritesAsync() => Task.WhenAll(_storageWrites.Values
-        .Concat(MarketplaceConnectors.Select(item => item.PendingWrite)).ToArray());
+        .Concat(MarketplaceConnectors.Select(item => item.PendingWrite)).Append(_interfaceWrite).ToArray());
 
     private async Task SaveMarketplaceSettingsAsync()
     {

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Interface Name="Connector">
+  <Grid RowDefinitions="Auto,Auto,*">
+    <Border Classes="card">
+      <StackPanel>
+        <TextBlock Text="{Binding Name}" FontSize="22" />
+        <WrapPanel>
+          <Button Classes="accent" Content="Télécharger depuis mon inventaire web" Command="{Binding OpenInventoryCommand}" />
+          <Button Classes="ghost" Content="Ajouter un fichier existant" Command="{Binding ImportExistingCommand}" />
+          <Button Classes="ghost" Content="Actualiser les fichiers locaux" Command="{Binding RefreshCommand}" />
+        </WrapPanel>
+        <TextBlock Text="{Binding Status}" TextWrapping="Wrap" FontSize="11" Foreground="#A4B3C2" />
+        <ProgressBar IsVisible="{Binding IsBusy}" IsIndeterminate="True" Height="3" />
+      </StackPanel>
+    </Border>
+    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" IsVisible="{Binding IsListVisible}">
+      <TextBox Text="{Binding Search}" PlaceholderText="Rechercher dans mes téléchargements…" />
+      <TextBlock Grid.Column="1" Text="{Binding Summary}" Foreground="#A4B3C2" />
+    </Grid>
+    <Grid Grid.Row="2" IsVisible="{Binding IsListVisible}">
+      <TextBlock IsVisible="{Binding IsEmpty}" Text="Aucun fichier correspondant. Téléchargez depuis le site ou ajoutez votre archive existante." TextWrapping="Wrap" Foreground="#8294A8" />
+      <ListBox ItemsSource="{Binding Assets}" IsVisible="{Binding !IsEmpty}">
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <Border Classes="card">
+              <Grid ColumnDefinitions="74,*,Auto">
+                <Border Height="74">
+                  <TextBlock Text="PACK" Foreground="#70A8FA" />
+                </Border>
+                <StackPanel Grid.Column="1">
+                  <TextBlock Text="{Binding Name}" FontSize="17" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Details}" TextWrapping="Wrap" FontSize="11" Foreground="#A4B3C2" />
+                  <TextBlock Text="{Binding Availability}" Foreground="#65CCA9" FontSize="11" />
+                </StackPanel>
+                <Button Grid.Column="2" Classes="ghost" Content="Voir la fiche" Command="{Binding OpenCommand}" />
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Grid>
+    <ScrollViewer Grid.Row="2" IsVisible="{Binding IsProductVisible}">
+      <StackPanel>
+        <Button Classes="ghost" Content="← Mes assets téléchargés" Command="{Binding BackCommand}" />
+        <Border Classes="card">
+          <StackPanel>
+            <TextBlock Text="{Binding SelectedAsset.Name}" FontSize="26" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding SelectedAsset.Details}" Foreground="#65CCA9" />
+            <TextBlock Text="FICHE LOCALE · FICHIER TÉLÉCHARGÉ" FontSize="11" Foreground="#70A8FA" />
+            <TextBlock Text="{Binding SelectedAsset.Asset.FilePath}" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding SelectedAsset.Date}" FontSize="11" />
+            <TextBlock Text="{Binding SelectedAsset.Availability}" Foreground="#A4B3C2" />
+            <Button Classes="ghost" Content="Ouvrir le dossier du fichier" Command="{Binding OpenFolderCommand}" />
+            <TextBlock Text="Le type est déduit des fichiers de l’archive, pas du site. La version moteur et les images officielles ne sont pas récupérées automatiquement." TextWrapping="Wrap" Foreground="#8294A8" FontSize="11" />
+          </StackPanel>
+        </Border>
+        <Border Classes="card">
+          <StackPanel>
+            <TextBlock Text="Personnaliser ma fiche" FontSize="16" />
+            <TextBox Text="{Binding EditName}" PlaceholderText="Nom de l’asset" />
+            <TextBox Text="{Binding EditNotes}" PlaceholderText="Notes personnelles" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90" />
+            <Button Classes="accent" Content="Enregistrer la fiche" Command="{Binding SaveCommand}" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</Interface>

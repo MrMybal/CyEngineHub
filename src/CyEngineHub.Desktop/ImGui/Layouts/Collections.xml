@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Interface Name="Collections">
+  <Grid RowDefinitions="Auto,*">
+    <Border Classes="card">
+      <StackPanel>
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel>
+            <TextBlock Text="COLLECTIONS OFFICIELLES MEGASCANS" FontSize="12" Foreground="#70A8FA" />
+            <TextBlock Text="Environnements, végétation, architecture et sélections Quixel. Ouvrez une collection pour retrouver ses assets dans votre bibliothèque." FontSize="11" Foreground="#A4B3C2" TextWrapping="Wrap" />
+          </StackPanel>
+          <Button Grid.Column="1" Classes="accent" Command="{Binding RefreshQuixelCollectionsCommand}" IsEnabled="{Binding !IsQuixelCollectionsBusy}">
+            <StackPanel Orientation="Horizontal">
+              <Path Width="15" Height="15" IsVisible="{Binding IsQuixelCollectionsBusy}" />
+              <TextBlock Text="{Binding QuixelCollectionsRefreshLabel}" />
+            </StackPanel>
+          </Button>
+        </Grid>
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox Classes="path" Text="{Binding QuixelCollectionsSearch, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Rechercher une collection par nom, catégorie ou description…" />
+          <TextBlock Grid.Column="1" Text="{Binding QuixelCollectionsResults}" Foreground="#A8C9F2" FontSize="11" />
+        </Grid>
+        <TextBlock Text="{Binding QuixelCollectionsStatus}" TextWrapping="Wrap" FontSize="10" Foreground="#8294A8" />
+      </StackPanel>
+    </Border>
+    <TextBlock Grid.Row="1" Text="Aucune collection à afficher. Modifiez la recherche ou actualisez le catalogue." IsVisible="{Binding HasNoQuixelCollections}" Foreground="#8294A8" TextWrapping="Wrap" />
+    <ListBox Grid.Row="1" ItemsSource="{Binding QuixelCollectionCards}">
+      <ListBox.ItemTemplate>
+        <DataTemplate>
+          <Border Height="156" AttachedToVisualTree="AttachCard">
+            <Button Command="{Binding OpenCommand}" ToolTip.Tip="Voir les assets de cette collection présents dans votre bibliothèque">
+              <Grid ColumnDefinitions="222,*,Auto">
+                <Border>
+                  <Grid>
+                    <TextBlock Text="MEGASCANS" Foreground="#29415A" FontSize="18" />
+                    <Image Source="{Binding Thumbnail}" IsVisible="{Binding HasThumbnail}" />
+                  </Grid>
+                </Border>
+                <StackPanel Grid.Column="1">
+                  <TextBlock Text="{Binding Name}" FontSize="18" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Category}" Foreground="#70A8FA" FontSize="11" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Description}" Foreground="#A4B3C2" FontSize="11" TextWrapping="Wrap" MaxHeight="40" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <TextBlock Grid.Column="2" Text="Voir les assets →" FontSize="12" Foreground="#A8C9F2" />
+              </Grid>
+            </Button>
+          </Border>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </Grid>
+</Interface>

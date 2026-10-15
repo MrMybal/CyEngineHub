@@ -11,6 +11,7 @@ using CyEngineHub.Core.Processes;
 using CyEngineHub.Core.Tasks;
 using CyEngineHub.Desktop.ViewModels;
 using CyEngineHub.Desktop.Views;
+using CyEngineHub.Desktop.ImGui;
 using CyEngineHub.Engines;
 using CyEngineHub.Infrastructure.AppData;
 using CyEngineHub.Infrastructure.Persistence;
@@ -110,8 +111,14 @@ static class Program
         Call(vm, "ReplaceToolchainSnapshot", new ToolchainSnapshot([], [new(engine.Id, engine.DisplayName, "5.5.0",
             [new(ToolchainKind.DotNet, ".NET", ToolchainHealth.Ready, "fixture", "fixture", ""),
              new(ToolchainKind.LinuxToolchain, "Linux", ToolchainHealth.Missing, "fixture", "absent", "SDK absent")], [])], [], [], [], DateTimeOffset.UtcNow));
-        var window = new MainWindow { DataContext = vm, Title = "CyEngineHub — Interface QA (données fictives)", Width = 1280, Height = 820 };
+        var window = new MainWindow { DataContext = vm, Title = "CyEngineHub — Interface QA (données fictives)", Width = 1280, Height = 820,
+            ShowActivated = false, ShowInTaskbar = false, Position = new PixelPoint(-3000, -3000) };
         window.Show();
+        if (ImGuiDiagnostics.IsHosted(window))
+        {
+            await TestImGui(window, vm, launcher);
+            window.Close(); stop.Cancel(); return;
+        }
         Click(window, vm.ShowEnginesCommand);
         await Task.Delay(150);
         Check(vm.IsEnginesVisible, "Engine navigation binding");
@@ -159,6 +166,59 @@ static class Program
         var button = window.GetVisualDescendants().OfType<Button>().Single(button => button.IsEffectivelyVisible && button.Classes.Contains("nav") && ReferenceEquals(button.Command, command));
         Check(button.IsEffectivelyEnabled, "Navigation button enabled");
         typeof(Button).GetMethod("OnClick", Private)!.Invoke(button, null);
+    }
+    static async Task TestImGui(Window window, MainWindowViewModel vm, RecordingLauncher launcher)
+    {
+        await ImGuiDiagnostics.FramesAsync(window, 3);
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-home.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Moteurs");
+        Check(vm.IsEnginesVisible, "ImGui pointer input activates engine navigation");
+        await ImGuiDiagnostics.ClickAsync(window, "row/Unreal 5.5 · QA");
+        await ImGuiDiagnostics.ClickAsync(window, "action/LaunchCommand");
+        Check(launcher.Launches.Count == 1 && launcher.Launches[0].Arguments.SequenceEqual(["-norecentproject"]), "ImGui engine launch uses real command binding");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-engines.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Projets");
+        Check(vm.IsProjectsVisible, "ImGui pointer input activates project navigation");
+        await ImGuiDiagnostics.ClickAsync(window, "resource-search");
+        await ImGuiDiagnostics.TextAsync(window, "nonexistent-project");
+        Check(!ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("row/", StringComparison.Ordinal)), "ImGui text input filters the project list");
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Stockage");
+        Check(vm.IsStorageVisible, "ImGui storage navigation");
+        await ImGuiDiagnostics.ClickAsync(window, "storage-tab/Packs");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-storage-debug.png"));
+        Console.WriteLine($"STORAGE TAB {vm.StorageOverviewTab} COUNT {vm.FilteredStorageEntries.Count}");
+        Check(vm.StorageOverviewTab == 3 && vm.FilteredStorageEntries.Count == 1, "ImGui storage tabs update bound filtering");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-storage.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Paramètres");
+        Check(vm.IsSettingsVisible, "ImGui pointer input activates settings navigation");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-settings.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Vue d’ensemble");
+        Check(vm.IsHomeVisible, "ImGui navigation remains functional after settings and tabs");
+        await ImGuiDiagnostics.ClickAsync(window, "action/ToggleProjectCreatorCommand");
+        Check(vm.IsProjectCreatorVisible, "Project creation modal opens through ImGui button");
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Moteurs", leadingEdge: true);
+        Check(vm.IsProjectCreatorVisible && vm.IsHomeVisible, "Modal blocks clicks on the uncovered backdrop navigation");
+        await ImGuiDiagnostics.ClickAsync(window, "field/NewProjectName");
+        await ImGuiDiagnostics.TextAsync(window, "ImGuiFixtureProject");
+        if (vm.NewProjectName != "ImGuiFixtureProject")
+        {
+            Console.WriteLine("PROJECT NAME " + vm.NewProjectName);
+            await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-input-debug.png"));
+        }
+        Check(vm.NewProjectName == "ImGuiFixtureProject", "Project form text input updates the creation model");
+        await ImGuiDiagnostics.ClickAsync(window, "tab/Configuration INI");
+        Check(vm.ProjectCreatorTabIndex == 3, "Project creation tabs update the INI editor selection");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-project-modal.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "command/CloseProjectCreatorCommand");
+        Check(!vm.IsProjectCreatorVisible, "Project modal close button executes its command");
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Paramètres");
+        Check(vm.IsSettingsVisible, "Closed ImGui modal releases navigation input");
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Téléchargements");
+        Check(vm.IsTasksVisible, "Download queue remains accessible through ImGui navigation");
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Moteurs");
+        await ImGuiDiagnostics.ClickAsync(window, "action/ToggleEngineImporterCommand");
+        Check(vm.IsEngineImporterVisible, "Add engine action exposes the complete engine importer");
+        Console.WriteLine("OUTPUT " + Output);
     }
     static async Task Capture(Window window, string name)
     {

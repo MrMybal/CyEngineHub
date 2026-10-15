@@ -1,5 +1,14 @@
 # Third-party notices
 
+## Dear ImGui user interface
+
+- Dear ImGui / cimgui, via ImGui.NET 1.91.6.1 — MIT License. https://github.com/ocornut/imgui and https://github.com/ImGuiNET/ImGui.NET
+- Silk.NET.OpenGLES 2.23.0 — MIT License. https://github.com/dotnet/Silk.NET
+
+The application uses Dear ImGui for its controls and Avalonia for native windows,
+graphics surfaces, file dialogs and WebView2 integration. Package license texts
+are included under `Licenses` in the Windows distribution.
+
 ## Microsoft Edge WebView2
 
 The Windows embedded sign-in window uses the Microsoft.Web.WebView2 SDK.

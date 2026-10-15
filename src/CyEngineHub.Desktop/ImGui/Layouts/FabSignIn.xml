@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Interface Name="FabSignIn">
+  <StackPanel>
+    <TextBlock Text="CONNEXION AUTOMATIQUE" FontSize="10" Foreground="#70A8FA" />
+    <TextBlock Text="Connectez-vous sur la page Epic dans une fenêtre du hub. Le code de la réponse JSON est récupéré et échangé automatiquement, sans copier-coller." FontSize="11" Foreground="#A4B3C2" TextWrapping="Wrap" />
+    <Button Classes="accent" Content="{Binding FabWebLoginButtonText}" Command="{Binding OpenEmbeddedFabAuthorizationCommand}" IsEnabled="{Binding !IsFabWebLoginActive}" />
+    <TextBlock Text="Windows · WebView2 (Chromium) · session privée séparée de votre navigateur. Les champs du formulaire et les cookies ne sont pas lus par CyEngineHub." FontSize="10" Foreground="#8294A8" TextWrapping="Wrap" />
+    <Expander Header="Mode manuel — navigateur externe / copier-coller" IsExpanded="{Binding IsFabManualSignInExpanded}" IsEnabled="{Binding !IsFabWebLoginActive}">
+      <StackPanel>
+        <TextBlock Text="Ce mode reste disponible si vous le préférez ou si un fournisseur refuse le navigateur intégré. Après connexion dans votre navigateur, copiez la réponse JSON (Ctrl+A puis Ctrl+C) : le hub la détecte pendant 2 minutes. Vous pouvez aussi coller le code puis cliquer sur Connecter." FontSize="10" Foreground="#A4B3C2" TextWrapping="Wrap" />
+        <Button Classes="ghost" Content="Ouvrir Epic dans mon navigateur" Command="{Binding OpenDirectFabAuthorizationCommand}" />
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBox Classes="path" Text="{Binding FabAuthorizationCode, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="authorizationCode ou réponse JSON Epic" />
+          <Button Grid.Column="1" Classes="ghost" Content="Connecter" Command="{Binding ConnectDirectFabCommand}" />
+        </Grid>
+      </StackPanel>
+    </Expander>
+  </StackPanel>
+</Interface>

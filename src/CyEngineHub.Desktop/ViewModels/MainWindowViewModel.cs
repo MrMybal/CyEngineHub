@@ -4924,6 +4924,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         try
         {
             await _database.InitializeAsync().ConfigureAwait(true);
+            await LoadInterfaceAsync().ConfigureAwait(true);
             LoadWindowsStartupSettings();
             await LoadUpdateSettingsAsync().ConfigureAwait(true);
             _workspacePreferences = await _workspacePreferencesService.LoadAsync().ConfigureAwait(true);
