@@ -50,6 +50,19 @@ internal static partial class StoragePathDiscovery
             AddProjectGenerated(candidates, project.Name, project.RootPath);
         }
 
+        foreach (var root in request.AdditionalRoots)
+        {
+            if (string.IsNullOrWhiteSpace(root.Path) || !Path.IsPathFullyQualified(root.Path)) continue;
+            var role = root.Category switch
+            {
+                StorageCategory.EngineInstallation or StorageCategory.Project or StorageCategory.MarketplaceLibrary => StorageEntryRole.Footprint,
+                StorageCategory.MarketplaceCache => StorageEntryRole.Cache,
+                _ => StorageEntryRole.External,
+            };
+            Add(candidates, new StoragePathCandidate(root.Category, role, root.Owner,
+                root.Owner, root.Path, root.Path, false));
+        }
+
         AddGlobalDdc(candidates);
         AddVaultCache(candidates);
         return candidates;

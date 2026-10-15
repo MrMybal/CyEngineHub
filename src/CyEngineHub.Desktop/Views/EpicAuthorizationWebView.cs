@@ -36,6 +36,17 @@ public sealed class EpicAuthorizationWebView : NativeControlHost, IDisposable
     public event EventHandler<string>? AuthorizationCodeReceived;
     public event EventHandler? CancelRequested;
 
+    public void GoBack()
+    {
+        if (!_disposed && !_delivered && _controller?.CoreWebView2.CanGoBack == true)
+            _controller.CoreWebView2.GoBack();
+    }
+
+    public void Reload()
+    {
+        if (!_disposed && !_delivered) _controller?.CoreWebView2.Reload();
+    }
+
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
     {
         if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("WebView2 nécessite Windows.");

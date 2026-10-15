@@ -33,7 +33,12 @@ static class Program
 {
     const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
     static readonly string Output = Path.GetFullPath("artifacts/cosmos-smoke-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
-    static Task Call(object vm, string method, params object?[] args) => (Task)vm.GetType().GetMethod(method, Private)!.Invoke(vm, args)!;
+    static Task Call(object vm, string method, params object?[] args)
+    {
+        var info = vm.GetType().GetMethod(method, Private)!;
+        var parameters = info.GetParameters();
+        return (Task)info.Invoke(vm, parameters.Select((p, i) => i < args.Length ? args[i] : p.DefaultValue).ToArray())!;
+    }
     static T Field<T>(object vm, string name) => (T)vm.GetType().GetField(name, Private)!.GetValue(vm)!;
     static void Check(bool passed, string message) { if (!passed) throw new InvalidOperationException(message); Console.WriteLine("PASS " + message); }
 

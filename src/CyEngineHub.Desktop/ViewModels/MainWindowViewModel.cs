@@ -49,6 +49,7 @@ using CyEngineHub.Toolchains.Persistence;
 using CyEngineHub.Updates;
 using CyEngineHub.Unreal.Detection;
 using CyEngineHub.Unreal.Acquisition;
+using CyEngineHub.Unreal.Integration;
 using CyEngineHub.Unreal.Models;
 using CyEngineHub.Unreal.Registration;
 
@@ -1153,21 +1154,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
             OpenDirectFabAuthorizationAsync,
             () => !IsFabWebLoginActive,
             onError: ShowError);
-        ConnectDirectFabCommand = new AsyncRelayCommand(ConnectDirectFabAsync, onError: ShowError);
-        DisconnectDirectFabCommand = new AsyncRelayCommand(DisconnectDirectFabAsync, onError: ShowError);
+        ConnectDirectFabCommand = new AsyncRelayCommand(ConnectDirectFabAsync, () => !IsEpicBusy && !IsFabWebLoginActive, ShowError);
+        DisconnectDirectFabCommand = new AsyncRelayCommand(DisconnectDirectFabAsync, () => !IsEpicBusy && !IsFabWebLoginActive, ShowError);
         _refreshDirectFabLibraryCommand = new AsyncRelayCommand(
             RefreshDirectFabLibraryAsync,
             () => IsDirectFabConnected && IsFabLibrarySourceAvailable && !IsFabLibraryRefreshing,
             ShowError);
         RefreshDirectFabLibraryCommand = _refreshDirectFabLibraryCommand;
         OpenQuixelAuthorizationCommand = new AsyncRelayCommand(
-            OpenQuixelAuthorizationAsync,
+            OpenEmbeddedQuixelAuthorizationAsync,
+            () => !IsFabWebLoginActive && !IsEpicBusy,
             onError: ShowError);
-        ConnectQuixelCommand = new AsyncRelayCommand(ConnectQuixelAsync, onError: ShowError);
+        ConnectQuixelCommand = new AsyncRelayCommand(ConnectQuixelAsync, () => !IsEpicBusy && !IsFabWebLoginActive, ShowError);
         ConnectQuixelFromEpicCommand = new AsyncRelayCommand(
             ConnectQuixelFromEpicAsync,
+            () => !IsEpicBusy && !IsFabWebLoginActive,
             onError: ShowError);
-        DisconnectQuixelCommand = new AsyncRelayCommand(DisconnectQuixelAsync, onError: ShowError);
+        DisconnectQuixelCommand = new AsyncRelayCommand(DisconnectQuixelAsync, () => !IsEpicBusy && !IsFabWebLoginActive, ShowError);
         _refreshQuixelLibraryCommand = new AsyncRelayCommand(
             RefreshQuixelLibraryAsync,
             () => IsQuixelConnected && IsQuixelLibrarySourceAvailable && !IsQuixelLibraryRefreshing,
@@ -2818,9 +2821,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public string EpicLauncherPath => _currentEpicSnapshot?.LauncherPath ?? "Aucun exécutable détecté";
 
-    public string StorageEngineSize => FormatBytes(SumStorage(StorageCategory.EngineInstallation));
+    public string StorageEngineSize => StorageCategorySize(StorageCategory.EngineInstallation);
 
-    public string StorageProjectSize => FormatBytes(SumStorage(StorageCategory.Project));
+    public string StorageProjectSize => StorageCategorySize(StorageCategory.Project);
 
     public string StorageDdcSize => FormatBytes(_currentStorageSnapshot?.Entries
         .Where(entry => entry.Category is
@@ -2986,6 +2989,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 _refreshEpicCommand.NotifyCanExecuteChanged();
                 (OpenEmbeddedFabAuthorizationCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                (OpenQuixelAuthorizationCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                (ConnectQuixelCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                (ConnectDirectFabCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                (DisconnectDirectFabCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                (ConnectQuixelFromEpicCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                (DisconnectQuixelCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                _openManualQuixelAuthorizationCommand?.NotifyCanExecuteChanged();
                 _launchFabProjectCommand.NotifyCanExecuteChanged();
                 _confirmFabImportCommand.NotifyCanExecuteChanged();
                 _confirmFabRollbackCommand.NotifyCanExecuteChanged();
@@ -7301,13 +7311,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void RestoreSupplierInstallVersions(RemoteFabAssetCardViewModel detailCard)
     {
+        PackDownloadEstimateSummary = "Estimez la sélection pour connaître le transfert et l’espace brut requis. Aucun moteur installé n’est nécessaire pour télécharger.";
         FabInstallVersions.Clear();
         var preferred = detailCard.Asset.PreferredProjectVersion;
         foreach (var version in detailCard.Asset.ProjectVersions
                      .OrderByDescending(item => ParseEngineVersion(
                          item.EngineVersions.Count == 0 ? string.Empty : item.EngineVersions[0])))
         {
-            FabInstallVersions.Add(new FabInstallVersionOptionViewModel(version, Equals(version, preferred)));
+            var option = new FabInstallVersionOptionViewModel(version, Equals(version, preferred));
+            option.PropertyChanged += (_, args) =>
+            {
+                if (args.PropertyName == nameof(FabInstallVersionOptionViewModel.IsSelected))
+                    PackDownloadEstimateSummary = "Sélection modifiée : recalculez l’estimation (les manifests déjà consultés seront réutilisés).";
+            };
+            FabInstallVersions.Add(option);
         }
         RebuildFabInstallTargets(detailCard);
     }
@@ -12616,8 +12633,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         await _platformLauncher.StartDetachedAsync(
             engine.EditorPath,
+            UnrealEditorLaunch.ProjectBrowserArguments,
             workingDirectory: engine.RootPath).ConfigureAwait(true);
-        StatusMessage = $"{engine.DisplayName} lancé.";
+        StatusMessage = $"{engine.DisplayName} démarré vers le navigateur de projets Unreal.";
     }
 
     private async Task LaunchProjectAsync(UnrealProject project)
@@ -12789,7 +12807,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task RefreshToolchainsAsync()
     {
-        var keepEngineProfileOpen = _section == PageSection.EngineDetails;
         var engines = _currentEngines.ToArray();
         IsToolchainBusy = true;
         ToolchainStatusSummary = "Inventaire manuel des toolchains en cours…";
@@ -12835,10 +12852,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             $"{ToolchainProblemCount} problème(s) · " +
             $"{snapshot.AndroidDevices.Count} appareil(s) ADB · cache actualisé";
         StatusMessage = "Inventaire Toolchains actualisé.";
-        if (!keepEngineProfileOpen)
-        {
-            ShowSection(PageSection.Toolchains);
-        }
+        // Keep the current navigation, even if the user left the engine page mid-scan.
     }
 
     private void ReplaceToolchainSnapshot(ToolchainSnapshot snapshot)
@@ -12886,14 +12900,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
         CancelPendingStorageCleanup();
         var request = new StorageAnalysisRequest(
             _currentEngines.ToArray(),
-            Projects.Select(project => project.Project).ToArray(),
-            GitRepositories.Select(repository => repository.Snapshot).ToArray());
+            _currentUnrealProjects.ToArray(),
+            GitRepositories.Select(repository => repository.Snapshot).ToArray())
+        {
+            AdditionalRoots = GetAdditionalStorageRoots(),
+        };
         IsStorageBusy = true;
         StorageStatusSummary = "Analyse manuelle et bornée des emplacements de stockage…";
         StorageSnapshot? snapshot = null;
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
             "Storage",
-            "Analyser le stockage Unreal",
+            "Analyser moteurs, projets et bibliothèques",
             async (context, cancellationToken) =>
             {
                 var progress = new InlineProgress<StorageAnalysisProgress>(value =>
@@ -12931,7 +12948,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             $"{snapshot.Entries.Count} emplacement(s) · {StorageReclaimableSize} récupérable(s) · " +
             $"{StorageWarningCount} résultat(s) à vérifier · cache actualisé";
         StatusMessage = "Inventaire Stockage actualisé.";
-        ShowSection(PageSection.Storage);
+        // A background scan must not navigate away from the current page.
     }
 
     private void ReplaceStorageSnapshot(StorageSnapshot snapshot)
@@ -12971,6 +12988,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(StorageVaultSize));
         OnPropertyChanged(nameof(StorageLfsSize));
         OnPropertyChanged(nameof(StorageReclaimableSize));
+        RefreshStorageOverview();
         OnPropertyChanged(nameof(WarningCount));
     }
 
@@ -14943,25 +14961,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void RefreshSelectedEngineToolchains()
     {
         var selectedId = SelectedEngineDetails?.Engine.Id;
-        var selectedRoot = SelectedEngineDetails?.Engine.RootPath
-                           ?? SelectedLocalEngineDetails?.Installation.RootPath;
-        var selectedVersion = SelectedEngineDetails?.Engine.Version.ToString()
-                              ?? SelectedLocalEngineDetails?.Installation.Version;
         SelectedEngineToolchains.Clear();
         if (_currentToolchainSnapshot is not null)
         {
             foreach (var snapshot in _currentToolchainSnapshot.Engines.Where(snapshot =>
-                         (!string.IsNullOrWhiteSpace(selectedId) &&
-                          string.Equals(snapshot.EngineId, selectedId, StringComparison.OrdinalIgnoreCase)) ||
-                         (!string.IsNullOrWhiteSpace(selectedRoot) &&
-                          snapshot.EngineId.Contains(selectedRoot, StringComparison.OrdinalIgnoreCase)) ||
-                         (!string.IsNullOrWhiteSpace(selectedVersion) &&
-                          string.Equals(snapshot.EngineVersion, selectedVersion, StringComparison.OrdinalIgnoreCase))))
+                         !string.IsNullOrWhiteSpace(selectedId) &&
+                         string.Equals(snapshot.EngineId, selectedId, StringComparison.OrdinalIgnoreCase)))
             {
                 SelectedEngineToolchains.Add(new EngineToolchainCardViewModel(snapshot));
             }
         }
         OnPropertyChanged(nameof(HasNoSelectedEngineToolchains));
+        RefreshCrossCompile();
     }
 
     private string GetEngineEffectiveSizeLabel(string rootPath)
@@ -15343,9 +15354,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         return parts.Length >= 2 ? $"{parts[0]}.{parts[1]}" : normalized;
     }
 
-    private long SumStorage(StorageCategory category) => _currentStorageSnapshot?.Entries
-        .Where(entry => entry.Category == category)
-        .Sum(entry => entry.SizeBytes) ?? 0;
+    private long SumStorage(StorageCategory category) => StorageOverview.SumDistinctRoots(
+        _currentStorageSnapshot?.Entries.Where(entry => entry.Category == category) ?? []);
 
     private enum FabInstallDestination
     {

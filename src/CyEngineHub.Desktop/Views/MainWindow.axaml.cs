@@ -36,6 +36,9 @@ public sealed partial class MainWindow : Window
     private void OnDataContextChanged(object? sender, EventArgs args) =>
         AttachViewModel(DataContext as MainWindowViewModel);
 
+    private void FocusEngineCompilation(object? sender, Avalonia.Interactivity.RoutedEventArgs args) =>
+        this.FindControl<Border>("EngineCompilationPanel")?.BringIntoView();
+
     private void AttachViewModel(MainWindowViewModel? viewModel)
     {
         if (_viewModel is not null)

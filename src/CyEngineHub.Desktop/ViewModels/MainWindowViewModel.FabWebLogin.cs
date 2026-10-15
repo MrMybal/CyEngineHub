@@ -15,7 +15,18 @@ public sealed partial class MainWindowViewModel
         get => _isFabWebLoginActive;
         private set
         {
-            if (SetProperty(ref _isFabWebLoginActive, value)) OnPropertyChanged(nameof(FabWebLoginButtonText));
+            if (SetProperty(ref _isFabWebLoginActive, value))
+            {
+                OnPropertyChanged(nameof(FabWebLoginButtonText));
+                (OpenEmbeddedFabAuthorizationCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                (OpenQuixelAuthorizationCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                _openManualQuixelAuthorizationCommand?.NotifyCanExecuteChanged();
+                (ConnectQuixelCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                (ConnectDirectFabCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                (DisconnectDirectFabCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                (ConnectQuixelFromEpicCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+                (DisconnectQuixelCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+            }
         }
     }
 

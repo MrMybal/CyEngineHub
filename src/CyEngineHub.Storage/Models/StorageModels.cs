@@ -19,6 +19,9 @@ public enum StorageCategory
     ProjectStagedBuilds,
     VaultCache,
     GitLfs,
+    MarketplaceLibrary,
+    MarketplaceDownloads,
+    MarketplaceCache,
 }
 
 public enum StorageEntryRole
@@ -73,7 +76,13 @@ public sealed record StorageSnapshot(
 public sealed record StorageAnalysisRequest(
     IReadOnlyList<UnrealEngineInstallation> Engines,
     IReadOnlyList<UnrealProject> Projects,
-    IReadOnlyList<GitRepositorySnapshot> GitRepositories);
+    IReadOnlyList<GitRepositorySnapshot> GitRepositories)
+{
+    public IReadOnlyList<AdditionalStorageRoot> AdditionalRoots { get; init; } = [];
+}
+
+// Explicit provider roots; never eligible for automatic cleanup.
+public sealed record AdditionalStorageRoot(StorageCategory Category, string Owner, string Path);
 
 public sealed record StorageAnalysisProgress(int Completed, int Total, string Message);
 

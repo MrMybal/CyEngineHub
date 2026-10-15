@@ -54,7 +54,8 @@ public sealed partial class QuixelMegascansApiClient : IQuixelMegascansClient
     }
 
     public Uri AuthorizationUri { get; } = new(
-        $"https://www.epicgames.com/id/login?client_id={EpicClientId}&response_type=code");
+        "https://www.epicgames.com/id/login?redirectUrl=" +
+        Uri.EscapeDataString($"https://www.epicgames.com/id/api/redirect?clientId={EpicClientId}&responseType=code"));
 
     public async Task<QuixelStatus> GetStatusAsync(CancellationToken cancellationToken = default)
     {

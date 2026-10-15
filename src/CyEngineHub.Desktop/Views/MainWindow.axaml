@@ -649,7 +649,8 @@
                     <TextBlock Text="{Binding SelectedEngineDetails.IssueSummary}" FontSize="11" Foreground="#D9A55C" Margin="0,12,0,0" TextWrapping="Wrap" />
                   </StackPanel>
                   <WrapPanel Grid.Column="1" VerticalAlignment="Center" MaxWidth="520">
-                    <Button Classes="accent" Content="Lancer" Command="{Binding SelectedEngineDetails.LaunchCommand}" Margin="0,0,8,8" />
+                    <Button Classes="accent" Content="Lancer · accueil Unreal" Command="{Binding SelectedEngineDetails.LaunchCommand}" Margin="0,0,8,8" />
+                    <Button Classes="ghost" Content="Compilation / Linux / Android" Click="FocusEngineCompilation" Margin="0,0,8,8" />
                     <Button Classes="ghost" Content="Setup" Command="{Binding SelectedEngineDetails.SetupCommand}" IsVisible="{Binding SelectedEngineDetails.CanSetup}" Margin="0,0,8,8" />
                     <Button Classes="ghost" Content="Build Editor" Command="{Binding SelectedEngineDetails.BuildEditorCommand}" Margin="0,0,8,8" />
                     <Button Classes="ghost" Content="GPF" Command="{Binding SelectedEngineDetails.GenerateProjectFilesCommand}" Margin="0,0,8,8" />
@@ -745,16 +746,32 @@
                 </Border>
               </Grid>
             </StackPanel>
-            <Border Classes="card" Padding="18">
+            <Border Classes="card" Padding="18" Name="EngineCompilationPanel">
               <StackPanel Spacing="11">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                   <StackPanel>
-                    <TextBlock Text="TOOLCHAINS &amp; COMPATIBILITÉ" FontSize="10" FontWeight="Bold" Foreground="#65788D" />
+                    <TextBlock Text="COMPILATION &amp; CROSS-COMPILATION" FontSize="10" FontWeight="Bold" Foreground="#65788D" />
                     <TextBlock Text="SDK, compilateurs et versions réellement requis pour cette installation." FontSize="10" Foreground="#8294A8" Margin="0,4,0,0" />
                   </StackPanel>
                   <Button Grid.Column="1" Classes="accent" Content="Analyser maintenant" Command="{Binding RefreshToolchainsCommand}" />
                 </Grid>
                 <TextBlock IsVisible="{Binding HasNoSelectedEngineToolchains}" Text="Aucune analyse compatible en cache pour ce moteur. Lancez l’analyse pour obtenir les prérequis exacts." FontSize="10" Foreground="#D9A55C" TextWrapping="Wrap" />
+                <StackPanel IsVisible="{Binding IsUnrealCrossCompileVisible}" Spacing="10">
+                  <TextBlock Text="Windows → Linux / Android. macOS et iOS nécessitent un Mac distant ; ils ne sont pas proposés comme compilation locale Windows." TextWrapping="Wrap" Foreground="#8294A8" FontSize="11" />
+                  <Grid ColumnDefinitions="2*,*,*" ColumnSpacing="10">
+                    <ComboBox ItemsSource="{Binding CrossCompileProjects}" SelectedItem="{Binding CrossCompileProject}" HorizontalAlignment="Stretch">
+                      <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:ProjectCardViewModel"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <ComboBox Grid.Column="1" ItemsSource="{Binding CrossCompilePlatforms}" SelectedItem="{Binding CrossCompilePlatform}" HorizontalAlignment="Stretch" />
+                    <ComboBox Grid.Column="2" ItemsSource="{Binding CrossCompileConfigurations}" SelectedItem="{Binding CrossCompileConfiguration}" HorizontalAlignment="Stretch" />
+                  </Grid>
+                  <TextBlock Text="{Binding CrossCompileStatus}" TextWrapping="Wrap" FontSize="11" Foreground="#D9A55C" />
+                  <Expander Header="Commande qui sera exécutée"><TextBlock Text="{Binding CrossCompilePreview}" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11" /></Expander>
+                  <WrapPanel>
+                    <Button Content="Compiler et packager le projet" Classes="accent" Command="{Binding RunCrossCompileCommand}" Margin="0,0,8,8" />
+                    <Button Content="Installer la toolchain Linux (guide)" Classes="ghost" Command="{Binding OpenLinuxToolchainGuideCommand}" Margin="0,0,8,8" />
+                  </WrapPanel>
+                </StackPanel>
                 <ItemsControl ItemsSource="{Binding SelectedEngineToolchains}">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:EngineToolchainCardViewModel">
@@ -3106,6 +3123,38 @@
 
         <ScrollViewer IsVisible="{Binding IsStorageVisible}" VerticalScrollBarVisibility="Auto">
           <StackPanel Spacing="14">
+            <TabControl SelectedIndex="{Binding StorageOverviewTab}" Name="StorageOverviewTabs">
+              <TabItem Header="Vue d’ensemble" />
+              <TabItem Header="Moteurs" />
+              <TabItem Header="Projets" />
+              <TabItem Header="Packs &amp; téléchargements" />
+              <TabItem Header="Caches &amp; nettoyage" />
+            </TabControl>
+            <TextBlock Text="{Binding StorageMeasurementDate}" Foreground="#8294A8" FontSize="11" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding StorageAnalysisWarnings}" Foreground="#D9A55C" FontSize="11" TextWrapping="Wrap" />
+            <Border Classes="card">
+              <StackPanel Spacing="8">
+                <TextBlock Text="BIBLIOTHÈQUES DE PACKS" FontWeight="Bold" FontSize="10" Foreground="#70A8FA" />
+                <TextBlock Text="{Binding StoragePacksSize}" FontSize="22" />
+                <TextBlock Text="Tailles sur disque. Les sous-dossiers ne sont pas additionnés deux fois dans ce total. Les caches et données générées sont déjà inclus dans les dossiers moteurs/projets : ne pas additionner tous les compteurs." TextWrapping="Wrap" Foreground="#8294A8" FontSize="10" />
+              </StackPanel>
+            </Border>
+            <Expander Header="Quotas et ordre des bibliothèques">
+            <ItemsControl ItemsSource="{Binding StorageLibraryCapacities}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:LibraryCapacityViewModel">
+                  <Border Classes="card" Margin="0,0,0,6">
+                    <StackPanel Spacing="4">
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding Path}" TextWrapping="Wrap" FontSize="10" Foreground="#8294A8" />
+                      <TextBlock Text="{Binding Quota}" FontSize="11" />
+                      <TextBlock Text="{Binding Status}" FontSize="11" Foreground="#D9A55C" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            </Expander>
             <Border Classes="card">
               <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
                 <StackPanel>
@@ -3209,11 +3258,11 @@
 
             <TextBlock Text="EMPLACEMENTS ANALYSÉS" FontSize="10" FontWeight="Bold" Foreground="#65788D" Margin="4,4,0,0" />
             <TextBlock
-                IsVisible="{Binding HasNoStorageEntries}"
+                IsVisible="{Binding HasNoFilteredStorageEntries}"
                 Text="Aucun inventaire en cache. Lancez l’analyse manuelle pour mesurer les chemins connus."
                 Foreground="#718398"
                 Margin="4,0,0,6" />
-            <ItemsControl ItemsSource="{Binding StorageEntries}">
+            <ItemsControl ItemsSource="{Binding FilteredStorageEntries}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:StorageEntryCardViewModel">
                   <Border Classes="card">
@@ -3579,21 +3628,24 @@
                         <Border IsVisible="{Binding !IsQuixelConnected}" Background="#0D141C" BorderBrush="#202C39" BorderThickness="1" CornerRadius="8" Padding="14">
                           <StackPanel Spacing="10">
                             <TextBlock Text="AUTORISATION OFFICIELLE UTILISÉE PAR BRIDGE" FontSize="10" FontWeight="Bold" Foreground="#70A8FA" />
-                            <TextBlock Text="Cette connexion vise la bibliothèque Quixel historique, distincte de Fab. Cliquez sur Autoriser, connectez votre compte Epic, puis copiez la réponse affichée avec Ctrl+A / Ctrl+C. CyEngineHub détectera le code et terminera l’échange automatiquement." FontSize="10" Foreground="#A4B3C2" TextWrapping="Wrap" />
+                            <TextBlock Text="Bibliothèque Quixel historique, distincte de Fab. Connectez-vous dans la fenêtre intégrée : le code est récupéré automatiquement. Si Epic refuse cet ancien service, utilisez Megascans via Fab." FontSize="10" Foreground="#A4B3C2" TextWrapping="Wrap" />
                             <WrapPanel>
-                              <Button Classes="accent" Content="1 · Autoriser Epic/Quixel" Command="{Binding OpenQuixelAuthorizationCommand}" Margin="0,0,8,0" />
+                              <Button Classes="accent" Content="Se connecter dans CyEngineHub" Command="{Binding OpenQuixelAuthorizationCommand}" Margin="0,0,8,0" />
                               <Button Classes="ghost" Content="Essayer la session Epic déjà connectée" Command="{Binding ConnectQuixelFromEpicCommand}" IsVisible="{Binding IsDirectFabConnected}" />
                             </WrapPanel>
                             <TextBlock Text="Le raccourci peut être refusé par Epic selon l’état du compte. L’autorisation officielle ci-dessus reste la méthode principale. CyEngineHub ne lit ni mot de passe ni cookies du navigateur." FontSize="9" Foreground="#D9A55C" TextWrapping="Wrap" />
-                            <Expander Header="Mode manuel de secours">
-                              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,8,0,0">
+                            <Expander Header="Mode manuel de secours" IsExpanded="{Binding IsQuixelManualSignInExpanded}">
+                              <StackPanel Spacing="8">
+                                <Button Classes="ghost" Content="Autoriser dans le navigateur externe" Command="{Binding OpenManualQuixelAuthorizationCommand}" HorizontalAlignment="Left" />
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,8,0,0">
                                 <TextBox Classes="path" Text="{Binding QuixelAuthorizationCode}" PlaceholderText="Code, URL de retour ou réponse JSON Epic/Quixel" />
                                 <Button Grid.Column="1" Classes="ghost" Content="Connecter" Command="{Binding ConnectQuixelCommand}" />
-                              </Grid>
+                                </Grid>
+                              </StackPanel>
                             </Expander>
                           </StackPanel>
                         </Border>
-                        <TextBlock Text="La session Quixel est stockée séparément dans le Gestionnaire d’identification Windows. Elle donne accès à /v1/assets/acquired puis résout les fiches du catalogue Megascans public." FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
+                        <TextBlock Text="La session historique reste séparée de Fab. Sans clé Algolia autorisée configurée localement, les recherches historiques restent désactivées. Megascans via Fab et les fiches locales restent disponibles." FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
                         <Button Content="Utiliser Megascans via Fab" Classes="accent" Command="{Binding OpenMegascansFabCommand}" HorizontalAlignment="Left" />
                         <TextBlock Text="Si Quixel refuse la connexion, utilisez votre compte sur le site Fab intégré. Le catalogue vendeur n’est pas une liste de possessions : Fab vérifie vos droits. Les fichiers téléchargés obtiennent une fiche locale ; votre cache historique est conservé." FontSize="10" Foreground="#A8C9F2" TextWrapping="Wrap" />
                       </StackPanel>
@@ -4607,6 +4659,8 @@
           <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
             <StackPanel>
               <TextBlock Text="VARIANTES À TÉLÉCHARGER" FontSize="20" FontWeight="SemiBold" />
+              <Button Content="Estimer la sélection" Classes="ghost" Command="{Binding EstimatePackDownloadsCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+              <TextBlock Text="{Binding PackDownloadEstimateSummary}" FontSize="11" Foreground="#A8C9F2" Margin="0,5,0,0" TextWrapping="Wrap" />
               <TextBlock Text="Sélectionnez les formats RAW, résolutions ou versions Unreal. Le téléchargement reste dans le stockage de la Bibliothèque." FontSize="10" Foreground="#8294A8" Margin="0,5,0,0" TextWrapping="Wrap" />
             </StackPanel>
             <Button Grid.Column="1" Classes="history" Content="✕" Command="{Binding CloseFabDownloadOptionsCommand}" ToolTip.Tip="Fermer" />

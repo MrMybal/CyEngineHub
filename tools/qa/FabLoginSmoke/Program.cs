@@ -39,6 +39,13 @@ sealed class FakeFab : IDirectFabClient
     public static readonly Uri Callback = new("https://www.epicgames.com/id/api/redirect?clientId=fixture&responseType=code");
     public Uri AuthorizationUri { get; } = new("https://www.epicgames.com/id/login?redirectUrl=" + Uri.EscapeDataString(Callback.AbsoluteUri));
     public int ConnectCount;
+    public int EstimateCount;
+    public bool UnknownEstimate;
+    public Task<DirectFabDownloadEstimate?> EstimateDownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version, CancellationToken cancellationToken = default)
+    {
+        EstimateCount++;
+        return Task.FromResult(UnknownEstimate ? null : new DirectFabDownloadEstimate(1024, 2048, 2));
+    }
     public bool Fail;
     public string? Received;
     public Task<DirectFabStatus> GetStatusAsync(CancellationToken cancellationToken = default) => Task.FromResult(new DirectFabStatus(DirectFabConnectionState.Disconnected, "Fixture"));
@@ -87,13 +94,14 @@ static class Program
         await store.InitializeAsync();
         await using var scheduler = new HubTaskScheduler(1);
         var fake = new FakeFab();
+        var quixel = new FakeQuixel();
         var ctor = typeof(MainWindowViewModel).GetConstructors().Single();
         MainWindowViewModel MakeVm() => (MainWindowViewModel)ctor.Invoke(ctor.GetParameters().Select(p => p.Name switch
         {
             "database" or "settings" or "engineCatalog" => (object)store,
             "engineModules" => new EngineModuleRegistry([new UnrealEngineModule()]),
             "engineRegistration" => new PreviewRegistration(), "taskScheduler" => scheduler,
-            "appData" => paths, "directFabClient" => fake, _ => null
+            "appData" => paths, "directFabClient" => fake, "quixelClient" => quixel, _ => null
         }).ToArray());
 
         var vm = MakeVm();
@@ -126,6 +134,38 @@ static class Program
         await login;
         Check(vm.IsDirectFabConnected && fake.Received == FakeFab.Code && vm.FabAuthorizationCode == "", "Automatic exchange does not fill manual textbox");
         Check(!vm.IsFabWebLoginActive && !vm.IsEpicBusy, "Successful exchange releases busy state");
+        var quixelLogin = Call(vm, "OpenEmbeddedQuixelAuthorizationAsync");
+        Check(pending!.ProviderDisplayName.Contains("Quixel") && pending.ProfileDirectory.EndsWith("Quixel"), "Quixel uses its own provider label and browser profile");
+        Check(!vm.ConnectDirectFabCommand.CanExecute(null), "Manual Fab cannot interrupt Quixel login");
+        pending.Complete(new FabWebAuthorizationResult { UseManualMode = true });
+        await quixelLogin;
+        Check(vm.IsQuixelManualSignInExpanded && !vm.IsFabWebLoginActive, "Quixel manual fallback releases shared auth guard");
+        quixel.Fail = true;
+        quixelLogin = Call(vm, "OpenEmbeddedQuixelAuthorizationAsync");
+        pending!.Complete(new FabWebAuthorizationResult { Code = FakeFab.Code });
+        await quixelLogin;
+        Check(!vm.QuixelStatusSummary.Contains(FakeFab.Code) && !vm.IsEpicBusy, "Quixel failed exchange is redacted and releases busy state");
+        quixel.Fail = false;
+        quixelLogin = Call(vm, "OpenEmbeddedQuixelAuthorizationAsync");
+        pending!.Complete(new FabWebAuthorizationResult { Code = FakeFab.Code });
+        await quixelLogin;
+        Check(vm.IsQuixelConnected && quixel.Received == FakeFab.Code && vm.IsDirectFabConnected, "Quixel login preserves separate existing Fab session");
+        var variant = new RemoteFabProjectVersion("fixture-variant", [], ["5.5"], ["Windows"]);
+        var asset = new RemoteFabAsset("fixture-asset", "fixture", "Fixture pack", "", "Fab", "ASSET_PACK", null, null, [], [variant]);
+        typeof(MainWindowViewModel).GetField("_selectedRemoteFabAsset", Private)!.SetValue(vm, asset);
+        vm.FabInstallVersions.Add(new FabInstallVersionOptionViewModel(variant, true));
+        await Call(vm, "EstimatePackDownloadsAsync");
+        Check(vm.PackDownloadEstimateSummary.Contains("1 KB") && vm.PackDownloadEstimateSummary.Contains("2 KB"), "Pack preflight shows transfer and uncompressed sizes");
+        await Call(vm, "EstimatePackDownloadsAsync");
+        Check(fake.EstimateCount == 1, "Repeated preflight reuses cached manifest estimate");
+        Check(vm.Engines.Count == 0 && vm.DownloadSelectedFabVersionsCommand.CanExecute(null), "Download is enabled without an installed engine");
+        vm.FabInstallVersions.Clear();
+        await Call(vm, "EstimatePackDownloadsAsync");
+        Check(vm.PackDownloadEstimateSummary.Contains("Sélectionnez"), "Empty selection provides an actionable preflight message");
+        fake.UnknownEstimate = true;
+        vm.FabInstallVersions.Add(new FabInstallVersionOptionViewModel(variant with { ArtifactId = "fixture-unknown" }, true));
+        await Call(vm, "EstimatePackDownloadsAsync");
+        Check(vm.PackDownloadEstimateSummary.Contains("inconnue") && vm.PackDownloadEstimateSummary.Contains("incomplet"), "Unknown sizes are not presented as a complete zero-byte estimate");
 
         var manualVm = MakeVm();
         manualVm.FabAuthorizationCode = FakeFab.Code;

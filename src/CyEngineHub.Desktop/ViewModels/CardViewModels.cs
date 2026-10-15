@@ -1007,7 +1007,7 @@ public sealed class EngineCardViewModel : ObservableObject
         Organization = organization;
         _effectiveSizeLabel = effectiveSizeLabel;
         InstallationOptions = BuildInstallationOptions(engine.RootPath);
-        LaunchCommand = new AsyncRelayCommand(() => launch(engine), onError: onError);
+        LaunchCommand = new AsyncRelayCommand(() => launch(engine), () => File.Exists(engine.EditorPath), onError);
         OpenFolderCommand = new AsyncRelayCommand(() => openFolder(engine.RootPath), onError: onError);
         var canSetup = File.Exists(System.IO.Path.Combine(engine.RootPath, "Setup.bat"));
         SetupCommand = new AsyncRelayCommand(() => setup(engine), () => canSetup, onError);
@@ -1022,7 +1022,7 @@ public sealed class EngineCardViewModel : ObservableObject
             () => generateProjectFiles(engine),
             () => canGenerate,
             onError);
-        BuildEditorCommand = new AsyncRelayCommand(() => buildEditor(engine), onError: onError);
+        BuildEditorCommand = new AsyncRelayCommand(() => buildEditor(engine), () => CanBuildEditor, onError);
         RegisterCommand = new AsyncRelayCommand(
             () => register(engine),
             () => CanRegister,
@@ -1051,6 +1051,8 @@ public sealed class EngineCardViewModel : ObservableObject
     public string TypeLabel => Engine.Type.ToString();
 
     public bool IsOfficialEpic => Engine.Type == EngineInstallationType.EpicBinary;
+    public bool CanBuildEditor => Engine.Type is EngineInstallationType.Source or EngineInstallationType.SourceFork or EngineInstallationType.Custom &&
+        File.Exists(System.IO.Path.Combine(Engine.RootPath, "Engine", "Build", "BatchFiles", "Build.bat"));
 
     public string OfficialSourceLabel => IsOfficialEpic ? "OFFICIEL EPIC" : "SOURCE / PERSONNALISÉ";
 
@@ -2434,6 +2436,9 @@ public sealed class StorageEntryCardViewModel
         StorageCategory.ProjectStagedBuilds => "STAGED",
         StorageCategory.VaultCache => "VAULT CACHE",
         StorageCategory.GitLfs => "GIT LFS",
+        StorageCategory.MarketplaceLibrary => "PACKS",
+        StorageCategory.MarketplaceDownloads => "TÉLÉCHARGEMENTS",
+        StorageCategory.MarketplaceCache => "CACHE MARKETPLACE",
         _ => Entry.Category.ToString().ToUpperInvariant(),
     };
 

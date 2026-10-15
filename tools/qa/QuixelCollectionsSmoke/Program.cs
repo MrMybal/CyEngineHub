@@ -96,7 +96,8 @@ static class Program
         using var fixture = new FixtureHttp();
         using var http = live ? new HttpClient() : new HttpClient(fixture);
         http.Timeout = TimeSpan.FromSeconds(30);
-        var client = new QuixelMegascansApiClient(http, new NoSession(), new NoSession());
+        var client = new QuixelMegascansApiClient(http, new NoSession(), new NoSession(),
+            algoliaSearchKey: live ? null : "fixture-search-only");
         var ctor = typeof(MainWindowViewModel).GetConstructors().Single();
         MainWindowViewModel MakeVm()
         {

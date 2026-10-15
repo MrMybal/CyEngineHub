@@ -11,6 +11,7 @@ public sealed class FabWebAuthorizationRequestEventArgs(Uri authorizationUri, st
     private readonly TaskCompletionSource<FabWebAuthorizationResult> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public Uri AuthorizationUri { get; } = authorizationUri;
     public string ProfileDirectory { get; } = profileDirectory;
+    public string ProviderDisplayName { get; init; } = "Epic / Fab";
     public Task<FabWebAuthorizationResult> Completion => _completion.Task;
     public void Complete(FabWebAuthorizationResult result) => _completion.TrySetResult(result);
 }

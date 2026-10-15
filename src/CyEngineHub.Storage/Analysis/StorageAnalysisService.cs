@@ -134,17 +134,21 @@ public sealed class StorageAnalysisService : IStorageAnalysisService
                 .ThenByDescending(entry => entry.SizeBytes)
                 .ThenBy(entry => entry.OwnerName, StringComparer.OrdinalIgnoreCase)
                 .ToArray(),
-            DetectDrives(entries, diagnostics),
+            DetectDrives(entries, request.AdditionalRoots, diagnostics),
             diagnostics,
             DateTimeOffset.UtcNow);
     }
 
     private static DriveStorageSnapshot[] DetectDrives(
         IReadOnlyList<StorageEntry> entries,
+        IReadOnlyList<AdditionalStorageRoot> additionalRoots,
         List<string> diagnostics)
     {
         var roots = entries
-            .Select(entry => Path.GetPathRoot(entry.Path))
+            .Select(entry => entry.Path)
+            .Concat(additionalRoots.Select(root => root.Path)
+                .Where(path => !string.IsNullOrWhiteSpace(path) && Path.IsPathFullyQualified(path)))
+            .Select(Path.GetPathRoot)
             .Where(root => !string.IsNullOrWhiteSpace(root))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();

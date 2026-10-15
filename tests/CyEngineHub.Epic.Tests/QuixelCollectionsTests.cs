@@ -8,6 +8,17 @@ namespace CyEngineHub.Epic.Tests;
 public sealed class QuixelCollectionsTests
 {
     [Fact]
+    public void QuixelLoginHasExactCallbackCompatibleWithEmbeddedCapture()
+    {
+        using var http = new HttpClient();
+        var client = new QuixelMegascansApiClient(http, new ForbiddenSessionStore(), new ForbiddenSessionStore());
+        var reader = new EpicAuthorizationResponse(client.AuthorizationUri);
+        var query = client.AuthorizationUri.Query;
+        var callback = Uri.UnescapeDataString(query[(query.IndexOf('=') + 1)..]);
+        Assert.True(reader.IsExpectedCallback(new Uri(callback)));
+        Assert.False(reader.IsExpectedCallback(new Uri("https://www.epicgames.com/id/api/redirect?clientId=other&responseType=code")));
+    }
+    [Fact]
     public async Task ReadsAllPublicPagesWithoutAccountAndSkipsHiddenCollections()
     {
         using var handler = new FixtureHandler(async request =>
