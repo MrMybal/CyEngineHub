@@ -61,7 +61,10 @@ public sealed record DirectFabDownloadProgress(
     double? Fraction,
     string Message,
     long DownloadedBytes,
-    long? TotalBytes);
+    long? TotalBytes)
+{
+    public long CachedBytes { get; init; }
+}
 
 public sealed record DirectFabDownloadResult(
     string AssetId,
@@ -100,6 +103,7 @@ public interface IDirectFabSessionStore
 
 public interface IDirectFabClient
 {
+    void SetDownloadConnections(int connections) { }
     Task<DirectFabDownloadEstimate?> EstimateDownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version,
         CancellationToken cancellationToken = default) => Task.FromResult<DirectFabDownloadEstimate?>(null);
     Uri AuthorizationUri { get; }

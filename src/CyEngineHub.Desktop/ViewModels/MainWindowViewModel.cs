@@ -238,8 +238,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _newProjectEngineAssociation = string.Empty;
     private string _newProjectPlugins = string.Empty;
     private string _newProjectDisabledPlugins = string.Empty;
-    private PageSection _section = PageSection.Home;
-    private PageSection _settingsReturnSection = PageSection.Home;
+    private PageSection _section = PageSection.Engines;
+    private PageSection _settingsReturnSection = PageSection.Engines;
     private readonly Stack<PageSection> _backNavigation = [];
     private readonly Stack<PageSection> _forwardNavigation = [];
     private readonly RelayCommand _navigateBackCommand;
@@ -801,7 +801,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         InitializeAiCommands();
         SelectedSettingsCategory = SettingsCategories.FirstOrDefault();
 
-        ShowHomeCommand = new RelayCommand(() => ShowSection(PageSection.Home));
+        ShowHomeCommand = new RelayCommand(() => ShowSection(PageSection.Engines));
         NavigateBackCommand = _navigateBackCommand = new RelayCommand(
             NavigateBack,
             () => _backNavigation.Count > 0);
@@ -840,7 +840,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         BackFromProjectDetailsCommand = new RelayCommand(() => ShowSection(PageSection.Projects));
         ShowSelectedEnginePluginsCommand = new RelayCommand(OpenSelectedEnginePlugins);
         ShowSelectedEngineBuildsCommand = new RelayCommand(() => ShowSection(PageSection.Builds));
-        ShowSelectedEngineToolchainsCommand = new RelayCommand(() => ShowSection(PageSection.Toolchains));
+        ShowSelectedEngineToolchainsCommand = new RelayCommand(() => { OpenTools(); ToolsTabIndex = 2; });
         RequestRemoveSelectedEngineCommand = new RelayCommand(() => IsEngineRemovalConfirmationVisible = true);
         CancelRemoveSelectedEngineCommand = new RelayCommand(() => IsEngineRemovalConfirmationVisible = false);
         ConfirmRemoveSelectedEngineCommand = new AsyncRelayCommand(RemoveSelectedEngineFromHubAsync, onError: ShowError);
@@ -857,7 +857,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ShowHubExtensionsCommand = new RelayCommand(() => ShowSection(PageSection.HubExtensions));
         ShowBuildsCommand = new RelayCommand(() => ShowSection(PageSection.Builds));
         ShowStorageCommand = new RelayCommand(() => ShowSection(PageSection.Storage));
-        ShowToolchainsCommand = new RelayCommand(() => ShowSection(PageSection.Toolchains));
+        ShowToolchainsCommand = new RelayCommand(OpenTools);
         ShowEpicCommand = ShowLibraryCommand;
         ShowLibraryFabCommand = new RelayCommand(() =>
         {
@@ -1621,7 +1621,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public BulkObservableCollection<LibraryFacetOptionViewModel> LibraryCollectionFacets { get; } = [];
 
     public IReadOnlyList<string> LibrarySortOptions { get; } =
-        ["Acquisition · récent", "Acquisition · ancien", "Nom · A → Z", "Nom · Z → A", "Catégorie", "Catégorie · Z → A", "Dossier / collection", "Versions moteur", "Versions moteur · croissant", "Téléchargeables d’abord"];
+        ["Acquisition · récent", "Acquisition · ancien", "Nom · A → Z", "Nom · Z → A", "Catégorie", "Catégorie · Z → A", "Dossier / collection", "Versions moteur", "Versions moteur · croissant", "Téléchargeables d’abord", "Taille locale · croissant", "Taille locale · décroissant"];
 
     public IReadOnlyList<string> PresetKinds { get; } = Enum.GetNames<UnrealBuildPresetKind>();
 
@@ -2075,10 +2075,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? "v0.0.0"
             : $"v{version.Major}.{version.Minor}.{Math.Max(0, version.Build)}";
     }
-
-    public bool IsHomeVisible => _section == PageSection.Home;
-
-    public bool IsHomeNavigationActive => _section == PageSection.Home;
 
     public bool IsEnginesNavigationActive =>
         _section is PageSection.Engines or PageSection.EngineDetails;
@@ -2863,7 +2859,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public string HeaderTitle => _section switch
     {
-        PageSection.Home => "Vue d’ensemble",
         PageSection.Engines => "Moteurs",
         PageSection.EngineDetails => SelectedEngineDetails?.DisplayName
                                      ?? SelectedLocalEngineDetails?.Name
@@ -2875,11 +2870,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         PageSection.Git => "Dépôts Git",
         PageSection.Plugins => "Plugins & packages",
         PageSection.HubExtensions => "Extensions CyEngineHub",
-        PageSection.Toolchains => "Toolchains",
+        PageSection.Toolchains => "Outils",
         PageSection.Storage => "Stockage",
         PageSection.Epic => "Bibliothèque",
         PageSection.Builds => "Builds & Packaging",
-        PageSection.Tasks => "Téléchargements & installations",
+        PageSection.Tasks => "Téléchargements",
+        PageSection.Actions => "Actions",
         PageSection.Logs => "Logs",
         PageSection.Settings => "Paramètres",
         PageSection.Roadmap => RoadmapTitle,
@@ -2888,7 +2884,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public string HeaderSubtitle => _section switch
     {
-        PageSection.Home => "Tous vos moteurs, projets et assets dans un hub indépendant.",
         PageSection.Engines => "Providers Unreal, Unity, Godot, CryEngine et futurs moteurs.",
         PageSection.EngineDetails => "Installation, plugins, outils de build et options du moteur.",
         PageSection.Projects => "Associations moteur, modules et plugins déclarés.",
@@ -2896,7 +2891,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         PageSection.Git => "Snapshots manuels, divergence des remotes et stockage Git LFS.",
         PageSection.Plugins => "Gestion Unreal, packages locaux Unity/Godot et inventaire CRYENGINE.",
         PageSection.HubExtensions => "Outils externes, conversions et intégrations ajoutés au hub.",
-        PageSection.Toolchains => "Compatibilité MSVC, SDK Windows, .NET, Android, Linux et Quest.",
+        PageSection.Toolchains => "Prérequis et utilitaires Unreal, .NET, C++, SDK et diagnostic de compatibilité.",
         PageSection.Storage => "DDC, projets, moteurs, Vault Cache et Git LFS avec Safe Clean confirmé.",
         PageSection.Epic => "Catalogues Fab et Unity organisés par source dans une bibliothèque multi-moteur.",
         PageSection.Builds => "UBT et UAT dans la file de tâches, avec logs classifiés.",
@@ -4401,7 +4396,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IsDerivedWorkspaceCreatorVisible || IsDerivedWorkspaceDeletionVisible ||
         IsDerivedFolderImporterVisible || IsPackTestCreatorVisible ||
         IsEngineRemovalConfirmationVisible || IsEngineUninstallConfirmationVisible ||
-        IsProjectCreatorVisible || IsProjectProfileEditorVisible;
+        IsProjectCreatorVisible || IsProjectProfileEditorVisible || IsUtilityLaunchConfirmationVisible;
 
     public double FabOptionsModalBlurRadius => IsAnyFabModalVisible ? 7 : 0;
 
@@ -4964,6 +4959,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             await LoadQuixelStatusAsync().ConfigureAwait(true);
             await LoadFabLocalLibraryCacheAsync().ConfigureAwait(true);
             await LoadCachedCatalogAsync().ConfigureAwait(true);
+            await LoadResourceFavoritesAsync().ConfigureAwait(true);
+            await RefreshPackFootprintsAsync().ConfigureAwait(true);
             await LoadDownloadQueueAsync().ConfigureAwait(true);
             await LoadAiSettingsAsync().ConfigureAwait(true);
             await RefreshCatalogAsync().ConfigureAwait(true);
@@ -7867,8 +7864,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private static (long? UncompressedBytes, long? StoredBytes) ResolveStoredDownloadSizes(
         FabStoredDownloadRecord stored)
     {
-        var uncompressedBytes = stored.UncompressedBytes;
-        var storedBytes = stored.StoredBytes ?? stored.Bytes;
+        var uncompressedBytes = stored.UncompressedBytes is >= 0 ? stored.UncompressedBytes : null;
+        var storedBytes = stored.StoredBytes is >= 0 ? stored.StoredBytes : (stored.Bytes > 0 ? stored.Bytes : (long?)null);
         var manifestPath = stored.ManifestPath;
         if (string.IsNullOrWhiteSpace(manifestPath))
         {
@@ -7876,30 +7873,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (File.Exists(candidate)) manifestPath = candidate;
         }
 
-        if ((!uncompressedBytes.HasValue || !stored.StoredBytes.HasValue) &&
+        if ((!uncompressedBytes.HasValue || stored.StoredBytes is not >= 0) &&
             !string.IsNullOrWhiteSpace(manifestPath) &&
             File.Exists(manifestPath))
         {
             try
             {
+                if (new FileInfo(manifestPath).Length > 1024 * 1024) return (uncompressedBytes, storedBytes);
                 using var input = File.OpenRead(manifestPath);
                 using var document = JsonDocument.Parse(input);
                 var root = document.RootElement;
                 if (!uncompressedBytes.HasValue &&
                     root.TryGetProperty("uncompressedBytes", out var rawProperty) &&
-                    rawProperty.TryGetInt64(out var raw))
+                    rawProperty.ValueKind == JsonValueKind.Number && rawProperty.TryGetInt64(out var raw) && raw >= 0)
                 {
                     uncompressedBytes = raw;
                 }
-                if (!stored.StoredBytes.HasValue &&
+                if (stored.StoredBytes is not >= 0 &&
                     root.TryGetProperty("storedBytes", out var storedProperty) &&
-                    storedProperty.TryGetInt64(out var compressed))
+                    storedProperty.ValueKind == JsonValueKind.Number && storedProperty.TryGetInt64(out var compressed) && compressed >= 0)
                 {
                     storedBytes = compressed;
                 }
             }
             catch (Exception exception) when (
-                exception is IOException or UnauthorizedAccessException or JsonException)
+                exception is IOException or UnauthorizedAccessException or JsonException or InvalidOperationException)
             {
                 // Les anciens téléchargements restent visibles même si leur sidecar est illisible.
             }
@@ -7908,7 +7906,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (!uncompressedBytes.HasValue &&
             string.Equals(stored.StorageMode, "Uncompressed", StringComparison.OrdinalIgnoreCase))
         {
-            uncompressedBytes = stored.Bytes;
+            uncompressedBytes = stored.Bytes >= 0 ? stored.Bytes : null;
         }
         return (uncompressedBytes, storedBytes);
     }
@@ -7994,6 +7992,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 .ConfigureAwait(true);
         }
         finally { _storedDownloadsPersistenceGate.Release(); }
+        await RefreshPackFootprintsAsync().ConfigureAwait(true);
     }
 
     private void UpdateStoredFabAssetState(string assetId)
@@ -8233,6 +8232,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
 
             var sourceAssets = GetLibrarySourceAssets().ToArray();
+            if (FavoritesOnly) sourceAssets = sourceAssets.Where(IsResourceFavorite).ToArray();
             _librarySourceAssetCount = sourceAssets.Length;
             OnPropertyChanged(nameof(QuixelCollectionScopeSummary));
             var preferences = _workspacePreferences.Items
@@ -8297,7 +8297,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             UpdateFacetCounts(LibraryCategoryFacets, result.CategoryCounts);
             UpdateFacetCounts(LibraryCollectionFacets, result.CollectionCounts);
             RefreshVisibleLibraryFacets();
-            _visibleRemoteFabCatalog = result.VisibleAssets;
+            _visibleRemoteFabCatalog = ApplyFavoriteAssets(result.VisibleAssets);
             _libraryPageIndex = 0;
             RebuildRemoteFabPresentation();
             OnPropertyChanged(nameof(HasNoRemoteFabAssets));
@@ -8539,7 +8539,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var sourceAssets = GetLibrarySourceAssets().ToArray();
         _librarySourceAssetCount = sourceAssets.Length;
         OnPropertyChanged(nameof(QuixelCollectionScopeSummary));
-        _visibleRemoteFabCatalog = sourceAssets;
+        _visibleRemoteFabCatalog = ApplyFavoriteAssets(sourceAssets);
         _libraryPageIndex = 0;
         RebuildRemoteFabPresentation();
         OnPropertyChanged(nameof(HasNoRemoteFabAssets));
@@ -8994,7 +8994,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         var progress = new InlineProgress<DirectFabDownloadProgress>(value =>
                         {
                             var fraction = value.Fraction ?? 0;
-                            var message = transfer.Format($"{option.Label} · {value.Message}", value.DownloadedBytes, value.TotalBytes);
+                            var message = transfer.Format($"{option.Label} · {value.Message}", value.DownloadedBytes, value.TotalBytes, value.CachedBytes);
                             context.Report(fraction, message);
                             Dispatcher.UIThread.Post(() => FabDownloadStatus = message);
                         });
@@ -9156,7 +9156,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var selectedDerived = string.IsNullOrWhiteSpace(_activeDerivedInstallArtifactId)
             ? null
             : _fabStoredDownloads.LastOrDefault(item =>
-                item.ArtifactId.Equals(_activeDerivedInstallArtifactId, StringComparison.OrdinalIgnoreCase));
+                item.ArtifactId.Equals(_activeDerivedInstallArtifactId, StringComparison.OrdinalIgnoreCase) &&
+                item.AssetId.Equals(asset.AssetId, StringComparison.OrdinalIgnoreCase) &&
+                item.Source.Equals(NormalizeAssetSource(asset), StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(_activeDerivedInstallArtifactId) &&
+            (selectedDerived is null || selectedDerived.AssetId != asset.AssetId || !Directory.Exists(selectedDerived.Path)))
+            throw new DirectoryNotFoundException("La version locale sélectionnée est indisponible ; aucun téléchargement de remplacement n’est lancé.");
         if (selectedDerived is null && !IsMarketplaceAvailable(NormalizeAssetSource(asset)))
             throw new InvalidOperationException("Cette marketplace est désactivée. Réactivez-la dans les paramètres pour une nouvelle installation distante.");
         var contentKind = selectedDerived is null
@@ -9208,7 +9213,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     var progress = new InlineProgress<DirectFabDownloadProgress>(value =>
                     {
                         var fraction = (index + (value.Fraction ?? 0)) / versions.Length;
-                        var message = transfer.Format($"{option.Label} · {value.Message}", value.DownloadedBytes, value.TotalBytes);
+                        var message = transfer.Format($"{option.Label} · {value.Message}", value.DownloadedBytes, value.TotalBytes, value.CachedBytes);
                         context.Report(fraction, message);
                         Dispatcher.UIThread.Post(() =>
                         {
@@ -9216,7 +9221,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                             FabDownloadStatus = message;
                         });
                     });
-                    var localDerived = _fabStoredDownloads.LastOrDefault(item =>
+                    var localDerived = selectedDerived is not null && selectedDerived.ArtifactId == option.Version.ArtifactId ? selectedDerived : _fabStoredDownloads.LastOrDefault(item =>
                         item.AssetId.Equals(asset.AssetId, StringComparison.OrdinalIgnoreCase) &&
                         item.ArtifactId.Equals(option.Version.ArtifactId, StringComparison.OrdinalIgnoreCase) &&
                         !string.IsNullOrWhiteSpace(item.SourceArtifactId));
@@ -10635,7 +10640,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         progress,
                         cancellationToken)
                     .ConfigureAwait(false);
-            }));
+            }) { IsDownload = true });
 
         var completed = await handle.Completion.ConfigureAwait(true);
         IsEpicBusy = false;
@@ -11833,7 +11838,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     var progress = new InlineProgress<DirectFabDownloadProgress>(value =>
                     {
                         var fraction = (index + (value.Fraction ?? 0)) / total;
-                        context.Report(fraction, transfer.Format($"{asset.Title} · {value.Message}", value.DownloadedBytes, value.TotalBytes));
+                        context.Report(fraction, transfer.Format($"{asset.Title} · {value.Message}", value.DownloadedBytes, value.TotalBytes, value.CachedBytes));
                     });
                     var download = IsQuixelAsset(asset)
                         ? await _quixelClient.DownloadAsync(
@@ -12431,6 +12436,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         NotifyCatalogProperties();
         ApplyEngineFamilyFilters();
         QueueOfficialEngineUpdateCheck();
+        if (IsToolchainsVisible) OpenTools();
     }
 
     private async Task AddEnginePathAsync()
@@ -12886,6 +12892,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void ReplaceToolchainSnapshot(ToolchainSnapshot snapshot)
     {
         _currentToolchainSnapshot = snapshot;
+        RefreshPrerequisiteRemediation(snapshot);
         ToolchainInstallations.Clear();
         foreach (var installation in snapshot.Installations)
         {
@@ -12900,7 +12907,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                      item => item.EngineDisplayName,
                      StringComparer.OrdinalIgnoreCase))
         {
-            EngineToolchains.Add(new EngineToolchainCardViewModel(engine));
+            EngineToolchains.Add(new EngineToolchainCardViewModel(engine, ShowPrerequisiteRemediation));
         }
         RefreshSelectedEngineToolchains();
 
@@ -12982,6 +12989,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void ReplaceStorageSnapshot(StorageSnapshot snapshot)
     {
         _currentStorageSnapshot = snapshot;
+        IndexResourceMeasurements(snapshot);
+        RebuildAssetStoredSizes();
         StorageEntries.Clear();
         foreach (var entry in snapshot.Entries)
         {
@@ -14716,7 +14725,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void OnTaskChanged(object? sender, HubTaskChangedEventArgs eventArgs)
     {
         AppendRawLog(
-            eventArgs.Task.Status == HubTaskStatus.Failed ? "ERROR" : "TASK",
+            _activityLogPolicy.LevelFor(eventArgs.Task),
             eventArgs.Task.Category,
             $"{eventArgs.Task.Title} · {eventArgs.Task.Status} · {eventArgs.Task.Error ?? eventArgs.Task.Message ?? string.Empty}");
         if (Interlocked.Exchange(ref _taskRefreshPending, 1) != 0) return;
@@ -14758,6 +14767,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
 
             OnPropertyChanged(nameof(HasNoTasks));
+            NotifyActivityQueues();
             OnPropertyChanged(nameof(FooterProgressPercent));
             OnPropertyChanged(nameof(FooterActivityText));
         });
@@ -14865,13 +14875,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void CloseSettings() => ShowSection(
         _settingsReturnSection == PageSection.Settings
-            ? PageSection.Home
+            ? PageSection.Engines
             : _settingsReturnSection);
 
     private void OpenUnrealEngineDetails(EngineCardViewModel engine)
     {
         SelectedLocalEngineDetails = null;
         SelectedEngineDetails = engine;
+        EngineDetailsTab = 0;
         SetEngineInstallationEditing(false);
         EngineComponentUpdateStatus = engine.IsOfficialEpic
             ? "Modifier permet d’ajouter les composants absents depuis le manifest Epic officiel."
@@ -14990,6 +15001,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         SelectedEngineDetails = null;
         SelectedLocalEngineDetails = engine;
+        EngineDetailsTab = 0;
         RefreshSelectedEngineToolchains();
         ShowSection(PageSection.EngineDetails);
     }
@@ -15004,7 +15016,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                          !string.IsNullOrWhiteSpace(selectedId) &&
                          string.Equals(snapshot.EngineId, selectedId, StringComparison.OrdinalIgnoreCase)))
             {
-                SelectedEngineToolchains.Add(new EngineToolchainCardViewModel(snapshot));
+                SelectedEngineToolchains.Add(new EngineToolchainCardViewModel(snapshot, ShowPrerequisiteRemediation));
             }
         }
         OnPropertyChanged(nameof(HasNoSelectedEngineToolchains));
@@ -15018,12 +15030,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return "Taille · à analyser";
         }
 
-        var bytes = _currentStorageSnapshot.Entries
+        var measured = _currentStorageSnapshot.Entries
             .Where(entry => entry.Category == StorageCategory.EngineInstallation &&
                             (string.Equals(entry.OwnerRoot, rootPath, StringComparison.OrdinalIgnoreCase) ||
                              string.Equals(entry.Path, rootPath, StringComparison.OrdinalIgnoreCase)))
-            .Sum(entry => entry.SizeBytes);
-        return bytes > 0 ? $"Taille · {FormatBytes(bytes)}" : "Taille · non mesurée";
+            .ToArray();
+        if (measured.Length == 0) return "Taille · non mesurée";
+        var partial = measured.Any(entry => entry.Health != StorageHealth.Ready);
+        return $"Taille · {(partial ? "≥ " : "")}{FormatBytes(measured.Sum(entry => entry.SizeBytes))}{(partial ? " (partielle)" : "")}";
     }
 
     private void OpenUnrealProjectDetails(ProjectCardViewModel project)
@@ -15153,8 +15167,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void AppendRawLogToView(string line)
     {
-        _latestRawLogLine = line.TrimEnd();
-        OnPropertyChanged(nameof(FooterActivityText));
+        if (CyEngineHub.Core.Diagnostics.ActivityLogPolicy.IsImportant(line))
+        {
+            _latestRawLogLine = line.Split('\n')[0].TrimEnd();
+            OnPropertyChanged(nameof(FooterActivityText));
+        }
         var combined = string.IsNullOrWhiteSpace(RawLogText) || RawLogText == "Le journal RAW est vide."
             ? line + Environment.NewLine
             : RawLogText + line + Environment.NewLine;
@@ -15163,8 +15180,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? combined
             : combined[^maximumCharacters..];
 
-        var entry = new RawLogEntryViewModel(_latestRawLogLine);
+        var entry = new RawLogEntryViewModel(line.TrimEnd(), ShowFullRawLog);
         _rawLogEntries.Add(entry);
+        if (CyEngineHub.Core.Diagnostics.ActivityLogPolicy.IsImportant(entry.Text))
+        {
+            _importantLogEntries.Add(entry);
+            if (_importantLogEntries.Count > 20_000) _importantLogEntries.RemoveAt(0);
+        }
         const int maximumEntries = 20_000;
         if (_rawLogEntries.Count > maximumEntries)
         {
@@ -15184,16 +15206,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void ReplaceRawLogEntries(string text)
     {
         _rawLogEntries.Clear();
+        _importantLogEntries.Clear();
         foreach (var line in text.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
-            _rawLogEntries.Add(new RawLogEntryViewModel(line.TrimEnd('\r')));
+            var entry = new RawLogEntryViewModel(line.TrimEnd('\r'));
+            _rawLogEntries.Add(entry);
+            if (CyEngineHub.Core.Diagnostics.ActivityLogPolicy.IsImportant(entry.Text)) _importantLogEntries.Add(entry);
         }
         ApplyRawLogFilter(scrollToEnd: true);
     }
 
     private void ApplyRawLogFilter(bool scrollToEnd)
     {
-        FilteredRawLogEntries.ReplaceWith(_rawLogEntries.Where(MatchesRawLogSearch));
+        FilteredRawLogEntries.ReplaceWith((ShowFullRawLog ? _rawLogEntries : _importantLogEntries).Where(MatchesRawLogSearch)
+            .Select(entry => new RawLogEntryViewModel(entry.Text, ShowFullRawLog)));
         if (scrollToEnd)
         {
             RequestRawLogScroll();
@@ -15201,16 +15227,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
     }
 
     private bool MatchesRawLogSearch(RawLogEntryViewModel entry) =>
-        string.IsNullOrWhiteSpace(RawLogSearchQuery) ||
-        entry.Text.Contains(RawLogSearchQuery.Trim(), StringComparison.OrdinalIgnoreCase);
+        (ShowFullRawLog || CyEngineHub.Core.Diagnostics.ActivityLogPolicy.IsImportant(entry.Text)) &&
+        (string.IsNullOrWhiteSpace(RawLogSearchQuery) ||
+        entry.Text.Contains(RawLogSearchQuery.Trim(), StringComparison.OrdinalIgnoreCase));
 
     private void RequestRawLogScroll() =>
         Dispatcher.UIThread.Post(() => RawLogScrollRequested?.Invoke(this, EventArgs.Empty));
 
     private void NotifySectionProperties()
     {
-        OnPropertyChanged(nameof(IsHomeVisible));
-        OnPropertyChanged(nameof(IsHomeNavigationActive));
         OnPropertyChanged(nameof(IsEnginesNavigationActive));
         OnPropertyChanged(nameof(IsProjectsNavigationActive));
         OnPropertyChanged(nameof(IsLibraryNavigationActive));
@@ -15218,7 +15243,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsPluginsNavigationActive));
         OnPropertyChanged(nameof(IsExtensionsNavigationActive));
         OnPropertyChanged(nameof(IsStorageNavigationActive));
+        OnPropertyChanged(nameof(IsToolsNavigationActive));
         OnPropertyChanged(nameof(IsTasksNavigationActive));
+        OnPropertyChanged(nameof(IsActionsNavigationActive));
+        OnPropertyChanged(nameof(IsActionsVisible));
+        NotifyActivityQueues();
         OnPropertyChanged(nameof(IsLogsNavigationActive));
         OnPropertyChanged(nameof(IsSettingsNavigationActive));
         OnPropertyChanged(nameof(IsEnginesVisible));
@@ -15402,7 +15431,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private enum PageSection
     {
-        Home,
         Engines,
         Projects,
         Git,
@@ -15413,6 +15441,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         Epic,
         Builds,
         Tasks,
+        Actions,
         Logs,
         Settings,
         EngineDetails,

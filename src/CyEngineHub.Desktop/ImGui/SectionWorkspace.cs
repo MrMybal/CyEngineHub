@@ -110,7 +110,8 @@ internal sealed partial class ImGuiWorkspace
         else
         {
             var product = vm.IsRemoteFabProductVisible || vm.IsConnectorLibrarySelected && vm.SelectedConnectorLibrary?.IsProductVisible == true;
-            if (!product && !(vm.IsRemoteMarketplaceContentVisible && vm.IsSelectedRemoteConnectionReady && vm.IsRemoteFabCatalogVisible)) DrawLibraryViewModes(vm);
+            if (!product && !(vm.IsRemoteMarketplaceContentVisible && vm.IsSelectedRemoteConnectionReady && vm.IsRemoteFabCatalogVisible))
+            { DrawSizeAnalysisMenu(vm, "packs"); DrawLibraryViewModes(vm); }
             if (!string.IsNullOrEmpty(vm.RemoteCatalogNotice) && vm.IsLibraryRemoteSelected)
             {
                 Gui.PushStyleColor(ImGuiCol.Text, ImGuiTheme.Warning);

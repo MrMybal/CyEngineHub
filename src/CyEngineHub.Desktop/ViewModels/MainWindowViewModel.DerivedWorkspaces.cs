@@ -445,6 +445,8 @@ public sealed partial class MainWindowViewModel
     private async Task OpenDerivedForInstallationAsync(FabStoredDownloadViewModel derived)
     {
         var asset = SelectedRemoteFabAsset ?? throw new InvalidOperationException("Aucun produit n’est ouvert.");
+        if (!_fabStoredDownloads.Any(item => item.AssetId == asset.AssetId && item.ArtifactId == derived.ArtifactId && item.Path == derived.Path) || !Directory.Exists(derived.Path))
+            throw new DirectoryNotFoundException("La version locale n’est plus disponible. Actualisez la bibliothèque ; aucun téléchargement ne sera lancé.");
         _activeDerivedInstallArtifactId = derived.ArtifactId;
         var version = new RemoteFabProjectVersion(
             derived.ArtifactId,
@@ -468,15 +470,16 @@ public sealed partial class MainWindowViewModel
 
     public string FabInstallContentKindLabel => HasActiveDerivedInstall
         ? FormatDerivedKind(ParseContentKind(_fabStoredDownloads.LastOrDefault(item =>
-            item.ArtifactId.Equals(_activeDerivedInstallArtifactId, StringComparison.OrdinalIgnoreCase))?.PackageKind))
+            item.ArtifactId.Equals(_activeDerivedInstallArtifactId, StringComparison.OrdinalIgnoreCase) &&
+            item.AssetId.Equals(SelectedRemoteFabAsset?.AssetId, StringComparison.OrdinalIgnoreCase))?.PackageKind))
         : SelectedRemoteFabAssetCard?.ContentKindLabel ?? "Type inconnu";
 
     public string FabInstallContentKindReason => HasActiveDerivedInstall
-        ? "Type défini dans le manifeste du dérivé local"
+        ? "Type défini dans le manifeste de la version locale"
         : SelectedRemoteFabAssetCard?.ContentKindReason ?? string.Empty;
 
     public string FabInstallModeGuidance => HasActiveDerivedInstall
-        ? "Cette installation utilise la révision locale dérivée sans retélécharger ni remplacer la version fournisseur."
+        ? "Cette installation utilise la version locale sélectionnée sans retélécharger ni modifier les fichiers du pack."
         : SelectedRemoteFabAssetCard?.InstallModeGuidance ?? string.Empty;
 
     private static string FormatDerivedKind(LibraryPackageContentKind kind) => kind switch

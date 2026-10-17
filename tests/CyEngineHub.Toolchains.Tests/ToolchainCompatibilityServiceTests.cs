@@ -84,6 +84,34 @@ public sealed class ToolchainCompatibilityServiceTests
             result.Checks.Single(check => check.Kind == ToolchainKind.AndroidNdk).Required);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void DotNetNeverUsesAnotherEnginesRuntime(bool hasOwnRuntime)
+    {
+        var requirements = CreateRequirements(new(null, null, null, null, [], [], null, "fixture"));
+        var items = new List<ToolchainInstallation>
+        {
+            ToolchainTestData.Installation(ToolchainKind.DotNet, "10.0", new Dictionary<string, string> { ["EngineId"] = "OTHER" }),
+        };
+        if (hasOwnRuntime) items.Add(ToolchainTestData.Installation(ToolchainKind.DotNet, "6.0.302", new Dictionary<string, string> { ["EngineId"] = "ENGINE" }));
+        var check = new ToolchainCompatibilityService().Evaluate(requirements, items).Checks.Single(item => item.Kind == ToolchainKind.DotNet);
+        Assert.Equal(hasOwnRuntime ? ToolchainHealth.Ready : ToolchainHealth.Missing, check.Health);
+        Assert.Equal(hasOwnRuntime ? "6.0.302" : "Absent", check.Installed);
+    }
+
+    [Fact]
+    public void BundledDotNetWinsOverNewerGlobalSdk()
+    {
+        var requirements = CreateRequirements(new(null, null, null, null, [], [], null, "fixture"));
+        var check = new ToolchainCompatibilityService().Evaluate(requirements,
+            [ToolchainTestData.Installation(ToolchainKind.DotNet, "10.0"),
+             ToolchainTestData.Installation(ToolchainKind.DotNet, "6.0.302", new Dictionary<string, string> { ["EngineId"] = "ENGINE" })])
+            .Checks.Single(item => item.Kind == ToolchainKind.DotNet);
+        Assert.Equal("6.0.302", check.Installed);
+        Assert.Equal(ToolchainHealth.Ready, check.Health);
+    }
+
     private static UnrealEngineToolchainRequirements CreateRequirements(
         WindowsToolchainRequirement windows) => new(
         "ENGINE",

@@ -1785,7 +1785,7 @@ public sealed class FabStoredDownloadViewModel : ObservableObject
             onError: onError);
         InstallDerivedCommand = new AsyncRelayCommand(
             () => installDerived?.Invoke(this) ?? Task.CompletedTask,
-            () => IsDerived,
+            () => installDerived is not null,
             onError);
         CreateDerivedCommand = new RelayCommand(
             () => createDerived?.Invoke(this));
@@ -1825,6 +1825,7 @@ public sealed class FabStoredDownloadViewModel : ObservableObject
     public ICommand CancelDeleteCommand { get; }
     public ICommand ConfirmDeleteCommand { get; }
     public ICommand InstallDerivedCommand { get; }
+    public ICommand InstallCommand => InstallDerivedCommand;
     public ICommand CreateDerivedCommand { get; }
     public ICommand CreateTestCommand { get; }
 
@@ -2003,13 +2004,15 @@ public sealed class RawLogEntryViewModel
     private static readonly IBrush ErrorForeground = new SolidColorBrush(Color.Parse("#E8747C"));
     private static readonly IBrush OutputForeground = new SolidColorBrush(Color.Parse("#79C7C3"));
 
-    public RawLogEntryViewModel(string text)
+    public RawLogEntryViewModel(string text, bool full = true)
     {
         Text = text;
+        DisplayText = full ? text : text.Split('\n')[0];
         Foreground = ResolveForeground(text);
     }
 
     public string Text { get; }
+    public string DisplayText { get; }
     public IBrush Foreground { get; }
 
     private static IBrush ResolveForeground(string text)
@@ -2307,10 +2310,11 @@ public sealed class ToolchainInstallationCardViewModel
 
 public sealed class EngineToolchainCardViewModel
 {
-    public EngineToolchainCardViewModel(EngineToolchainSnapshot snapshot)
+    public EngineToolchainCardViewModel(EngineToolchainSnapshot snapshot, Action<string, ToolchainCompatibilityCheck>? remediate = null)
     {
         Snapshot = snapshot;
-        Checks = snapshot.Checks.Select(check => new ToolchainCheckItemViewModel(check)).ToArray();
+        Checks = snapshot.Checks.Select(check => new ToolchainCheckItemViewModel(check,
+            remediate is null ? null : () => remediate(snapshot.EngineId, check), snapshot.EngineVersion)).ToArray();
     }
 
     public EngineToolchainSnapshot Snapshot { get; }
@@ -2320,6 +2324,7 @@ public sealed class EngineToolchainCardViewModel
     public string Version => Snapshot.EngineVersion;
 
     public string Health => Snapshot.OverallHealth.ToString();
+    public string HealthColor => Snapshot.OverallHealth switch { ToolchainHealth.Ready => "#5CD26E", ToolchainHealth.Missing => "#E8747C", _ => "#F5A623" };
 
     public string Summary
     {
@@ -2337,10 +2342,14 @@ public sealed class EngineToolchainCardViewModel
 
 public sealed class ToolchainCheckItemViewModel
 {
-    public ToolchainCheckItemViewModel(ToolchainCompatibilityCheck check)
+    public ToolchainCheckItemViewModel(ToolchainCompatibilityCheck check, Action? remediate = null, string engineVersion = "")
     {
+        HasRemediation = check.Health != ToolchainHealth.Ready && remediate is not null;
+        RemediationLabel = CyEngineHub.Toolchains.Compatibility.ToolchainRemediation.For(check, engineVersion).ButtonLabel;
+        ObtainPrerequisiteCommand = new RelayCommand(() => remediate?.Invoke(), () => HasRemediation);
         Label = check.Label;
         Health = check.Health.ToString();
+        HealthColor = check.Health switch { ToolchainHealth.Ready => "#5CD26E", ToolchainHealth.Missing => "#E8747C", _ => "#F5A623" };
         Required = check.Required;
         Installed = check.Installed;
         Diagnostic = check.Diagnostic;
@@ -2349,12 +2358,16 @@ public sealed class ToolchainCheckItemViewModel
     public string Label { get; }
 
     public string Health { get; }
+    public string HealthColor { get; }
 
     public string Required { get; }
 
     public string Installed { get; }
 
     public string Diagnostic { get; }
+    public bool HasRemediation { get; }
+    public string RemediationLabel { get; }
+    public ICommand ObtainPrerequisiteCommand { get; }
 }
 
 public sealed class EnvironmentVariableCardViewModel
@@ -3645,6 +3658,9 @@ public sealed class TaskItemViewModel : ObservableObject
     public Guid Id { get; }
 
     public string Category { get; }
+    public bool IsDownload => _snapshot.IsDownload;
+    public bool IsRunning => _snapshot.Status == HubTaskStatus.Running;
+    public bool IsQueued => _snapshot.Status == HubTaskStatus.Queued;
 
     public string Title { get; }
 

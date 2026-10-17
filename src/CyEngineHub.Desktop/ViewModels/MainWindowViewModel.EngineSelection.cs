@@ -24,6 +24,8 @@ public sealed partial class MainWindowViewModel
             }
             else if (action == "updates")
                 await CheckOfficialEngineUpdatesAsync(true, selected).ConfigureAwait(true);
+            else if (action == "size")
+                await AnalyzeEngineSizesAsync(selected).ConfigureAwait(true);
             else if (action == "check")
             {
                 StatusMessage = $"Vérification de {selected.Count} moteur(s)…";

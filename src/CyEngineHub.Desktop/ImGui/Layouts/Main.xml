@@ -19,15 +19,16 @@
           </Grid>
           <StackPanel Grid.Row="1">
             <TextBlock Text="ENVIRONNEMENT" FontSize="10" Foreground="#617184" />
-            <Button Classes="nav" Content="Vue d’ensemble" Command="{Binding ShowHomeCommand}" />
             <Button Classes="nav" Content="Moteurs" Command="{Binding ShowEnginesCommand}" />
             <Button Classes="nav" Content="Projets" Command="{Binding ShowProjectsCommand}" />
             <Button Classes="nav" Content="Bibliothèque" Command="{Binding ShowLibraryCommand}" />
             <Button Classes="nav" Content="Extensions Hub" Command="{Binding ShowHubExtensionsCommand}" />
+            <Button Classes="nav" Content="Outils" Command="{Binding ShowToolchainsCommand}" />
             <Button Classes="nav" Content="Stockage" Command="{Binding ShowStorageCommand}" />
           </StackPanel>
           <StackPanel Grid.Row="2">
             <TextBlock Text="SYSTÈME" FontSize="10" Foreground="#617184" />
+            <Button Classes="nav" Content="Actions" Command="{Binding ShowActionsCommand}" FontSize="12" />
             <Button Classes="nav" Content="Téléchargements" Command="{Binding ShowTasksCommand}" FontSize="12" />
             <Button Classes="nav" Content="Logs" Command="{Binding ShowLogsCommand}" IsVisible="{Binding IsLogsNavigationVisible}" />
             <Button Classes="nav" Content="⚙  Paramètres" Command="{Binding ShowSettingsCommand}" />
@@ -74,101 +75,6 @@
           </Grid>
         </Border>
         <Grid Grid.Row="1">
-          <ScrollViewer IsVisible="{Binding IsHomeVisible}">
-            <StackPanel>
-              <Grid ColumnDefinitions="*,*,*,*">
-                <Border Classes="metric">
-                  <StackPanel>
-                    <TextBlock Text="MOTEURS" FontSize="10" Foreground="#6E8196" />
-                    <TextBlock Text="{Binding EngineCount}" FontSize="34" Foreground="#EAF1F8" />
-                    <TextBlock Text="Installations détectées" FontSize="11" Foreground="#74869A" />
-                  </StackPanel>
-                </Border>
-                <Border Grid.Column="1" Classes="metric">
-                  <StackPanel>
-                    <TextBlock Text="PROJETS" FontSize="10" Foreground="#6E8196" />
-                    <TextBlock Text="{Binding ProjectCount}" FontSize="34" Foreground="#EAF1F8" />
-                    <TextBlock Text="Descripteurs catalogués" FontSize="11" Foreground="#74869A" />
-                  </StackPanel>
-                </Border>
-                <Border Grid.Column="2" Classes="metric">
-                  <StackPanel>
-                    <TextBlock Text="TOOLCHAINS" FontSize="10" Foreground="#6E8196" />
-                    <TextBlock Text="{Binding ToolchainProblemCount}" FontSize="34" Foreground="#F2B84B" />
-                    <TextBlock Text="Compatibilités à vérifier" FontSize="11" Foreground="#74869A" />
-                  </StackPanel>
-                </Border>
-                <Border Grid.Column="3" Classes="metric">
-                  <StackPanel>
-                    <TextBlock Text="ATTENTION" FontSize="10" Foreground="#6E8196" />
-                    <TextBlock Text="{Binding WarningCount}" FontSize="34" Foreground="#F2B84B" />
-                    <TextBlock Text="Éléments à vérifier" FontSize="11" Foreground="#74869A" />
-                  </StackPanel>
-                </Border>
-              </Grid>
-              <Grid ColumnDefinitions="2*,*">
-                <Border Classes="card">
-                  <StackPanel>
-                    <TextBlock Text="Démarrage rapide" FontSize="16" />
-                    <TextBlock Text="CyEngineHub fédère des providers indépendants pour Unreal, Unity, Godot, CryEngine et les moteurs futurs. Chaque provider contrôle sa détection, ses projets, ses builds et ses assets." TextWrapping="Wrap" Foreground="#8799AC" FontSize="12" />
-                    <WrapPanel>
-                      <Button Classes="accent" Content="Voir les moteurs" Command="{Binding ShowEnginesCommand}" />
-                      <Button Classes="ghost" Content="Voir les projets" Command="{Binding ShowProjectsCommand}" />
-                    </WrapPanel>
-                  </StackPanel>
-                </Border>
-                <Border Grid.Column="1" Classes="card">
-                  <StackPanel>
-                    <TextBlock Text="Mode local" FontSize="16" />
-                    <TextBlock Text="{Binding StorageMode}" Foreground="#55C7A6" />
-                    <TextBlock Text="{Binding DataDirectory}" TextWrapping="Wrap" Foreground="#718398" FontSize="11" />
-                    <TextBlock Text="Aucune télémétrie." Foreground="#718398" FontSize="11" />
-                  </StackPanel>
-                </Border>
-              </Grid>
-              <Border Classes="card">
-                <StackPanel>
-                  <TextBlock Text="Modules du hub" FontSize="16" />
-                  <TextBlock Text="Moteurs · Projets · Builds UBT/UAT · Git &amp; LFS · Plugins locaux · Toolchains · Stockage Unreal et Safe Clean" Foreground="#8294A8" />
-                </StackPanel>
-              </Border>
-              <Border Classes="card">
-                <StackPanel>
-                  <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Text="Stockage local" FontSize="16" />
-                    <Button Grid.Column="1" Classes="ghost" Content="Ouvrir Stockage" Command="{Binding ShowStorageCommand}" />
-                  </Grid>
-                  <Grid ColumnDefinitions="*,*,*,*,*,*">
-                    <StackPanel>
-                      <TextBlock Text="MOTEURS" FontSize="9" Foreground="#5F7287" />
-                      <TextBlock Text="{Binding StorageEngineSize}" FontSize="15" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1">
-                      <TextBlock Text="PROJETS" FontSize="9" Foreground="#5F7287" />
-                      <TextBlock Text="{Binding StorageProjectSize}" FontSize="15" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="2">
-                      <TextBlock Text="DDC" FontSize="9" Foreground="#5F7287" />
-                      <TextBlock Text="{Binding StorageDdcSize}" FontSize="15" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="3">
-                      <TextBlock Text="VAULT" FontSize="9" Foreground="#5F7287" />
-                      <TextBlock Text="{Binding StorageVaultSize}" FontSize="15" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="4">
-                      <TextBlock Text="GIT LFS" FontSize="9" Foreground="#5F7287" />
-                      <TextBlock Text="{Binding StorageLfsSize}" FontSize="15" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="5">
-                      <TextBlock Text="SAFE CLEAN" FontSize="9" Foreground="#5F7287" />
-                      <TextBlock Text="{Binding StorageReclaimableSize}" FontSize="15" Foreground="#55C7A6" />
-                    </StackPanel>
-                  </Grid>
-                  <TextBlock Text="Valeurs issues du dernier inventaire manuel en cache." FontSize="9" Foreground="#617489" />
-                </StackPanel>
-              </Border>
-            </StackPanel>
-          </ScrollViewer>
           <Grid IsVisible="{Binding IsEnginesVisible}" RowDefinitions="0,Auto,*">
             <Border Grid.Row="1" Classes="card">
               <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
@@ -462,7 +368,7 @@
                     </StackPanel>
                   </Border>
                 </Grid>
-                <Border Classes="card">
+                <Border Classes="card" Name="EngineInstallationOptions">
                   <StackPanel>
                     <Grid ColumnDefinitions="*,Auto,Auto">
                       <TextBlock Text="OPTIONS DE L’INSTALLATION" FontSize="10" Foreground="#65788D" />
@@ -558,7 +464,19 @@
                       <ComboBox Grid.Column="1" ItemsSource="{Binding CrossCompilePlatforms}" SelectedItem="{Binding CrossCompilePlatform}" />
                       <ComboBox Grid.Column="2" ItemsSource="{Binding CrossCompileConfigurations}" SelectedItem="{Binding CrossCompileConfiguration}" />
                     </Grid>
-                    <TextBlock Text="{Binding CrossCompileStatus}" TextWrapping="Wrap" FontSize="11" Foreground="#D9A55C" />
+                    <TextBlock Text="{Binding CrossCompileStatus}" IsVisible="{Binding !HasCrossCompileChecks}" TextWrapping="Wrap" FontSize="11" Foreground="{Binding CrossCompileStatusColor}" />
+                    <ItemsControl ItemsSource="{Binding CrossCompileChecks}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                          <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Label}" FontSize="11" />
+                            <TextBlock Text="{Binding Health}" FontSize="11" Foreground="{Binding HealthColor}" />
+                            <TextBlock Text="{Binding Required}" FontSize="10" Foreground="#8294A8" />
+                            <Button Content="{Binding RemediationLabel}" IsVisible="{Binding HasRemediation}" Command="{Binding ObtainPrerequisiteCommand}" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                     <Expander Header="Commande qui sera exécutée">
                       <TextBlock Text="{Binding CrossCompilePreview}" TextWrapping="Wrap" FontSize="11" />
                     </Expander>
@@ -577,17 +495,20 @@
                                 <TextBlock Text="{Binding Name}" FontSize="14" />
                                 <TextBlock Text="{Binding Version}" FontSize="10" Foreground="#70A8FA" />
                               </StackPanel>
-                              <TextBlock Grid.Column="1" Text="{Binding Summary}" FontSize="10" Foreground="#D9A55C" />
+                              <TextBlock Grid.Column="1" Text="{Binding Summary}" FontSize="10" Foreground="{Binding HealthColor}" />
                             </Grid>
                             <ItemsControl ItemsSource="{Binding Checks}">
                               <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                   <Grid ColumnDefinitions="1.1*,0.7*,1.25*,1.25*,2*">
                                     <TextBlock Text="{Binding Label}" FontSize="9" />
-                                    <TextBlock Grid.Column="1" Text="{Binding Health}" FontSize="9" Foreground="#D9A55C" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Health}" FontSize="9" Foreground="{Binding HealthColor}" />
                                     <TextBlock Grid.Column="2" Text="{Binding Required}" FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" />
                                     <TextBlock Grid.Column="3" Text="{Binding Installed}" FontSize="9" Foreground="#AAB7C5" TextWrapping="Wrap" />
-                                    <TextBlock Grid.Column="4" Text="{Binding Diagnostic}" FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
+                                    <StackPanel Grid.Column="4">
+                                      <TextBlock Text="{Binding Diagnostic}" FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
+                                      <Button Content="{Binding RemediationLabel}" IsVisible="{Binding HasRemediation}" Command="{Binding ObtainPrerequisiteCommand}" />
+                                    </StackPanel>
                                   </Grid>
                                 </DataTemplate>
                               </ItemsControl.ItemTemplate>
@@ -1483,10 +1404,13 @@
                             <DataTemplate>
                               <Grid ColumnDefinitions="1.1*,0.8*,1.6*,1.4*,2.5*">
                                 <TextBlock Text="{Binding Label}" FontSize="11" />
-                                <TextBlock Grid.Column="1" Text="{Binding Health}" FontSize="10" Foreground="#D9A55C" />
+                                <TextBlock Grid.Column="1" Text="{Binding Health}" FontSize="10" Foreground="{Binding HealthColor}" />
                                 <TextBlock Grid.Column="2" Text="{Binding Required}" FontSize="10" Foreground="#99A9B9" TextWrapping="Wrap" />
                                 <TextBlock Grid.Column="3" Text="{Binding Installed}" FontSize="10" Foreground="#B6C2CE" TextWrapping="Wrap" />
-                                <TextBlock Grid.Column="4" Text="{Binding Diagnostic}" FontSize="10" Foreground="#7F91A5" TextWrapping="Wrap" />
+                                <StackPanel Grid.Column="4">
+                                  <TextBlock Text="{Binding Diagnostic}" FontSize="10" Foreground="#7F91A5" TextWrapping="Wrap" />
+                                  <Button Content="{Binding RemediationLabel}" IsVisible="{Binding HasRemediation}" Command="{Binding ObtainPrerequisiteCommand}" />
+                                </StackPanel>
                               </Grid>
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
@@ -1661,7 +1585,7 @@
                     <Grid IsVisible="{Binding IsRemoteFabCatalogVisible}" RowDefinitions="Auto,Auto,*">
                       <Border Classes="card">
                         <StackPanel>
-                          <Grid ColumnDefinitions="*,Auto">
+                          <Grid Name="LibraryCatalogHeader" ColumnDefinitions="*,Auto">
                             <StackPanel>
                               <TextBlock Text="{Binding LibraryRemoteHeading}" FontSize="10" Foreground="#70A8FA" />
                               <TextBlock Text="{Binding LibraryRemoteAccount}" FontSize="10" Foreground="#65CCA9" />
@@ -1812,29 +1736,12 @@
                               <TextBlock Text="{Binding SelectedRemoteFabAssetCard.Categories, StringFormat='Catégories · {0}'}" FontSize="10" Foreground="#8294A8" TextWrapping="Wrap" />
                               <TextBlock Text="{Binding SelectedRemoteFabAssetCard.Platforms, StringFormat='Plateformes · {0}'}" FontSize="10" Foreground="#8294A8" TextWrapping="Wrap" />
                             </StackPanel>
-                            <StackPanel Grid.Column="2">
-                              <StackPanel Orientation="Horizontal">
-                                <Button Classes="ghost asset-action" Command="{Binding OpenSelectedRemoteFabListingCommand}" IsEnabled="{Binding HasSelectedRemoteFabListing}" ToolTip.Tip="Ouvrir la page web">
-                                  <TextBlock Text="🌐" FontSize="14" />
-                                </Button>
-                                <Button Classes="ghost asset-action" Command="{Binding SelectedRemoteFabAssetCard.DownloadCommand}" IsEnabled="{Binding SelectedRemoteFabAssetCard.CanDownload}" ToolTip.Tip="Choisir les versions à télécharger">
-                                  <Viewbox Width="16" Height="16">
-                                    <Canvas Width="24" Height="24">
-                                      <Path />
-                                    </Canvas>
-                                  </Viewbox>
-                                </Button>
-                                <Button Classes="accent asset-action" Command="{Binding OpenFabInstallOptionsCommand}" IsEnabled="{Binding SelectedRemoteFabAssetCard.CanInstall}" ToolTip.Tip="Installer dans un ou plusieurs projets">
-                                  <Viewbox Width="16" Height="16">
-                                    <Canvas Width="24" Height="24">
-                                      <Path />
-                                    </Canvas>
-                                  </Viewbox>
-                                </Button>
-                                <Button Classes="ghost asset-action" Content="＋" Command="{Binding SelectedRemoteFabAssetCard.OpenCollectionsCommand}" ToolTip.Tip="Ajouter à des collections" />
-                              </StackPanel>
-                              <Button Classes="ghost" Content="{Binding SelectedFabAssetVisibilityLabel}" Command="{Binding HideSelectedFabAssetCommand}" IsVisible="{Binding !SelectedRemoteFabAssetCard.IsHidden}" />
-                              <Button Classes="danger" Content="{Binding SelectedFabAssetVisibilityLabel}" Command="{Binding HideSelectedFabAssetCommand}" IsVisible="{Binding SelectedRemoteFabAssetCard.IsHidden}" />
+                            <StackPanel Grid.Column="2" Name="ProductActionPanel">
+                              <Button Content="Télécharger les versions…" Command="{Binding SelectedRemoteFabAssetCard.DownloadCommand}" IsEnabled="{Binding SelectedRemoteFabAssetCard.CanDownload}" />
+                              <Button Content="Installer dans un projet…" Command="{Binding OpenFabInstallOptionsCommand}" IsEnabled="{Binding SelectedRemoteFabAssetCard.CanInstall}" />
+                              <Button Content="Ouvrir la page web" Command="{Binding OpenSelectedRemoteFabListingCommand}" IsEnabled="{Binding HasSelectedRemoteFabListing}" />
+                              <Button Content="Collections…" Command="{Binding SelectedRemoteFabAssetCard.OpenCollectionsCommand}" />
+                              <Button Content="{Binding SelectedFabAssetVisibilityLabel}" Command="{Binding HideSelectedFabAssetCommand}" />
                             </StackPanel>
                           </Grid>
                         </Border>
@@ -1902,7 +1809,7 @@
                                         </StackPanel>
                                       </Grid>
                                       <WrapPanel>
-                                        <Button Classes="accent" Content="Installer" Command="{Binding InstallDerivedCommand}" IsVisible="{Binding IsDerived}" />
+                                        <Button Classes="accent" Content="Installer" Command="{Binding InstallCommand}" />
                                         <Button Classes="ghost" Content="Dériver" Command="{Binding CreateDerivedCommand}" />
                                         <Button Classes="ghost" Content="Tester" Command="{Binding CreateTestCommand}" />
                                         <Button Classes="ghost" Content="Dossier" Command="{Binding OpenFolderCommand}" ToolTip.Tip="{Binding Path}" />
@@ -2969,7 +2876,7 @@
           </Grid>
           <Grid IsVisible="{Binding IsTasksVisible}">
             <TextBlock IsVisible="{Binding HasNoTasks}" Text="Aucune tâche exécutée pendant cette session." Foreground="#718398" />
-            <ListBox Classes="catalog" ItemsSource="{Binding Tasks}">
+            <ListBox Classes="catalog" ItemsSource="{Binding VisibleActivityTasks}">
               <ListBox.ItemTemplate>
                 <DataTemplate>
                   <Border Classes="card">
@@ -2998,22 +2905,27 @@
               </ListBox.ItemTemplate>
             </ListBox>
           </Grid>
+          <Grid IsVisible="{Binding IsActionsVisible}">
+            <TextBlock Text="Installations, compilations et analyses en cours ou en attente." />
+            <ListBox ItemsSource="{Binding VisibleActivityTasks}" />
+          </Grid>
           <Grid IsVisible="{Binding IsLogsVisible}">
             <Border Classes="card">
               <Grid RowDefinitions="Auto,Auto,*">
                 <Grid ColumnDefinitions="*,Auto,Auto">
                   <StackPanel>
-                    <TextBlock Text="RAW LOG" FontSize="14" />
+                    <TextBlock Text="{Binding RawLogModeLabel}" FontSize="14" />
+                    <CheckBox Content="Journal complet (progression et détails techniques)" IsChecked="{Binding ShowFullRawLog}" />
                     <TextBlock Text="{Binding RawLogFilePath}" FontSize="9" Foreground="#718398" TextTrimming="CharacterEllipsis" />
                   </StackPanel>
                   <Button Grid.Column="1" Classes="ghost" Content="Recharger" Command="{Binding RefreshRawLogCommand}" />
                   <Button Grid.Column="2" Classes="ghost" Content="Ouvrir le dossier" Command="{Binding OpenRawLogFolderCommand}" />
                 </Grid>
-                <TextBox Grid.Row="1" Classes="path" Text="{Binding RawLogSearchQuery}" PlaceholderText="Rechercher dans le journal RAW…" />
+                <TextBox Grid.Row="1" Classes="path" Text="{Binding RawLogSearchQuery}" PlaceholderText="Rechercher dans les événements affichés…" />
                 <ListBox Grid.Row="2" ItemsSource="{Binding FilteredRawLogEntries}">
                   <ListBox.ItemTemplate>
                     <DataTemplate>
-                      <SelectableTextBlock Text="{Binding Text}" Foreground="{Binding Foreground}" FontSize="10" TextWrapping="NoWrap" />
+                      <SelectableTextBlock Text="{Binding DisplayText}" Foreground="{Binding Foreground}" FontSize="10" TextWrapping="NoWrap" />
                     </DataTemplate>
                   </ListBox.ItemTemplate>
                 </ListBox>
@@ -3295,6 +3207,11 @@
                           <TextBlock Text="Téléchargements simultanés (1 à 16)" />
                           <NumericUpDown Grid.Column="1" Minimum="1" Maximum="16" FormatString="0" Value="{Binding DownloadConcurrency}" />
                         </Grid>
+                        <Grid ColumnDefinitions="*,140">
+                          <TextBlock Text="Connexions par téléchargement Fab / Megascans (1 à 32)" />
+                          <NumericUpDown Grid.Column="1" Minimum="1" Maximum="32" FormatString="0" Value="{Binding AssetDownloadConnections}" />
+                        </Grid>
+                        <TextBlock Text="12 par défaut. Fab : chunks en parallèle. Megascans : fichiers en parallèle et segments des gros fichiers si le serveur les autorise. Sinon, une connexion par fichier. Distinct du nombre de packs simultanés." FontSize="10" TextWrapping="Wrap" />
                         <CheckBox Content="Reprendre les téléchargements interrompus au lancement" IsChecked="{Binding ResumeDownloadsOnStartup}" />
                         <Grid ColumnDefinitions="*,140">
                           <TextBlock Text="Connexions de chunks par moteur Unreal (1 à 32)" />
@@ -4754,6 +4671,19 @@
           <StackPanel Orientation="Horizontal">
             <Button Classes="ghost" Content="Annuler" Command="{Binding CancelUninstallSelectedEngineCommand}" />
             <Button Classes="danger" Content="Confirmer la désinstallation" Command="{Binding ConfirmUninstallSelectedEngineCommand}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
+    <Grid IsVisible="{Binding IsUtilityLaunchConfirmationVisible}" Panel.ZIndex="2300">
+      <Border />
+      <Border MaxWidth="700">
+        <StackPanel>
+          <TextBlock Text="LANCER UN OUTIL LOCAL" FontSize="19" />
+          <TextBlock Text="{Binding UtilityLaunchConfirmationText}" TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal">
+            <Button Classes="ghost" Content="Annuler" Command="{Binding CancelUtilityLaunchCommand}" />
+            <Button Classes="accent" Content="Confirmer le lancement" Command="{Binding ConfirmUtilityLaunchCommand}" />
           </StackPanel>
         </StackPanel>
       </Border>

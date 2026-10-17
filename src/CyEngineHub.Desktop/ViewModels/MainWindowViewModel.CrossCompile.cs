@@ -33,6 +33,10 @@ public sealed partial class MainWindowViewModel
     }
     private EngineToolchainSnapshot? CrossCompileSnapshot => SelectedEngineToolchains
         .FirstOrDefault(card => card.Snapshot.EngineId == SelectedEngineDetails?.Engine.Id)?.Snapshot;
+    public IReadOnlyList<ToolchainCheckItemViewModel> CrossCompileChecks => CrossCompileSnapshot is { } snapshot
+        ? PlatformToolchainAssessment.ChecksFor(snapshot, CrossCompilePlatform).Select(check => new ToolchainCheckItemViewModel(check,
+            () => ShowPrerequisiteRemediation(snapshot.EngineId, check), snapshot.EngineVersion)).ToArray() : [];
+    public bool HasCrossCompileChecks => CrossCompileChecks.Count > 0;
     public string CrossCompileStatus => CrossCompileSnapshot is not { } snapshot
         ? "Analyse nécessaire pour ce moteur (aucun résultat validé en cache)."
         : string.Join(" · ", PlatformToolchainAssessment.ChecksFor(snapshot, CrossCompilePlatform)
@@ -40,6 +44,16 @@ public sealed partial class MainWindowViewModel
     private bool CanCrossCompile => CrossCompileProject is not null && CrossCompileSnapshot is { } snapshot &&
         PlatformToolchainAssessment.CanBuild(snapshot, CrossCompilePlatform) &&
         ResolveEngine(CrossCompileProject.Project.EngineAssociation)?.Id == SelectedEngineDetails?.Engine.Id;
+    public string CrossCompileStatusColor
+    {
+        get
+        {
+            if (CrossCompileSnapshot is not { } snapshot) return "#F5A623";
+            var checks = PlatformToolchainAssessment.ChecksFor(snapshot, CrossCompilePlatform);
+            return checks.Any(check => check.Health == ToolchainHealth.Missing) ? "#E8747C" :
+                checks.Any(check => check.Health == ToolchainHealth.Warning) ? "#F5A623" : "#5CD26E";
+        }
+    }
     public string CrossCompilePreview
     {
         get
@@ -80,6 +94,9 @@ public sealed partial class MainWindowViewModel
     private void NotifyCrossCompile()
     {
         OnPropertyChanged(nameof(CrossCompileStatus));
+        OnPropertyChanged(nameof(CrossCompileStatusColor));
+        OnPropertyChanged(nameof(CrossCompileChecks));
+        OnPropertyChanged(nameof(HasCrossCompileChecks));
         OnPropertyChanged(nameof(CrossCompilePreview));
         _runCrossCompileCommand?.NotifyCanExecuteChanged();
     }

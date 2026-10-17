@@ -23,12 +23,14 @@ public sealed class ToolchainCompatibilityService : IToolchainCompatibilityServi
             checks.Add(EvaluateVisualStudio(windows, installations));
             checks.Add(EvaluateMsvc(windows, installations));
             checks.Add(EvaluateWindowsSdk(windows, installations));
-            checks.Add(EvaluatePresence(
-                ToolchainKind.DotNet,
-                ".NET",
-                "SDK .NET ou runtime fourni avec UE",
-                installations,
-                missingHealth: ToolchainHealth.Missing));
+            var bundled = installations.Where(item => item.Kind == ToolchainKind.DotNet &&
+                item.Details.TryGetValue("EngineId", out var owner) && owner == requirements.EngineId).ToArray();
+            var dotnet = EvaluatePresence(ToolchainKind.DotNet, ".NET", "Runtime fourni avec ce moteur ou SDK compatible",
+                bundled.Length > 0 ? bundled : installations.Where(item => !item.Details.ContainsKey("EngineId")).ToArray(),
+                ToolchainHealth.Missing);
+            checks.Add(bundled.Length == 0 && dotnet.Health == ToolchainHealth.Ready
+                ? dotnet with { Health = ToolchainHealth.Warning, Diagnostic = "SDK système détecté ; compatibilité avec ce moteur à vérifier. Le runtime embarqué est préférable." }
+                : dotnet);
         }
 
         if (requirements.Android is { } android)

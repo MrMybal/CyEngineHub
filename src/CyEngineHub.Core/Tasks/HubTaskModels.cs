@@ -21,6 +21,7 @@ public sealed record HubTaskSnapshot(
     DateTimeOffset? FinishedAt,
     string? Error)
 {
+    public bool IsDownload { get; init; }
     public IReadOnlyList<HubTaskLink> Links { get; init; } = [];
 
 }

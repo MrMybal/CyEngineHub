@@ -6,6 +6,33 @@ namespace CyEngineHub.Core.Tests;
 public sealed class ImGuiInterfaceTests
 {
     [Fact]
+    public void DownloadedSupplierVersionsExposeTheSameLocalInstallActionAsDerivedVersions()
+    {
+        var nodes = UiDocument.Load("Main").Root.Descendants().ToArray();
+        var install = nodes.Single(node => node.Kind == "Button" && UiBinding.Path(node["Command"]) == "InstallCommand");
+        Assert.Equal("Installer", install["Content"]);
+        Assert.Null(install["IsVisible"]);
+    }
+    [Fact]
+    public void ProductActionsHaveExplicitLabelsAndKeepTheirOriginalCommands()
+    {
+        var panel = UiDocument.Load("Main").Root.Descendants().Single(node => node["Name"] == "ProductActionPanel");
+        var buttons = panel.Descendants().Where(node => node.Kind == "Button").ToArray();
+        Assert.Equal(5, buttons.Length);
+        Assert.All(buttons, node => Assert.False(string.IsNullOrWhiteSpace(node["Content"])));
+        Assert.Contains(buttons, node => UiBinding.Path(node["Command"]) == "SelectedRemoteFabAssetCard.DownloadCommand");
+        Assert.Contains(buttons, node => UiBinding.Path(node["Command"]) == "SelectedRemoteFabAssetCard.OpenCollectionsCommand");
+        Assert.Contains(buttons, node => UiBinding.Path(node["Command"]) == "HideSelectedFabAssetCommand");
+    }
+    [Fact]
+    public void EngineChecksBindTheirStatusColorInsteadOfAConstantWarningColor()
+    {
+        var panel = UiDocument.Load("Main").Root.Descendants().Single(node => node["Name"] == "EngineCompilationPanel");
+        var checks = panel.Descendants().Where(node => UiBinding.Path(node["Text"]) == "Health").ToArray();
+        Assert.NotEmpty(checks);
+        Assert.All(checks, node => Assert.Equal("HealthColor", UiBinding.Path(node["Foreground"])));
+    }
+    [Fact]
     public void DownloadControlsHaveTheirOwnSettingsSection()
     {
         var nodes = UiDocument.Load("Main").Root.Descendants().ToArray();
@@ -133,7 +160,8 @@ public sealed class ImGuiInterfaceTests
     {
         var document = UiDocument.Load("Main");
         var pages = document.Pages.Select(node => UiBinding.Path(node["IsVisible"])).ToArray();
-        foreach (var page in new[] { "IsHomeVisible", "IsEnginesVisible", "IsEngineDetailsVisible", "IsProjectsVisible", "IsProjectDetailsVisible", "IsLibraryVisible", "IsPluginsVisible", "IsHubExtensionsVisible", "IsToolchainsVisible", "IsStorageVisible", "IsBuildsVisible", "IsTasksVisible", "IsLogsVisible", "IsSettingsVisible" }) Assert.Contains(page, pages);
+        foreach (var page in new[] { "IsEnginesVisible", "IsEngineDetailsVisible", "IsProjectsVisible", "IsProjectDetailsVisible", "IsLibraryVisible", "IsPluginsVisible", "IsHubExtensionsVisible", "IsToolchainsVisible", "IsStorageVisible", "IsBuildsVisible", "IsTasksVisible", "IsActionsVisible", "IsLogsVisible", "IsSettingsVisible" }) Assert.Contains(page, pages);
+        Assert.DoesNotContain("IsHomeVisible", pages);
         Assert.True(document.Modals.Length >= 18);
         Assert.Contains(document.Modals, node => UiBinding.Path(node["IsVisible"]) == "IsProjectCreatorVisible");
         Assert.Contains(document.Modals, node => UiBinding.Path(node["IsVisible"]) == "IsFabInstallationScriptConfigurationVisible");

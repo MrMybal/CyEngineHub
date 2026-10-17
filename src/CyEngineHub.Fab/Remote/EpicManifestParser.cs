@@ -187,7 +187,7 @@ public static class EpicManifestParser
         }
         var headerVersion = reader.ReadUInt32();
         var headerSize = checked((int)reader.ReadUInt32());
-        _ = reader.ReadUInt32();
+        var payloadSize = reader.ReadUInt32();
         var guid = reader.ReadGuid();
         _ = reader.ReadUInt64();
         var compressed = reader.ReadByte() != 0;
@@ -208,6 +208,14 @@ public static class EpicManifestParser
         {
             throw new DirectFabException($"L’en-tête du chunk {expected.ChunkId} est invalide.");
         }
+        if (payloadSize != bytes.Length - headerSize)
+            throw new DirectFabException($"Le chunk {expected.ChunkId} est incomplet : sa charge utile ne correspond pas à l’en-tête.");
+        // CDN chunks may be reserialized from header v2 to v3 (four extra bytes)
+        // without changing the manifest's original serialized size. Do not reject
+        // that precise upgrade; all other size differences remain invalid.
+        if (expected.DownloadSize > 0 && bytes.Length != expected.DownloadSize &&
+            !(headerVersion == 3 && headerSize == 66 && bytes.Length == expected.DownloadSize + 4))
+            throw new DirectFabException($"La taille du chunk {expected.ChunkId} ne correspond pas au manifest.");
         reader.Skip(headerSize - reader.Position);
         var payload = reader.ReadBytes(reader.Remaining).ToArray();
         if (!compressed)

@@ -11,7 +11,6 @@ internal sealed partial class ImGuiWorkspace
     private const float UiScale = UiCardGrid.InterfaceScale;
     private RemoteFabAssetRowViewModel[] _catalogRows = [];
     private (RemoteFabAssetRowViewModel Row, int Index)[] _catalogSlots = [];
-    private string? _selectedAssetCard;
 
     private void CardInteraction(object item, string id, Vector4 actions, Action select, bool selected, string command = "OpenDetailsCommand")
     {
@@ -30,8 +29,19 @@ internal sealed partial class ImGuiWorkspace
                 if (Gui.IsMouseDoubleClicked(ImGuiMouseButton.Left)) Execute(item, "{Binding " + command + "}");
             }
         }
-        if (selected || hovered)
-            Gui.GetWindowDrawList().AddRect(min, min + Gui.GetWindowSize(), Gui.ColorConvertFloat4ToU32(selected ? ImGuiTheme.Accent : ImGuiTheme.Muted), 3);
+        if (hovered && Gui.IsMouseClicked(ImGuiMouseButton.Right))
+        {
+            if (item is EngineCardViewModel or LocalEngineInstallationCardViewModel or EngineDownloadCardViewModel) RequestEngineContext(item);
+            else RequestItemContext(item, command);
+        }
+        selected = item is EngineCardViewModel or LocalEngineInstallationCardViewModel or EngineDownloadCardViewModel
+            ? IsResourceSelected(item, true) : IsItemSelected(item);
+        if (selected) DrawCardSelection(min, max);
+        else if (hovered) Gui.GetWindowDrawList().AddRect(min + new Vector2(2), max - new Vector2(2), Gui.ColorConvertFloat4ToU32(ImGuiTheme.Muted), 3);
+        if (_root is MainWindowViewModel favorites && favorites.IsResourceFavorite(item)) DrawFavoriteMarker(min + new Vector2(13, 13) * UiScale);
+        if (selected) Record("selection/item/" + MainWindowViewModel.ResourceIdentity(item));
+        if (hovered && _root is MainWindowViewModel sizes && sizes.ResourceSizeBytes(item) is not null)
+            Gui.SetTooltip(ResourceName(item) + "\n" + sizes.ResourceSizeLabel(item) + "\n" + sizes.ResourceSizeEvidence(item));
     }
 
     private void DrawFixedCards(string id, int count, float width, float height, Action<int> draw, string? catalogBinding = null)
@@ -68,6 +78,8 @@ internal sealed partial class ImGuiWorkspace
             _catalogRows = rows;
             _catalogSlots = rows.SelectMany(row => Enumerable.Range(0, row.AssetCount).Select(index => (Row: row, Index: index))).ToArray();
         }
+        SynchronizeItemSelection(LibrarySelectionScope(binding),
+            _catalogSlots.Select(slot => (object)slot.Row.AssetAt(slot.Index)));
         if (_root is MainWindowViewModel { IsLibraryRowsMode: true } rowVm) { DrawRemoteAssetRows(rowVm, binding); return; }
         var small = _root is MainWindowViewModel { IsLibraryCompactCards: true };
         var minimal = _root is MainWindowViewModel { IsLibraryImageOnlyCards: true };
@@ -92,8 +104,8 @@ internal sealed partial class ImGuiWorkspace
         CardImage(thumbnail, 95 * UiScale, placeholder.ToUpperInvariant());
         Record("minimal/image/" + id);
         CardTitle(name, 2);
-        CardInteraction(item, id, new(float.PositiveInfinity), () => _selectedAssetCard = id, _selectedAssetCard == id, command);
-        if (_selectedAssetCard == id) Record("minimal/selected/" + id);
+        CardInteraction(item, id, new(float.PositiveInfinity), () => SelectItem(item), IsItemSelected(item), command);
+        if (IsItemSelected(item)) Record("minimal/selected/" + id);
         Gui.EndChild();
         Record("minimal/card/" + id);
         if (item is RemoteFabAssetCardViewModel asset) Record("asset/card/" + asset.Asset.AssetId);
@@ -101,6 +113,12 @@ internal sealed partial class ImGuiWorkspace
 
     private void DrawMinimalLibraryCatalog(object[] items, string binding)
     {
+        if (_root is MainWindowViewModel favorites)
+        {
+            items = items.Where(item => !favorites.FavoritesOnly || favorites.IsResourceFavorite(item)).ToArray();
+            if (favorites.FavoritesFirst) items = items.OrderByDescending(favorites.IsResourceFavorite).ToArray();
+        }
+        SynchronizeItemSelection(LibrarySelectionScope(binding), items);
         DrawFixedCards("minimal-library-" + binding, items.Length, 180 * UiScale, 150 * UiScale, index =>
         {
             var item = items[index];
@@ -108,8 +126,8 @@ internal sealed partial class ImGuiWorkspace
             {
                 collection.EnsureThumbnailLoaded(); _seenCollections.Add(collection); _collections.Add(collection);
             }
-            var command = item is QuixelCollectionCardViewModel or ConnectorAssetViewModel ? "OpenCommand" : "UseCommand";
-            var id = binding + "/" + index;
+            var command = item is QuixelCollectionCardViewModel or ConnectorAssetViewModel ? "OpenCommand" : item is FabLocalContentPackCardViewModel ? "UseForImportCommand" : "UseCommand";
+            var id = binding + "/" + MainWindowViewModel.ResourceIdentity(item);
             DrawMinimalLibraryCard(item, Value(item, "Name"), UiBinding.Read(item, "{Binding Thumbnail}") as Bitmap,
                 180 * UiScale, 150 * UiScale, id, item is ConnectorAssetViewModel ? "PACK" : "MEGASCANS", command);
             VisibleRows[binding] = VisibleRows.GetValueOrDefault(binding) + 1;
@@ -118,7 +136,6 @@ internal sealed partial class ImGuiWorkspace
 
     private void DrawAssetCard(RemoteFabAssetCardViewModel asset, float width, float height, bool small)
     {
-        var key = asset.Source + "/" + asset.Asset.AssetId;
         Gui.BeginChild("asset", new(width, height), ImGuiChildFlags.Borders, ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
         CardImage(asset.Thumbnail, (small ? 105 : 150) * UiScale, asset.Source.ToUpperInvariant());
         Record("asset/image/" + asset.Asset.AssetId);
@@ -154,7 +171,8 @@ internal sealed partial class ImGuiWorkspace
         Gui.EndChild();
         if (Gui.IsItemHovered()) Gui.SetTooltip("Versions disponibles : " + asset.AllEngineVersions + "\n" + asset.CollectionSummary);
         if (Gui.GetCursorPosY() + Gui.GetTextLineHeight() < footerY - 3)
-            Gui.TextDisabled(Elide(asset.CollectionSummary, Gui.GetContentRegionAvail().X));
+            Gui.TextDisabled(Elide((_root as MainWindowViewModel)?.ResourceSizeBytes(asset) is not null
+                ? (_root as MainWindowViewModel)!.ResourceSizeLabel(asset) + " · " + asset.CollectionSummary : asset.CollectionSummary, Gui.GetContentRegionAvail().X));
         Gui.SetCursorPosY(footerY);
         var actionsMin = Gui.GetCursorScreenPos();
         ActionButton(asset, "Fiche", "OpenDetailsCommand"); Gui.SameLine();
@@ -164,8 +182,8 @@ internal sealed partial class ImGuiWorkspace
         Gui.SameLine(); ActionButton(asset, "Installer", "OpenInstallCommand");
         Gui.SameLine(); ActionButton(asset, "+", "OpenCollectionsCommand");
         var actionsMax = Gui.GetItemRectMax();
-        CardInteraction(asset, "asset/" + asset.Asset.AssetId, new(actionsMin.X, actionsMin.Y, actionsMax.X, actionsMax.Y), () => _selectedAssetCard = key, _selectedAssetCard == key);
-        if (_selectedAssetCard == key) Elements["card/selected/asset/" + asset.Asset.AssetId] = Elements.GetValueOrDefault("card/body/asset/" + asset.Asset.AssetId);
+        CardInteraction(asset, "asset/" + asset.Asset.AssetId, new(actionsMin.X, actionsMin.Y, actionsMax.X, actionsMax.Y), () => SelectItem(asset), IsItemSelected(asset));
+        if (IsItemSelected(asset)) Elements["card/selected/asset/" + asset.Asset.AssetId] = Elements.GetValueOrDefault("card/body/asset/" + asset.Asset.AssetId);
         Gui.EndChild();
         Record("asset/card/" + asset.Asset.AssetId);
     }
@@ -214,6 +232,54 @@ internal sealed partial class ImGuiWorkspace
         if (Gui.IsItemHovered()) Gui.SetTooltip(title);
     }
 
+    private void DrawResourceRowImage(object item, string label, float width, float height)
+    {
+        var start = Gui.GetItemRectMin();
+        var size = Math.Min(42 * UiScale, height - Gui.GetStyle().CellPadding.Y * 2);
+        var draw = Gui.GetWindowDrawList();
+        var end = start + new Vector2(width, height);
+        draw.PushClipRect(start, end, true);
+        draw.AddRectFilled(start, start + new Vector2(size), Gui.ColorConvertFloat4ToU32(ImGuiTheme.Input), 3);
+        if (UiBinding.Read(item, "{Binding Thumbnail}") is Bitmap bitmap)
+        {
+            var factor = size / Math.Max(bitmap.PixelSize.Width, bitmap.PixelSize.Height);
+            var imageSize = new Vector2(bitmap.PixelSize.Width, bitmap.PixelSize.Height) * factor;
+            var min = start + (new Vector2(size) - imageSize) / 2;
+            var texture = _image(bitmap);
+            if (texture != 0) draw.AddImage(texture, min, min + imageSize);
+        }
+        draw.AddText(start + new Vector2(size + 8 * UiScale, Math.Max(0, (size - Gui.GetTextLineHeight()) / 2)),
+            Gui.GetColorU32(ImGuiCol.Text), Elide(label, Math.Max(1, width - size - 8 * UiScale)));
+        draw.PopClipRect();
+        Record("resource-row/image/" + ResourceName(item));
+    }
+
+    private void DrawMinimalResourceCards(object[] items, bool engines)
+    {
+        DrawFixedCards("resource-minimal-cards", items.Length, 180 * UiScale, 150 * UiScale, index =>
+        {
+            var item = items[index];
+            var selected = IsResourceSelected(item, engines);
+            var official = engines && Flag(item, "IsOfficialEpic");
+            if (official) Gui.PushStyleColor(ImGuiCol.ChildBg, Flag(item, "IsInstallationAvailable") ? ImGuiTheme.OfficialRow : ImGuiTheme.Input);
+            Gui.BeginChild("minimal-resource", new(180 * UiScale, 150 * UiScale), ImGuiChildFlags.Borders,
+                ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
+            CardImage(UiBinding.Read(item, "{Binding Thumbnail}") as Bitmap, 95 * UiScale, engines ? "MOTEUR" : "PROJET");
+            CardTitle(ResourceName(item), 2);
+            CardInteraction(item, "resource/" + ResourceName(item), new(float.PositiveInfinity), () => SelectResource(item, items, engines), selected);
+            if (selected) Elements["card/selected/resource/" + ResourceName(item)] = Elements.GetValueOrDefault("card/body/resource/" + ResourceName(item));
+            if (engines && Gui.IsWindowHovered(ImGuiHoveredFlags.ChildWindows) && Gui.IsMouseClicked(ImGuiMouseButton.Right)) RequestEngineContext(item);
+            if (engines && selected) Elements["engine/selected/" + Value(item, "Path")] = Elements.GetValueOrDefault("card/body/resource/" + ResourceName(item));
+            if (Gui.IsWindowHovered()) TextTooltip(item is EngineDownloadCardViewModel pending ? pending.StatusLabel + "\n" + pending.Message : ResourceVersion(item) + "\n" + Value(item, "Path"));
+            if (official) Record("official-engine/" + Value(item, "Path"));
+            Gui.EndChild();
+            Record("resource/card/" + ResourceName(item));
+            Record("resource/minimal/" + ResourceName(item));
+            if (official) Gui.PopStyleColor();
+        });
+        if (items.Length == 0) Gui.TextDisabled("Aucun élément pour cette recherche.");
+    }
+
     private void DrawResourceCards(object[] items, bool engines)
     {
         DrawFixedCards("resource-cards", items.Length, 270 * UiScale, 285 * UiScale, index =>
@@ -240,7 +306,7 @@ internal sealed partial class ImGuiWorkspace
                 foreach (var line in pending.Message.Split('\n').Skip(1)) MutedText(Elide(line, Gui.GetContentRegionAvail().X));
                 if (Gui.IsWindowHovered()) TextTooltip(pending.Message);
             }
-            else Gui.TextDisabled(engines ? Value(item, "EffectiveSizeLabel") : Value(item, "HealthLabel"));
+            else Gui.TextDisabled(engines ? Value(item, "EffectiveSizeLabel") : (_root as MainWindowViewModel)?.ResourceSizeLabel(item) ?? Value(item, "HealthLabel"));
             if (official && item is not EngineDownloadCardViewModel) Gui.TextColored(Flag(item, "OfficialUpdateAvailable") ? ImGuiTheme.Warning : ImGuiTheme.Muted, Value(item, "OfficialUpdateLabel"));
             var footerY = 285 * UiScale - Gui.GetStyle().WindowPadding.Y - Gui.GetFrameHeight() - 1;
             Gui.SetCursorPosY(footerY);

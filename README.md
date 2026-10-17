@@ -3,10 +3,40 @@
 Hub de développement multi-moteur, local-first, pour Windows. Unreal Engine est
 le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers locaux.
 
-**Version publiée : `2.0.0-alpha.15`.** Sauvegardez vos projets avant d'essayer les
+**Version publiée : `2.0.0-alpha.25`.** Sauvegardez vos projets avant d'essayer les
 opérations d'installation, de déplacement ou de conversion d'assets.
 
+Les changements depuis l’alpha.15 sont récapitulés dans les
+[notes de version](docs/releases/v2.0.0-alpha.25.md).
+
 ## Interface officielle V2
+
+Le hub s’ouvre directement sur les moteurs ; la vue d’ensemble a été supprimée.
+Les fiches moteur sont organisées en trois onglets : Général, Options d’installation
+et Compilation / cross-compilation. Les contrôles prêts sont verts, les avertissements
+orange et les prérequis manquants rouges. Le clic droit sur un ou plusieurs moteurs
+permet de lancer une analyse de taille ciblée, en lecture seule et annulable.
+Les mesures partielles sont indiquées explicitement et les autres mesures sont conservées.
+Les sélections de cartes ont un cadre contrasté, un fond teinté et une coche ; les lignes
+sélectionnées sont surlignées sur toute leur largeur. Les produits et projets proposent
+leurs actions au clic droit. Ctrl + clic ajoute ou retire une carte ; Maj + clic
+sélectionne une plage dans l’ordre affiché. Le clic droit conserve le groupe sélectionné,
+avec favoris et analyse de taille groupés ; les actions individuelles restent réservées
+à une seule sélection. Les favoris sont mémorisés ; un unique bouton étoile encadré
+active le filtre des favoris et le désactive pour tout afficher, avant pagination.
+L’analyse de taille est à côté d’Actualiser dans le catalogue ; les filtres, modes
+d’affichage et l’étoile partagent la barre, avec pagination alignée à droite.
+Dans Moteurs et Projets, les modes d’affichage et l’étoile sont regroupés sur une
+même ligne, dans des cadres alignés ; le compteur est centré à leur côté.
+Les actions restent sur leur propre ligne et se replient lorsque l’espace manque.
+Moteurs, projets et packs disposent de deux analyses de taille : compléter les mesures
+manquantes ou tout revérifier sur disque. Les tailles déclarées dans les manifestes des
+packs sont reprises sans parcours disque complet ; une revérification inclut les annexes.
+Chaque version locale téléchargée, fournisseur ou dérivée, possède une action Installer
+qui prépare cette version précise sans téléchargement de remplacement.
+Dans Activité, Actions regroupe installations, compilations et analyses ; Téléchargements
+reste réservé aux transferts. Chaque entrée possède un pictogramme et deux compteurs :
+en cours et en attente. Les tâches terminées conservent leur file d’origine.
 
 Dear ImGui est désormais l’interface officielle et l’interface par défaut de CyEngineHub.
 Le logiciel reste distribué sur le canal alpha.
@@ -15,10 +45,40 @@ redimensionnables, inspecteur latéral, recherche et formulaires à onglets. La 
 est réglable et mémorisée. Les téléchargements, profils, scripts d’installation,
 connexions et outils MCP utilisent les services existants.
 
+L’onglet principal Outils regroupe les utilitaires Unreal, l’inventaire des toolchains
+et le diagnostic détaillé de compatibilité. Choisissez un moteur pour retrouver
+son installateur de prérequis, Unreal Version Selector, Unreal Insights et Swarm
+Agent lorsqu’ils sont présents. Les listes sont recherchables et triables ;
+l’exécutable et son rôle sont présentés avant un lancement explicitement confirmé.
+La présence de l’installateur Unreal ne signifie pas que ses prérequis sont installés.
+Les ressources officielles .NET, Visual Studio/C++, Windows SDK et Unreal s’ouvrent
+dans le navigateur, sans installation automatique. Les analyses restent manuelles.
+Les prérequis absents ou à vérifier proposent une aide contextuelle dans Outils,
+avec la version requise et un accès aux téléchargements officiels. Le wrapper Gradle
+se répare avec son moteur, pas avec une version globale arbitraire. Les runtimes
+.NET et wrappers Unreal sont rattachés à leur propre installation ; les toolchains
+Linux standard et les variables d’environnement sont prises en compte.
+Les actions de lancement et compilation sont vertes, les retraits rouges, les actions
+principales bleues ; l’orange reste réservé à la sélection et aux avertissements.
+
 Les boutons Nouveau projet et Ajouter un moteur se distinguent en vert. Les options
 propres à un projet sont accessibles dans sa fiche via Paramètres du projet ;
 la vue Projets conserve la création, les profils et l’import de projets.
 Les vues Moteurs et Projets utilisent toute la largeur, sans inspecteur latéral ;
+elles proposent les mêmes quatre présentations que les markets : cartes détaillées,
+image et nom, lignes sans image, lignes avec vignette. Les préférences des moteurs,
+projets et markets sont enregistrées séparément. Le double-clic ouvre toujours la fiche,
+sans lancer l’éditeur. Les colonnes restent triables dans les deux modes lignes.
+Les filtres du catalogue sont des boutons à état sélectionné ; filtres, affichage et
+pagination disposent de cadres distincts qui se réorganisent selon la largeur.
+Les actions des fiches produit sont des boutons texte complets, regroupés par usage.
+Les quatre modes d’affichage utilisent des boutons à icônes vectorielles : cartes
+détaillées, image et nom, lignes sans image et lignes avec vignette. Les infobulles
+conservent les intitulés et le mode actif reste distingué par sa couleur et son contour.
+Leur hauteur suit exactement celle des boutons standard, en densité compacte comme
+en densité confort ; les pictogrammes sont réduits et centrés dans cette hauteur.
+
+Les vues Moteurs et Projets conservent leurs actions et leur sélection ;
 les profils se préparent dans Paramètres et les plugins se gèrent depuis les fiches
 des projets ou moteurs. La navigation Stockage et Activité est ancrée en bas.
 Les sources de bibliothèque sont sur une ligne, avec l’aide en bas ; les options
@@ -67,6 +127,21 @@ ainsi que le menu contextuel. La reprise conserve la version et la destination
 d’origine et revalide les chunks du cache avant de télécharger les manquants.
 Pour une demande créée dans une ancienne version du hub, sélectionnez à nouveau
 la même version officielle et le même dossier cible : le cache adjacent est réutilisé.
+
+Les téléchargements acceptent les chunks Epic dont l’en-tête passe de v2 à v3
+avec quatre octets supplémentaires, sans confondre cet écart avec un transfert
+tronqué. La taille HTTP, la charge utile de l’en-tête, le GUID, la décompression et
+les empreintes des fichiers reconstruits restent contrôlés lors de la reprise.
+Fab utilise le même pipeline de chunks parallèles, avec cache validé et nouvelles
+tentatives. Dans Paramètres → Téléchargements, un réglage indépendant de 1 à 32
+connexions par téléchargement Fab/Megascans est disponible (12 par défaut).
+Megascans télécharge plusieurs fichiers signés en parallèle et segmente les gros
+fichiers lorsque le serveur propose des plages d’octets avec un validateur fort ;
+sinon, il utilise une connexion par fichier. Les fichiers incomplets ne sont pas
+publiés dans la bibliothèque. Ces réglages ne changent pas les transferts actifs.
+Le journal affiche les événements importants par défaut : débuts, fins,
+annulations, avertissements et erreurs. L’option Journal complet révèle les
+progressions et détails techniques, conservés dans le fichier journal.
 
 Les moteurs et projets disposent de modes Cartes/Liste mémorisés séparément. Les
 cartes d’assets gardent une taille fixe ; un clic sélectionne la carte entière,

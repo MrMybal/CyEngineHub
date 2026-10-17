@@ -6,6 +6,8 @@ namespace CyEngineHub.Toolchains.Detection;
 
 internal static class EngineToolchainDetector
 {
+    private static readonly string[] WindowsDotNetLayouts = ["win-x64", "windows"];
+    private static readonly string[] LinuxDotNetLayouts = ["linux-x64", "linux"];
     public static void Detect(
         IReadOnlyList<UnrealEngineInstallation> engines,
         IReadOnlyList<EnvironmentVariableSnapshot> variables,
@@ -20,6 +22,9 @@ internal static class EngineToolchainDetector
         }
 
         DetectEnvironmentLinux(variables, installations);
+        if (OperatingSystem.IsWindows())
+            AddLinuxDirectories(Path.Combine(Path.GetPathRoot(Environment.SystemDirectory)!, "UnrealToolchains"),
+                "Installation standard Unreal", installations, null);
         AddPathExecutable(installations, ToolchainKind.CMake, "CMake", "cmake");
         AddPathExecutable(installations, ToolchainKind.Ninja, "Ninja", "ninja");
         AddPathExecutable(installations, ToolchainKind.Clang, "Clang", "clang");
@@ -38,11 +43,10 @@ internal static class EngineToolchainDetector
         var root = Path.Combine(engine.RootPath, "Engine", "Binaries", "ThirdParty", "DotNet");
         foreach (var versionDirectory in GetDirectoriesSafe(root))
         {
-            var executable = Path.Combine(
-                versionDirectory,
-                OperatingSystem.IsWindows() ? "win-x64" : "linux-x64",
-                OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet");
-            if (File.Exists(executable))
+            var executable = (OperatingSystem.IsWindows() ? WindowsDotNetLayouts : LinuxDotNetLayouts)
+                .Select(folder => Path.Combine(versionDirectory, folder, OperatingSystem.IsWindows() ? "dotnet.exe" : "dotnet"))
+                .FirstOrDefault(File.Exists);
+            if (executable is not null)
             {
                 AddInstallation(
                     installations,
@@ -61,14 +65,10 @@ internal static class EngineToolchainDetector
         UnrealEngineInstallation engine,
         List<ToolchainInstallation> installations)
     {
-        var path = Path.Combine(
-            engine.RootPath,
-            "Engine",
-            "Build",
-            "Android",
-            "Java",
-            OperatingSystem.IsWindows() ? "gradlew.bat" : "gradlew");
-        if (File.Exists(path))
+        var root = Path.Combine(engine.RootPath, "Engine", "Build", "Android", "Java");
+        var wrapper = OperatingSystem.IsWindows() ? "gradlew.bat" : "gradlew";
+        var path = new[] { Path.Combine(root, "gradle", wrapper), Path.Combine(root, wrapper) }.FirstOrDefault(File.Exists);
+        if (path is not null)
         {
             AddInstallation(
                 installations,
@@ -134,7 +134,7 @@ internal static class EngineToolchainDetector
         }
 
         var directories = GetDirectoriesSafe(root);
-        if (directories.Count == 0 && Path.GetFileName(root).StartsWith('v'))
+        if (Path.GetFileName(Path.TrimEndingDirectorySeparator(root)).StartsWith('v'))
         {
             directories = [root];
         }
@@ -142,6 +142,9 @@ internal static class EngineToolchainDetector
         foreach (var directory in directories.Where(item =>
                      Path.GetFileName(item).StartsWith('v')))
         {
+            // A leftover/empty installation directory is not an installed compiler.
+            if (!File.Exists(Path.Combine(directory, "x86_64-unknown-linux-gnu", "bin", OperatingSystem.IsWindows() ? "clang.exe" : "clang")))
+                continue;
             var details = new Dictionary<string, string>();
             if (engineId is not null)
             {

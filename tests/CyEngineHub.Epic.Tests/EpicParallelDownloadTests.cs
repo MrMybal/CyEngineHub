@@ -17,10 +17,39 @@ public sealed class EpicParallelDownloadTests : IDisposable
     [Theory]
     [InlineData("normal")]
     [InlineData("retry")]
+    [InlineData("header-upgrade-cache")]
+    public async Task FabAssetsUseParallelValidatedResumableChunks(string mode)
+    {
+        using var handler = new FixtureHandler(mode);
+        using var http = new HttpClient(handler);
+        using var direct = new DirectFabApiClient(http, new FixtureSession()) { ChunkRetryDelayAsync = (_, _) => Task.CompletedTask };
+        direct.SetDownloadConnections(4);
+        var version = new RemoteFabProjectVersion("qa-version", [], ["5.6"], ["Windows"]);
+        var asset = new RemoteFabAsset("qa-asset", "qa", "Fixture", "", "Fab", "assetPack", null, null, [], [version]);
+        if (mode == "header-upgrade-cache")
+        {
+            var cache = Directory.CreateDirectory(Path.Combine(_root, ".cyenginehub-downloads", asset.AssetId, "chunks")).FullName;
+            await File.WriteAllBytesAsync(Path.Combine(cache, FixtureHandler.GuidFor(0) + ".chunk"), FixtureHandler.UpgradedChunk(0));
+        }
+        var operation = direct.DownloadAsync(asset, version, _root);
+        await handler.FourRequests.Task.WaitAsync(TimeSpan.FromSeconds(8));
+        Assert.Equal(4, handler.Peak);
+        handler.Release.TrySetResult();
+        var result = await operation;
+        Assert.Equal(12, result.FileCount);
+        for (var i = 0; i < 12; i++) Assert.Equal(FixtureHandler.Payload(i), await File.ReadAllBytesAsync(Path.Combine(result.DestinationDirectory, "Engine", $"QA{i}.dat")));
+        if (mode == "header-upgrade-cache") Assert.False(handler.Attempts.ContainsKey(FixtureHandler.GuidFor(0)));
+    }
+
+    [Theory]
+    [InlineData("normal")]
+    [InlineData("retry")]
     [InlineData("cache")]
     [InlineData("timeout-once")]
     [InlineData("truncated-once")]
     [InlineData("long-transient")]
+    [InlineData("header-upgrade")]
+    [InlineData("header-upgrade-cache")]
     public async Task StreamsParallelChunksWithinLimitAndReconstructsVerifiedFiles(string mode)
     {
         using var handler = new FixtureHandler(mode);
@@ -30,6 +59,11 @@ public sealed class EpicParallelDownloadTests : IDisposable
         var backend = new OfficialEpicGamesLauncherEngineBackend(http, direct, session) { ChunkRetryDelayAsync = (_, _) => Task.CompletedTask };
         backend.SetChunkConcurrency(4);
         var target = Path.Combine(_root, "Engine");
+        if (mode == "header-upgrade-cache")
+        {
+            var cache = Directory.CreateDirectory(Path.Combine(target + ".cyenginehub-download", "chunks")).FullName;
+            await File.WriteAllBytesAsync(Path.Combine(cache, FixtureHandler.GuidFor(0) + ".chunk"), FixtureHandler.UpgradedChunk(0));
+        }
         if (mode == "cache")
         {
             var cache = Directory.CreateDirectory(Path.Combine(target + ".cyenginehub-download", "chunks")).FullName;
@@ -59,6 +93,11 @@ public sealed class EpicParallelDownloadTests : IDisposable
             Assert.False(handler.Attempts.ContainsKey(FixtureHandler.GuidFor(0)));
             Assert.Equal(1, handler.Attempts[FixtureHandler.GuidFor(1)]);
             Assert.Equal(FixtureHandler.Chunk(0).Length, samples[^1].CachedBytes);
+        }
+        if (mode == "header-upgrade-cache")
+        {
+            Assert.False(handler.Attempts.ContainsKey(FixtureHandler.GuidFor(0)));
+            Assert.Equal(FixtureHandler.UpgradedChunk(0).Length, samples[^1].CachedBytes);
         }
         Assert.True(Directory.EnumerateFiles(_root, "*", SearchOption.AllDirectories).Sum(path => new FileInfo(path).Length) < 1024 * 1024);
     }
@@ -235,6 +274,7 @@ public sealed class EpicParallelDownloadTests : IDisposable
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var uri = request.RequestUri!;
+            if (uri.Host == "www.fab.com") return Json("{\"downloadInfo\":[{\"distributionPointBaseUrls\":[\"https://qa.invalid/\"],\"distributionPoints\":[{\"manifestUrl\":\"https://qa.invalid/test.manifest\"}]}]}");
             if (uri.Host == "launcher-public-service-prod06.ol.epicgames.com") return Json("{\"elements\":[{\"manifests\":[{\"uri\":\"https://qa.invalid/test.manifest\"}]}]}");
             Assert.Equal("qa.invalid", uri.Host);
             if (uri.AbsolutePath == "/test.manifest") return new(HttpStatusCode.OK) { Content = new ByteArrayContent(Manifest()) };
@@ -252,6 +292,7 @@ public sealed class EpicParallelDownloadTests : IDisposable
                 if (index == 1 && mode == "retry" && attempt == 1) return new(HttpStatusCode.ServiceUnavailable);
                 if (index == 1 && mode == "timeout-once" && attempt == 1) throw new TaskCanceledException("Synthetic HTTP timeout");
                 var bytes = Chunk(index);
+                if (mode.StartsWith("header-upgrade", StringComparison.Ordinal)) bytes = UpgradedChunk(index);
                 if (index == 1 && mode == "midcancel") return new(HttpStatusCode.OK) { Content = new SlowContent(InsideStream) };
                 if (index == 1 && mode == "short") bytes = bytes[..^1];
                 if (index == 1 && (mode == "truncated-once" && attempt == 1 || mode == "long-transient" && attempt <= 4)) bytes = bytes[..^1];
@@ -260,7 +301,7 @@ public sealed class EpicParallelDownloadTests : IDisposable
             finally { Interlocked.Decrement(ref _active); }
         }
         private static HttpResponseMessage Json(string json) => new(HttpStatusCode.OK) { Content = new StringContent(json) };
-        private static byte[] Manifest()
+        private byte[] Manifest()
         {
             var indices = Enumerable.Range(0, 12).ToArray();
             return JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string, object>
@@ -275,7 +316,7 @@ public sealed class EpicParallelDownloadTests : IDisposable
                 }),
                 ["ChunkHashList"] = indices.ToDictionary(GuidFor, _ => Blob(BitConverter.GetBytes(1UL))),
                 ["DataGroupList"] = indices.ToDictionary(GuidFor, _ => Blob([7])),
-                ["ChunkFilesizeList"] = indices.ToDictionary(GuidFor, index => Blob(BitConverter.GetBytes((long)Chunk(index).Length)))
+                ["ChunkFilesizeList"] = indices.ToDictionary(GuidFor, index => Blob(BitConverter.GetBytes((long)(mode.StartsWith("header-upgrade", StringComparison.Ordinal) ? UpgradedChunk(index).Length - 4 : Chunk(index).Length))))
             });
         }
         public static byte[] Chunk(int index)
@@ -285,6 +326,15 @@ public sealed class EpicParallelDownloadTests : IDisposable
             var guid = GuidFor(index);
             for (var part = 0; part < 32; part += 8) writer.Write(uint.Parse(guid.AsSpan(part, 8), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
             writer.Write(1UL); writer.Write((byte)0); writer.Write(Payload(index)); return output.ToArray();
+        }
+        public static byte[] UpgradedChunk(int index)
+        {
+            using var output = new MemoryStream(); using var writer = new BinaryWriter(output);
+            writer.Write(2986228386U); writer.Write(3U); writer.Write(66U); writer.Write(1024U);
+            var guid = GuidFor(index);
+            for (var part = 0; part < 32; part += 8) writer.Write(uint.Parse(guid.AsSpan(part, 8), NumberStyles.HexNumber, CultureInfo.InvariantCulture));
+            writer.Write(1UL); writer.Write((byte)0); writer.Write(new byte[20]); writer.Write((byte)0);
+            writer.Write(1024U); writer.Write(Payload(index)); return output.ToArray();
         }
         private static string Blob(IEnumerable<byte> bytes) => string.Concat(bytes.Select(value => value.ToString("D3", CultureInfo.InvariantCulture)));
     }

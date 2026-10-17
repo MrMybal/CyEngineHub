@@ -4,6 +4,21 @@ namespace CyEngineHub.Core.Tests;
 
 public sealed class HubTaskSchedulerTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TaskLaneIsExplicitAndSurvivesProgressAndCompletion(bool isDownload)
+    {
+        await using var scheduler = new HubTaskScheduler();
+        var changes = new System.Collections.Concurrent.ConcurrentQueue<HubTaskSnapshot>();
+        scheduler.TaskChanged += (_, change) => changes.Enqueue(change.Task);
+        var handle = scheduler.Enqueue(new HubTaskDefinition("Any category", "Misleading download install title", (context, _) =>
+        { context.Report(.5, "Working"); return Task.CompletedTask; }) { IsDownload = isDownload });
+        var result = await handle.Completion.WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.Equal(isDownload, result.IsDownload);
+        Assert.Equal(isDownload, scheduler.GetSnapshot().Single().IsDownload);
+        Assert.All(changes, item => Assert.Equal(isDownload, item.IsDownload));
+    }
     [Fact]
     public async Task CancelQueuedTaskCompletesImmediatelyWithoutExecutingIt()
     {

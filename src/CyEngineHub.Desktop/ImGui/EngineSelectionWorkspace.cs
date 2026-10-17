@@ -13,12 +13,12 @@ internal sealed partial class ImGuiWorkspace
     private bool _engineRemovalRequested;
 
     private bool IsResourceSelected(object item, bool engines) => engines
-        ? _selectedEnginePaths.Contains(Value(item, "Path")) : ReferenceEquals(item, _selectedResource);
+        ? _selectedEnginePaths.Contains(Value(item, "Path")) : IsItemSelected(item);
 
     private void SelectResource(object item, object[] items, bool engines)
     {
         _selectedResource = item;
-        if (!engines) return;
+        if (!engines) { SelectItem(item); return; }
         var path = Value(item, "Path");
         var io = Gui.GetIO();
         if (io.KeyShift && _engineSelectionAnchor is not null)
@@ -64,6 +64,13 @@ internal sealed partial class ImGuiWorkspace
         {
             var paths = _selectedEnginePaths.ToArray();
             Gui.TextDisabled(paths.Length + " moteur(s) sélectionné(s)"); Gui.Separator();
+            if (_selectedResource is { } favoriteEngine)
+            {
+                var addFavorite = !vm.IsResourceFavorite(favoriteEngine);
+                if (Gui.MenuItem(addFavorite ? "Ajouter aux favoris" : "Retirer des favoris"))
+                    _actions.Enqueue(() => vm.SetResourceFavorites(vm.Engines.Cast<object>().Concat(vm.LocalEngineInstallations).Where(item => paths.Contains(Value(item, "Path"))), addFavorite));
+                Record("engine-context/favorite");
+            }
             var resumableDownloads = vm.EpicEngineDownloads.Where(item => item.CanRetry && paths.Contains(item.Path)).ToArray();
             if (resumableDownloads.Length > 0 && Gui.MenuItem("Reprendre les téléchargements sélectionnés"))
                 _actions.Enqueue(() => { foreach (var download in resumableDownloads) if (download.RetryCommand.CanExecute(null)) download.RetryCommand.Execute(null); });
@@ -79,6 +86,9 @@ internal sealed partial class ImGuiWorkspace
             if (Gui.MenuItem("Vérifier les installations")) _actions.Enqueue(() => vm.RunEngineSelectionAction(paths, "check"));
             Record("engine-context/check");
             if (Gui.IsItemHovered()) Gui.SetTooltip("Vérifie les dossiers, Build.version, l’éditeur et les outils locaux. Aucun téléchargement.");
+            if (Gui.MenuItem("Analyser la taille des moteurs sélectionnés")) _actions.Enqueue(() => vm.RunEngineSelectionAction(paths, "size"));
+            Record("engine-context/size");
+            if (Gui.IsItemHovered()) Gui.SetTooltip("Analyse ciblée en arrière-plan, annulable dans Actions. Aucune analyse des autres dossiers.");
             Gui.BeginDisabled(vm.IsCheckingOfficialEngineUpdates || !vm.Engines.Any(engine => paths.Contains(engine.Path) && engine.IsOfficialEpic));
             if (Gui.MenuItem("Rechercher les mises à jour officielles")) _actions.Enqueue(() => vm.RunEngineSelectionAction(paths, "updates"));
             Record("engine-context/updates");

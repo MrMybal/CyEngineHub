@@ -16,20 +16,22 @@ internal static class ImGuiTheme
     public static readonly Vector4 Success = Rgb(0x5CD26E);
     public static readonly Vector4 OfficialRow = Rgb(0x334C3A);
     public static readonly Vector4 Warning = Rgb(0xF5A623);
-    private static bool IsCreationCommand(string? command) => command is "ToggleProjectCreatorCommand" or "ToggleEngineImporterCommand";
-    internal static int PushActionColors(string? command, bool primary)
+    internal static int PushActionColors(string? command, bool primary, bool danger = false)
     {
-        if (IsCreationCommand(command))
+        var tone = ActionColorPolicy.Resolve(command, primary, danger);
+        if (tone is ActionTone.Start or ActionTone.Danger)
         {
-            Gui.PushStyleColor(ImGuiCol.Button, Rgb(0x287346));
-            Gui.PushStyleColor(ImGuiCol.ButtonHovered, Rgb(0x348D57));
-            Gui.PushStyleColor(ImGuiCol.ButtonActive, Rgb(0x205D38));
+            Gui.PushStyleColor(ImGuiCol.Button, Rgb(tone == ActionTone.Start ? 0x287346u : 0x872D40u));
+            Gui.PushStyleColor(ImGuiCol.ButtonHovered, Rgb(tone == ActionTone.Start ? 0x348D57u : 0xA63B50u));
+            Gui.PushStyleColor(ImGuiCol.ButtonActive, Rgb(tone == ActionTone.Start ? 0x205D38u : 0x6B2232u));
             Gui.PushStyleColor(ImGuiCol.Text, Rgb(0xFFFFFF));
             return 4;
         }
         if (!primary) return 0;
-        Gui.PushStyleColor(ImGuiCol.Button, Primary);
-        return 1;
+        Gui.PushStyleColor(ImGuiCol.Button, Rgb(0x315E82));
+        Gui.PushStyleColor(ImGuiCol.ButtonHovered, Rgb(0x4079A3));
+        Gui.PushStyleColor(ImGuiCol.ButtonActive, Rgb(0x254865));
+        return 3;
     }
     internal static Vector4 Rgb(uint hex) => new(((hex >> 16) & 255) / 255f, ((hex >> 8) & 255) / 255f, (hex & 255) / 255f, 1);
     public static void Apply()
@@ -52,9 +54,9 @@ internal static class ImGuiTheme
         s.Colors[(int)ImGuiCol.Button] = Rgb(0x4B4B4B);
         s.Colors[(int)ImGuiCol.ButtonHovered] = Rgb(0x626262);
         s.Colors[(int)ImGuiCol.ButtonActive] = Primary;
-        s.Colors[(int)ImGuiCol.Header] = Selected;
-        s.Colors[(int)ImGuiCol.HeaderHovered] = Rgb(0x625444);
-        s.Colors[(int)ImGuiCol.HeaderActive] = Primary;
+        s.Colors[(int)ImGuiCol.Header] = Rgb(0x414141);
+        s.Colors[(int)ImGuiCol.HeaderHovered] = Rgb(0x555555);
+        s.Colors[(int)ImGuiCol.HeaderActive] = Rgb(0x626262);
         s.Colors[(int)ImGuiCol.CheckMark] = Accent; s.Colors[(int)ImGuiCol.SliderGrab] = Accent;
         s.Colors[(int)ImGuiCol.PlotHistogram] = Rgb(0x52D1A2);
         s.Colors[(int)ImGuiCol.Tab] = Rgb(0x414141);

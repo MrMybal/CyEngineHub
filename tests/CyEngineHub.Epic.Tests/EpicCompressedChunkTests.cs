@@ -9,6 +9,31 @@ public sealed class EpicCompressedChunkTests
     internal static readonly EpicManifestChunk Expected = new(new string('0', 32), 0, 0, 0, new Uri("https://qa.invalid/chunk"));
 
     [Theory]
+    [InlineData(4, true)]
+    [InlineData(1, false)]
+    [InlineData(8, false)]
+    public void OnlyThePreciseV2ToV3HeaderUpgradeMayDifferFromTheManifest(int difference, bool valid)
+    {
+        var payload = new byte[1024];
+        var raw = Create(payload);
+        var expected = Expected with { DownloadSize = raw.Length - difference };
+        if (valid) Assert.Equal(payload, EpicManifestParser.ParseChunk(raw, expected));
+        else Assert.Throws<DirectFabException>(() => EpicManifestParser.ParseChunk(raw, expected));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(-1)]
+    public void HeaderUpgradeNeverAcceptsAnIncompleteOrOverlongPayload(int delta)
+    {
+        var raw = Create(new byte[1024]);
+        var expected = Expected with { DownloadSize = raw.Length - 4 };
+        var declared = BinaryPrimitives.ReadUInt32LittleEndian(raw.AsSpan(12));
+        BinaryPrimitives.WriteUInt32LittleEndian(raw.AsSpan(12), checked((uint)(declared + delta)));
+        Assert.Throws<DirectFabException>(() => EpicManifestParser.ParseChunk(raw, expected));
+    }
+
+    [Theory]
     [InlineData("valid")]
     [InlineData("unknown-size")]
     [InlineData("overrun")]

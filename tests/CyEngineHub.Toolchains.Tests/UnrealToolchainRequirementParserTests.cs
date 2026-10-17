@@ -99,6 +99,15 @@ public sealed class UnrealToolchainRequirementParserTests : IDisposable
         Assert.Equal("v22_clang-16.0.6-centos7", result.Linux!.MainVersion);
     }
 
+    [Fact]
+    public async Task ParserReadsLegacyLinuxMainVersionMethod()
+    {
+        var source = CreateSource("Linux", "LinuxPlatformSDK.Versions.cs");
+        await File.WriteAllTextAsync(source, "public override string GetMainVersion() { return \"v21_clang-15.0.1-centos7\"; }");
+        var result = await new UnrealToolchainRequirementParser().ParseAsync(ToolchainTestData.CreateEngine(_testDirectory));
+        Assert.Equal("v21_clang-15.0.1-centos7", result.Linux!.MainVersion);
+    }
+
     private string CreateConfig(string platform, string fileName)
     {
         var directory = Path.Combine(_testDirectory, "Engine", "Config", platform);

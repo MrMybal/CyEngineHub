@@ -507,7 +507,7 @@ public sealed class FabLocalContentLibraryServiceTests
             writer.Write(2_986_228_386U);
             writer.Write(1U);
             writer.Write(41U);
-            writer.Write(0U);
+            writer.Write((uint)payload.Length);
             for (var index = 0; index < 4; index++)
             {
                 writer.Write(Convert.ToUInt32(chunkGuid.Substring(index * 8, 8), 16));

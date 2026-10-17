@@ -234,7 +234,7 @@ public sealed partial class UnrealToolchainRequirementParser : IUnrealToolchainR
         {
             var text = await ReadBoundedTextAsync(sourcePath, cancellationToken).ConfigureAwait(false);
             return new LinuxToolchainRequirement(
-                MatchMethodReturn(text, "GetMainVersionInternal"),
+                MatchMethodReturn(text, "GetMainVersionInternal") ?? MatchMethodReturn(text, "GetMainVersion"),
                 MatchAssignment(text, "MinVersion"),
                 MatchAssignment(text, "MaxVersion"),
                 sourcePath);

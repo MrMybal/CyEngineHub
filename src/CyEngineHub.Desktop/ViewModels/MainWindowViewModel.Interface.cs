@@ -5,6 +5,17 @@ public sealed partial class MainWindowViewModel
     private bool _useCompactInterface = true;
     private bool _engineCardsView = true;
     private bool _projectCardsView = true;
+    private bool _engineImageOnlyCards, _projectImageOnlyCards, _engineRowImages, _projectRowImages;
+    public bool EngineImageOnlyCards { get => _engineImageOnlyCards; set { if (SetProperty(ref _engineImageOnlyCards, value)) SaveInterfacePreference("interface.engines.image-only.v2", value); } }
+    public bool ProjectImageOnlyCards { get => _projectImageOnlyCards; set { if (SetProperty(ref _projectImageOnlyCards, value)) SaveInterfacePreference("interface.projects.image-only.v2", value); } }
+    public bool EngineRowImages { get => _engineRowImages; set { if (SetProperty(ref _engineRowImages, value)) SaveInterfacePreference("interface.engines.row-images.v2", value); } }
+    public bool ProjectRowImages { get => _projectRowImages; set { if (SetProperty(ref _projectRowImages, value)) SaveInterfacePreference("interface.projects.row-images.v2", value); } }
+    public void SetResourcePresentation(bool engines, int mode)
+    {
+        if (mode is < 0 or > 3) throw new ArgumentOutOfRangeException(nameof(mode));
+        if (engines) { EngineCardsView = mode < 2; EngineImageOnlyCards = mode == 1; EngineRowImages = mode == 3; }
+        else { ProjectCardsView = mode < 2; ProjectImageOnlyCards = mode == 1; ProjectRowImages = mode == 3; }
+    }
     private bool _libraryImageOnlyCards;
     private bool _libraryRows;
     private bool _libraryRowImages;
@@ -64,6 +75,14 @@ public sealed partial class MainWindowViewModel
         _projectCardsView = !bool.TryParse(projects, out var projectCards) || projectCards;
         OnPropertyChanged(nameof(EngineCardsView));
         OnPropertyChanged(nameof(ProjectCardsView));
+        _engineImageOnlyCards = bool.TryParse(await _settings.GetAsync("interface.engines.image-only.v2").ConfigureAwait(true), out var engineMinimal) && engineMinimal;
+        _projectImageOnlyCards = bool.TryParse(await _settings.GetAsync("interface.projects.image-only.v2").ConfigureAwait(true), out var projectMinimal) && projectMinimal;
+        _engineRowImages = bool.TryParse(await _settings.GetAsync("interface.engines.row-images.v2").ConfigureAwait(true), out var engineImages) && engineImages;
+        _projectRowImages = bool.TryParse(await _settings.GetAsync("interface.projects.row-images.v2").ConfigureAwait(true), out var projectImages) && projectImages;
+        OnPropertyChanged(nameof(EngineImageOnlyCards));
+        OnPropertyChanged(nameof(ProjectImageOnlyCards));
+        OnPropertyChanged(nameof(EngineRowImages));
+        OnPropertyChanged(nameof(ProjectRowImages));
         var imageOnly = await _settings.GetAsync("interface.library.image-only.v2").ConfigureAwait(true);
         _libraryImageOnlyCards = bool.TryParse(imageOnly, out var minimal) && minimal;
         _libraryRows = bool.TryParse(await _settings.GetAsync("interface.library.rows.v2").ConfigureAwait(true), out var rows) && rows;

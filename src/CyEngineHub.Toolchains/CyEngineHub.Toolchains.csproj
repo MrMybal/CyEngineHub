@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <InternalsVisibleTo Include="CyEngineHub.Toolchains.Tests" />
     <ProjectReference Include="../CyEngineHub.Core/CyEngineHub.Core.csproj" />
     <ProjectReference Include="../CyEngineHub.Unreal/CyEngineHub.Unreal.csproj" />
   </ItemGroup>

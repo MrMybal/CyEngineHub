@@ -209,7 +209,6 @@
 
         <StackPanel Grid.Row="1">
           <TextBlock Text="ENVIRONNEMENT" FontSize="10" FontWeight="Bold" Foreground="#617184" Margin="10,0,0,7" />
-          <Button Classes="nav" Classes.active="{Binding IsHomeNavigationActive}" Content="Vue d’ensemble" Command="{Binding ShowHomeCommand}" />
           <Button Classes="nav" Classes.active="{Binding IsEnginesNavigationActive}" Content="Moteurs" Command="{Binding ShowEnginesCommand}" />
           <Button Classes="nav" Classes.active="{Binding IsProjectsNavigationActive}" Content="Projets" Command="{Binding ShowProjectsCommand}" />
           <Button Classes="nav" Classes.active="{Binding IsLibraryNavigationActive}" Content="Bibliothèque" Command="{Binding ShowLibraryCommand}" />
@@ -255,112 +254,6 @@
       </Border>
 
       <Grid Grid.Row="1" Margin="10,4,16,8">
-        <ScrollViewer IsVisible="{Binding IsHomeVisible}" VerticalScrollBarVisibility="Auto">
-          <StackPanel Spacing="18">
-            <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="14">
-              <Border Classes="metric">
-                <StackPanel>
-                  <TextBlock Text="MOTEURS" FontSize="10" FontWeight="Bold" Foreground="#6E8196" />
-                  <TextBlock Text="{Binding EngineCount}" FontSize="34" FontWeight="SemiBold" Foreground="#EAF1F8" Margin="0,8,0,0" />
-                  <TextBlock Text="Installations détectées" FontSize="11" Foreground="#74869A" />
-                </StackPanel>
-              </Border>
-              <Border Grid.Column="1" Classes="metric">
-                <StackPanel>
-                  <TextBlock Text="PROJETS" FontSize="10" FontWeight="Bold" Foreground="#6E8196" />
-                  <TextBlock Text="{Binding ProjectCount}" FontSize="34" FontWeight="SemiBold" Foreground="#EAF1F8" Margin="0,8,0,0" />
-                  <TextBlock Text="Descripteurs catalogués" FontSize="11" Foreground="#74869A" />
-                </StackPanel>
-              </Border>
-              <Border Grid.Column="2" Classes="metric">
-                <StackPanel>
-                  <TextBlock Text="TOOLCHAINS" FontSize="10" FontWeight="Bold" Foreground="#6E8196" />
-                  <TextBlock Text="{Binding ToolchainProblemCount}" FontSize="34" FontWeight="SemiBold" Foreground="#F2B84B" Margin="0,8,0,0" />
-                  <TextBlock Text="Compatibilités à vérifier" FontSize="11" Foreground="#74869A" />
-                </StackPanel>
-              </Border>
-              <Border Grid.Column="3" Classes="metric">
-                <StackPanel>
-                  <TextBlock Text="ATTENTION" FontSize="10" FontWeight="Bold" Foreground="#6E8196" />
-                  <TextBlock Text="{Binding WarningCount}" FontSize="34" FontWeight="SemiBold" Foreground="#F2B84B" Margin="0,8,0,0" />
-                  <TextBlock Text="Éléments à vérifier" FontSize="11" Foreground="#74869A" />
-                </StackPanel>
-              </Border>
-            </Grid>
-
-            <Grid ColumnDefinitions="2*,*" ColumnSpacing="14">
-              <Border Classes="card">
-                <StackPanel>
-                  <TextBlock Text="Démarrage rapide" FontSize="16" FontWeight="SemiBold" />
-                  <TextBlock
-                      Text="CyEngineHub fédère des providers indépendants pour Unreal, Unity, Godot, CryEngine et les moteurs futurs. Chaque provider contrôle sa détection, ses projets, ses builds et ses assets."
-                      TextWrapping="Wrap"
-                      Foreground="#8799AC"
-                      FontSize="12"
-                      Margin="0,8,0,18" />
-                  <WrapPanel>
-                    <Button Classes="accent" Content="Voir les moteurs" Command="{Binding ShowEnginesCommand}" Margin="0,0,8,0" />
-                    <Button Classes="ghost" Content="Voir les projets" Command="{Binding ShowProjectsCommand}" />
-                  </WrapPanel>
-                </StackPanel>
-              </Border>
-              <Border Grid.Column="1" Classes="card">
-                <StackPanel>
-                  <TextBlock Text="Mode local" FontSize="16" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding StorageMode}" Foreground="#55C7A6" FontWeight="SemiBold" Margin="0,10,0,0" />
-                  <TextBlock Text="{Binding DataDirectory}" TextWrapping="Wrap" Foreground="#718398" FontSize="11" Margin="0,5,0,0" />
-                  <TextBlock Text="Aucune télémétrie." Foreground="#718398" FontSize="11" Margin="0,16,0,0" />
-                </StackPanel>
-              </Border>
-            </Grid>
-
-            <Border Classes="card">
-              <StackPanel>
-                <TextBlock Text="Modules du hub" FontSize="16" FontWeight="SemiBold" />
-                <TextBlock
-                    Text="Moteurs · Projets · Builds UBT/UAT · Git &amp; LFS · Plugins locaux · Toolchains · Stockage Unreal et Safe Clean"
-                    Foreground="#8294A8"
-                    Margin="0,9,0,0" />
-              </StackPanel>
-            </Border>
-
-            <Border Classes="card">
-              <StackPanel Spacing="12">
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Text="Stockage local" FontSize="16" FontWeight="SemiBold" />
-                  <Button Grid.Column="1" Classes="ghost" Content="Ouvrir Stockage" Command="{Binding ShowStorageCommand}" />
-                </Grid>
-                <Grid ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="16">
-                  <StackPanel>
-                    <TextBlock Text="MOTEURS" FontSize="9" FontWeight="Bold" Foreground="#5F7287" />
-                    <TextBlock Text="{Binding StorageEngineSize}" FontSize="15" Margin="0,4,0,0" />
-                  </StackPanel>
-                  <StackPanel Grid.Column="1">
-                    <TextBlock Text="PROJETS" FontSize="9" FontWeight="Bold" Foreground="#5F7287" />
-                    <TextBlock Text="{Binding StorageProjectSize}" FontSize="15" Margin="0,4,0,0" />
-                  </StackPanel>
-                  <StackPanel Grid.Column="2">
-                    <TextBlock Text="DDC" FontSize="9" FontWeight="Bold" Foreground="#5F7287" />
-                    <TextBlock Text="{Binding StorageDdcSize}" FontSize="15" Margin="0,4,0,0" />
-                  </StackPanel>
-                  <StackPanel Grid.Column="3">
-                    <TextBlock Text="VAULT" FontSize="9" FontWeight="Bold" Foreground="#5F7287" />
-                    <TextBlock Text="{Binding StorageVaultSize}" FontSize="15" Margin="0,4,0,0" />
-                  </StackPanel>
-                  <StackPanel Grid.Column="4">
-                    <TextBlock Text="GIT LFS" FontSize="9" FontWeight="Bold" Foreground="#5F7287" />
-                    <TextBlock Text="{Binding StorageLfsSize}" FontSize="15" Margin="0,4,0,0" />
-                  </StackPanel>
-                  <StackPanel Grid.Column="5">
-                    <TextBlock Text="SAFE CLEAN" FontSize="9" FontWeight="Bold" Foreground="#5F7287" />
-                    <TextBlock Text="{Binding StorageReclaimableSize}" FontSize="15" Foreground="#55C7A6" Margin="0,4,0,0" />
-                  </StackPanel>
-                </Grid>
-                <TextBlock Text="Valeurs issues du dernier inventaire manuel en cache." FontSize="9" Foreground="#617489" />
-              </StackPanel>
-            </Border>
-          </StackPanel>
-        </ScrollViewer>
 
         <Grid IsVisible="{Binding IsEnginesVisible}" RowDefinitions="0,Auto,*">
           <Border Classes="card" Margin="0,0,0,14" IsVisible="False">

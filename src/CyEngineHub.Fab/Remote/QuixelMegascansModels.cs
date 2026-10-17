@@ -38,6 +38,7 @@ public interface IQuixelSessionStore
 
 public interface IQuixelMegascansClient
 {
+    void SetDownloadConnections(int connections) { }
     Uri AuthorizationUri { get; }
 
     Task<QuixelStatus> GetStatusAsync(CancellationToken cancellationToken = default);

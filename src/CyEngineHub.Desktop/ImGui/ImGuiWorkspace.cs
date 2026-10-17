@@ -208,12 +208,14 @@ internal sealed partial class ImGuiWorkspace : IDisposable
             case "ItemsControl": DrawItems(node, context); break;
             case "Grid":
                 if (_root is MainWindowViewModel { IsLibraryVisible: true } toolbar && node["Name"] == "LibrarySearchToolbar") DrawLibrarySearchToolbar(toolbar, node);
+                else if (_root is MainWindowViewModel { IsLibraryVisible: true } header && node["Name"] == "LibraryCatalogHeader") DrawLibraryCatalogHeader(header, node);
                 else if (_root is MainWindowViewModel { IsLibraryVisible: true } display && node["Name"] == "LibraryDisplayToolbar") DrawLibraryDisplayToolbar(display);
                 else DrawGrid(node, context);
                 break;
             case "WrapPanel":
             case "StackPanel":
-                if (_root is MainWindowViewModel { IsLibraryVisible: true } library && node["Orientation"] == "Horizontal" &&
+                if (_root is MainWindowViewModel product && node["Name"] == "ProductActionPanel") DrawProductActions(product);
+                else if (_root is MainWindowViewModel { IsLibraryVisible: true } library && node["Orientation"] == "Horizontal" &&
                     UiBinding.Path(node["IsVisible"]) == "IsLibraryQuixelSelected") DrawQuixelSubTabs(library);
                 else DrawStack(node, context);
                 break;
@@ -337,8 +339,8 @@ internal sealed partial class ImGuiWorkspace : IDisposable
                 "ShowQuixelCollectionsTabCommand" => Flag(_root, "IsQuixelCollectionsTabSelected"),
                 _ => false,
             };
-        var colorCount = ImGuiTheme.PushActionColors(UiBinding.Path(node["Command"]), accent);
-        if (selected || danger) { Gui.PushStyleColor(ImGuiCol.Button, selected ? ImGuiTheme.Selected : new Vector4(.48f, .15f, .22f, 1)); colorCount++; }
+        var colorCount = ImGuiTheme.PushActionColors(UiBinding.Path(node["Command"]), accent, danger);
+        if (selected && !danger) { Gui.PushStyleColor(ImGuiCol.Button, ImGuiTheme.Selected); colorCount++; }
         if (Gui.Button(NormalizeLabel(label) + "###button"))
         {
             if (node["Click"] is { } action) _actions.Enqueue(() => _nativeAction?.Invoke(action));
@@ -455,6 +457,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
 
     private static float NaturalWidth(UiNode node, object? context)
     {
+        if (node["Name"] == "ProductActionPanel") return 240;
         if (node.Kind == "Button") return Gui.CalcTextSize(NormalizeLabel(ButtonLabel(node, context))).X + Gui.GetStyle().FramePadding.X * 2;
         if (node.Kind is "CheckBox" or "ToggleSwitch") return Gui.CalcTextSize(Text(context, node["Content"])).X + 35;
         if (node.Kind is "TextBlock" or "SelectableTextBlock") return Gui.CalcTextSize(Text(context, node["Text"])).X;
@@ -519,19 +522,24 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         var selected = UiBinding.Read(context, node["SelectedItem"]);
         var scroll = node.Kind == "ListBox";
         var binding = UiBinding.Path(node["ItemsSource"]) ?? node.Id;
+        if (_root is MainWindowViewModel favoriteVm && binding is "FabLocalContentPacks" or "QuixelLocalAssets" or "QuixelCollectionCards")
+        {
+            var filtered = values.Cast<object>().Where(item => !favoriteVm.FavoritesOnly || favoriteVm.IsResourceFavorite(item));
+            values = (favoriteVm.FavoritesFirst ? filtered.OrderByDescending(favoriteVm.IsResourceFavorite) : filtered).ToArray();
+        }
         if (binding == "PagedRemoteFabRows")
         {
             DrawAssetCatalog(values.Cast<RemoteFabAssetRowViewModel>().ToArray(), binding);
             return;
         }
         if (_root is MainWindowViewModel { IsLibraryVisible: true, IsLibraryRowsMode: true } rowVm &&
-            (binding is "QuixelCollectionCards" or "QuixelLocalAssets" || binding == "Assets" && context is ConnectorLibraryViewModel))
+            (binding is "QuixelCollectionCards" or "QuixelLocalAssets" or "FabLocalContentPacks" || binding == "Assets" && context is ConnectorLibraryViewModel))
         {
             DrawLocalLibraryRows(values.Cast<object>().ToArray(), binding, rowVm.IsLibraryRowImages);
             return;
         }
         if (_root is MainWindowViewModel { IsLibraryVisible: true, IsLibraryImageOnlyCards: true } &&
-            (binding is "QuixelCollectionCards" or "QuixelLocalAssets" || binding == "Assets" && context is ConnectorLibraryViewModel))
+            (binding is "QuixelCollectionCards" or "QuixelLocalAssets" or "FabLocalContentPacks" || binding == "Assets" && context is ConnectorLibraryViewModel))
         {
             DrawMinimalLibraryCatalog(values.Cast<object>().ToArray(), binding);
             return;
@@ -544,6 +552,8 @@ internal sealed partial class ImGuiWorkspace : IDisposable
             Gui.BeginChild("list", new(0, binding == "QuixelCollectionCards" ? height : Math.Clamp(height, 120, 650)), ImGuiChildFlags.Borders);
             if (_scrollRequests.Remove(binding)) Gui.SetScrollY(Gui.GetScrollMaxY());
         }
+        if (binding is "FabLocalContentPacks" or "QuixelLocalAssets" or "QuixelCollectionCards" || binding == "Assets" && context is ConnectorLibraryViewModel)
+            SynchronizeItemSelection(LibrarySelectionScope(binding), values.Cast<object>());
         void Item(int index)
         {
             if (index >= values.Count) return;
@@ -575,6 +585,13 @@ internal sealed partial class ImGuiWorkspace : IDisposable
                 DrawNode(template, item);
                 if (Equals(item, selected)) Gui.PopStyleColor();
                 Gui.EndGroup();
+                if (item is FabLocalContentPackCardViewModel or QuixelLocalAssetCardViewModel or QuixelCollectionCardViewModel or ConnectorAssetViewModel)
+                {
+                    if (Gui.IsItemClicked()) SelectItem(item);
+                    if (Gui.IsItemClicked(ImGuiMouseButton.Right)) { RequestItemContext(item,
+                        item is FabLocalContentPackCardViewModel ? "UseForImportCommand" : item is QuixelLocalAssetCardViewModel ? "UseCommand" : "OpenCommand"); }
+                    if (IsItemSelected(item)) DrawCardSelection(Gui.GetItemRectMin(), Gui.GetItemRectMax());
+                }
                 if (node["SelectedItem"] is not null && Gui.IsItemClicked()) Set(context, node["SelectedItem"], item);
                 Record("list/" + binding + "/" + Label(item));
             }

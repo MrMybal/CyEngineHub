@@ -9,16 +9,17 @@ internal sealed partial class ImGuiWorkspace
     private string? _remoteRowsSortValue;
     private void DrawRemoteAssetRows(MainWindowViewModel vm, string binding)
     {
-        if (!Gui.BeginTable("library-assets", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY | ImGuiTableFlags.BordersInnerH,
+        if (!Gui.BeginTable("library-assets", 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY | ImGuiTableFlags.BordersInnerH,
             new(0, System.Math.Max(120, Gui.GetContentRegionAvail().Y - 4)))) return;
         Gui.TableSetupColumn("Nom", ImGuiTableColumnFlags.WidthStretch, 3);
         Gui.TableSetupColumn("Catégorie", ImGuiTableColumnFlags.WidthStretch, 1.2f);
         Gui.TableSetupColumn("Versions", ImGuiTableColumnFlags.WidthStretch, 1.4f);
         Gui.TableSetupColumn("Acquisition", ImGuiTableColumnFlags.WidthFixed, 140 * UiScale);
+        Gui.TableSetupColumn("Taille locale", ImGuiTableColumnFlags.WidthFixed, 110 * UiScale);
         Gui.TableSetupScrollFreeze(0, 1);
         if (_remoteRowsSortValue != vm.SelectedLibrarySort) _tableSorts.Remove("library-assets");
         var oldSort = _tableSorts.GetValueOrDefault("library-assets", (-1, false));
-        var sort = SortableHeaders("library-assets", ["Nom", "Catégorie", "Versions", "Acquisition"]);
+        var sort = SortableHeaders("library-assets", ["Nom", "Catégorie", "Versions", "Acquisition", "Taille locale"]);
         if (sort != oldSort)
         {
             // The VM sorts the complete filtered catalog asynchronously before pagination.
@@ -27,6 +28,7 @@ internal sealed partial class ImGuiWorkspace
                 0 => sort.Descending ? "Nom · Z → A" : "Nom · A → Z",
                 1 => sort.Descending ? "Catégorie · Z → A" : "Catégorie",
                 2 => sort.Descending ? "Versions moteur" : "Versions moteur · croissant",
+                4 => sort.Descending ? "Taille locale · décroissant" : "Taille locale · croissant",
                 _ => sort.Descending ? "Acquisition · récent" : "Acquisition · ancien",
             };
         }
@@ -48,6 +50,8 @@ internal sealed partial class ImGuiWorkspace
             Gui.TableNextColumn(); Gui.TextUnformatted(Elide(card.AllEngineVersions, Gui.GetContentRegionAvail().X));
             if (Gui.IsItemHovered()) Gui.SetTooltip(card.AllEngineVersions);
             Gui.TableNextColumn(); Gui.TextDisabled(card.Asset.AcquiredAt?.ToLocalTime().ToString("d", System.Globalization.CultureInfo.CurrentCulture) ?? "Inconnue");
+            Gui.TableNextColumn(); Gui.TextDisabled(vm.ResourceSizeBytes(card) is not null ? vm.ResourceSizeLabel(card) : "—");
+            if (Gui.IsItemHovered()) Gui.SetTooltip(vm.ResourceSizeEvidence(card));
             Gui.PopID();
         });
         if (Gui.GetScrollMaxY() - Gui.GetScrollY() < 500) _actions.Enqueue(vm.LoadMoreLibraryItems);
@@ -57,13 +61,22 @@ internal sealed partial class ImGuiWorkspace
         Avalonia.Media.Imaging.Bitmap? bitmap, bool image, string placeholder)
     {
         var position = Gui.GetCursorScreenPos();
-        if (Gui.Selectable("###library-row", _selectedAssetCard == id, ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick,
+        PushRowSelection();
+        if (Gui.Selectable("###library-row", IsItemSelected(item), ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick,
             new(0, height - Gui.GetStyle().CellPadding.Y * 2)))
         {
-            _selectedAssetCard = id;
+            SelectItem(item);
             if (Gui.IsMouseDoubleClicked(ImGuiMouseButton.Left)) Execute(item, "{Binding " + command + "}");
         }
+        if (Gui.IsItemClicked(ImGuiMouseButton.Right)) RequestItemContext(item, command);
+        if (IsItemSelected(item))
+        {
+            Gui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, Gui.ColorConvertFloat4ToU32(ImGuiTheme.Rgb(0x815022)));
+            Record("selection/row/" + id);
+            Record("selection/item/" + MainWindowViewModel.ResourceIdentity(item));
+        }
         var rect = new System.Numerics.Vector4(Gui.GetItemRectMin().X, Gui.GetItemRectMin().Y, Gui.GetItemRectMax().X, Gui.GetItemRectMax().Y);
+        Gui.PopStyleColor(3);
         Gui.SetCursorScreenPos(position);
         if (image)
         {
@@ -75,8 +88,11 @@ internal sealed partial class ImGuiWorkspace
             Record("library-row-image/" + id);
             Gui.SameLine();
         }
+        var favorite = _root is MainWindowViewModel favoriteVm && favoriteVm.IsResourceFavorite(item);
+        if (favorite && !image) Gui.SetCursorScreenPos(Gui.GetCursorScreenPos() + new System.Numerics.Vector2(22 * UiScale, 0));
         Gui.TextUnformatted(Elide(name, Gui.GetContentRegionAvail().X));
         if (Gui.IsItemHovered()) Gui.SetTooltip(name);
+        if (favorite) DrawFavoriteMarker(position + new System.Numerics.Vector2(8, 9) * UiScale);
         Elements["library-select/" + id] = rect;
     }
     private void DrawLocalLibraryRows(object[] items, string binding, bool images)
@@ -88,7 +104,14 @@ internal sealed partial class ImGuiWorkspace
         Gui.TableSetupColumn("Catégorie / format", ImGuiTableColumnFlags.WidthStretch, 2);
         Gui.TableSetupScrollFreeze(0, 1); SortableHeaders(id, ["Nom", "Catégorie / format"]);
         string Category(object item) => item is ConnectorAssetViewModel connector ? connector.Details : Value(item, "Category");
+        if (_root is MainWindowViewModel favorites)
+        {
+            items = items.Where(item => !favorites.FavoritesOnly || favorites.IsResourceFavorite(item)).ToArray();
+            if (favorites.FavoritesFirst) items = items.OrderByDescending(favorites.IsResourceFavorite).ToArray();
+        }
         items = SortTableItems(id, items, (item, column) => column == 0 ? Value(item, "Name") : Category(item));
+        if (_root is MainWindowViewModel firstVm && firstVm.FavoritesFirst) items = items.OrderByDescending(firstVm.IsResourceFavorite).ToArray();
+        SynchronizeItemSelection(LibrarySelectionScope(binding), items);
         var height = images ? 48 * UiScale + Gui.GetStyle().CellPadding.Y * 2 : System.Math.Max(30 * UiScale, Gui.GetTextLineHeight() + Gui.GetStyle().CellPadding.Y * 2);
         Clipped(items.Length, height, index =>
         {
@@ -96,12 +119,12 @@ internal sealed partial class ImGuiWorkspace
             if (images && item is QuixelCollectionCardViewModel collection)
             { collection.EnsureThumbnailLoaded(); _collections.Add(collection); _seenCollections.Add(collection); }
             Gui.PushID(index); Gui.TableNextRow(ImGuiTableRowFlags.None, height); Gui.TableNextColumn();
-            var stableId = item is ConnectorAssetViewModel connector ? connector.Asset.Id : item is QuixelCollectionCardViewModel group ? group.Collection.Id : Value(item, "AssetId");
+            var stableId = MainWindowViewModel.ResourceIdentity(item);
             LibraryRowName(item, Value(item, "Name"), binding + "/" + stableId,
-                item is QuixelCollectionCardViewModel or ConnectorAssetViewModel ? "OpenCommand" : "UseCommand", height,
+                item is QuixelCollectionCardViewModel or ConnectorAssetViewModel ? "OpenCommand" : item is FabLocalContentPackCardViewModel ? "UseForImportCommand" : "UseCommand", height,
                 images ? UiBinding.Read(item, "{Binding Thumbnail}") as Avalonia.Media.Imaging.Bitmap : null, images, "PACK");
             Record("library-local-row/" + Value(item, "Name"));
-            Gui.TableNextColumn(); Gui.TextUnformatted(Elide(Category(item), Gui.GetContentRegionAvail().X)); Gui.PopID();
+            Gui.TableNextColumn(); Gui.TextUnformatted(Elide(Category(item) + " · " + (_root as MainWindowViewModel)?.ResourceSizeLabel(item), Gui.GetContentRegionAvail().X)); Gui.PopID();
             VisibleRows[binding] = VisibleRows.GetValueOrDefault(binding) + 1;
         });
         Gui.EndTable();

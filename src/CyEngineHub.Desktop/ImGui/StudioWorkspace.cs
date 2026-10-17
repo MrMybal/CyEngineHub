@@ -29,13 +29,13 @@ internal sealed partial class ImGuiWorkspace
         Gui.PushStyleColor(ImGuiCol.Text, ImGuiTheme.Muted); Gui.TextUnformatted(text); Gui.PopStyleColor();
     }
     private static void TextTooltip(string text) { Gui.BeginTooltip(); Gui.TextUnformatted(text); Gui.EndTooltip(); }
-    private void ActionButton(object? model, string label, string command, bool primary = false)
+    private void ActionButton(object? model, string label, string command, bool primary = false, float width = 0)
     {
         var action = UiBinding.Read(model, "{Binding " + command + "}") as ICommand;
         Gui.PushID(command);
         Gui.BeginDisabled(action?.CanExecute(null) != true);
         var colorCount = ImGuiTheme.PushActionColors(command, primary);
-        if (Gui.Button(label)) Execute(model, "{Binding " + command + "}");
+        if (Gui.Button(label, new(width, 0))) Execute(model, "{Binding " + command + "}");
         Record("action/" + command);
         if (command is "ToggleProjectCreatorCommand" or "ToggleEngineImporterCommand") Record("creation-action/" + command);
         if (colorCount > 0) Gui.PopStyleColor(colorCount);
@@ -56,7 +56,7 @@ internal sealed partial class ImGuiWorkspace
         Gui.BeginChild("studio-body", new(0, -27 * UiScale), ImGuiChildFlags.None, ImGuiWindowFlags.NoScrollbar);
         Gui.BeginChild("studio-sidebar", new(180 * UiScale, 0), ImGuiChildFlags.Borders, ImGuiWindowFlags.NoScrollbar);
         var logsVisible = Flag(_root, "IsLogsNavigationVisible");
-        var footerHeight = (logsVisible ? 4 : 3) * (29 * UiScale + Gui.GetStyle().ItemSpacing.Y) +
+        var footerHeight = (logsVisible ? 5 : 4) * (29 * UiScale + Gui.GetStyle().ItemSpacing.Y) + 20 * UiScale +
             Gui.GetTextLineHeightWithSpacing() + Gui.GetStyle().ItemSpacing.Y + 1;
         Gui.BeginChild("sidebar-main", new(0, -footerHeight), ImGuiChildFlags.None);
         if (_logo is not null) { Gui.Image(_image(_logo), new(28)); Gui.SameLine(); }
@@ -64,17 +64,21 @@ internal sealed partial class ImGuiWorkspace
         Gui.TextDisabled(Value(_root, "ApplicationVersion"));
         Gui.Spacing(); Gui.Separator(); Gui.Spacing();
         Gui.TextDisabled("ESPACE DE TRAVAIL");
-        StudioNav("Vue d’ensemble", "ShowHomeCommand", "IsHomeNavigationActive");
         StudioNav("Moteurs", "ShowEnginesCommand", "IsEnginesNavigationActive");
         StudioNav("Projets", "ShowProjectsCommand", "IsProjectsNavigationActive");
         StudioNav("Bibliothèque", "ShowLibraryCommand", "IsLibraryNavigationActive");
         StudioNav("Extensions", "ShowHubExtensionsCommand", "IsExtensionsNavigationActive");
+        StudioNav("Outils", "ShowToolchainsCommand", "IsToolsNavigationActive");
         Gui.EndChild();
         Gui.Separator();
         Gui.TextDisabled("ACTIVITÉ");
         Record("nav/activity-heading");
         StudioNav("Stockage", "ShowStorageCommand", "IsStorageNavigationActive");
-        StudioNav("Téléchargements", "ShowTasksCommand", "IsTasksNavigationActive");
+        if (_root is MainWindowViewModel activity)
+        {
+            StudioActivityNav(activity, false);
+            StudioActivityNav(activity, true);
+        }
         if (logsVisible) StudioNav("Journal", "ShowLogsCommand", "IsLogsNavigationActive");
         StudioNav("Paramètres", "ShowSettingsCommand", "IsSettingsNavigationActive");
         Gui.EndChild(); Gui.SameLine();
@@ -109,6 +113,7 @@ internal sealed partial class ImGuiWorkspace
         }
         Gui.EndChild(); Gui.EndChild(); Gui.EndChild();
         DrawEngineSelectionMenus();
+        if (_root is MainWindowViewModel itemActions) DrawItemContextMenus(itemActions);
         Gui.Separator();
         Gui.TextColored(_error is null ? ImGuiTheme.Muted : ImGuiTheme.Rgb(0xE58C83),
             Elide(_error ?? Value(_root, "StatusMessage"), Math.Max(20, size.X - 35)));
@@ -116,50 +121,21 @@ internal sealed partial class ImGuiWorkspace
     private bool DrawStudioPage(UiNode page)
     {
         if (_root is not MainWindowViewModel vm) return false;
-        if (vm.IsHomeVisible) { DrawDashboard(vm); return true; }
         if (vm.IsEnginesVisible || vm.IsProjectsVisible)
         {
             DrawResources(vm, vm.IsEnginesVisible);
             return true;
         }
         if (vm.IsStorageVisible) { DrawStorage(vm, page); return true; }
-        if (vm.IsTasksVisible) { DrawTasks(vm); return true; }
+        if (vm.IsTasksVisible || vm.IsActionsVisible) { DrawTasks(vm); return true; }
+        if (vm.IsEngineDetailsVisible) { DrawEngineDetails(vm, page); return true; }
+        if (vm.IsToolchainsVisible) { DrawTools(vm, page); return true; }
         if (vm.IsHubExtensionsVisible) { DrawExtensions(vm, page); return true; }
         if (vm.IsPluginsVisible) { DrawPlugins(vm, page); return true; }
         if (vm.IsLibraryVisible || vm.IsSettingsVisible) { DrawSection(vm, page, vm.IsSettingsVisible); return true; }
         // The advanced forms use the same ImGui controls and command pipeline.
         // They are not hidden legacy Avalonia windows.
         return false;
-    }
-    private void DrawDashboard(MainWindowViewModel vm)
-    {
-        Gui.TextDisabled("VOTRE ENVIRONNEMENT");
-        Gui.TextWrapped("Moteurs, projets et assets réunis dans un espace de travail local.");
-        Gui.Spacing();
-        if (Gui.BeginTable("overview-metrics", 4, ImGuiTableFlags.SizingStretchSame))
-        {
-            Metric("MOTEURS", (vm.Engines.Count + vm.LocalEngineInstallations.Count).ToString(CultureInfo.CurrentCulture));
-            Metric("PROJETS", vm.Projects.Count.ToString(CultureInfo.CurrentCulture));
-            Metric("OPÉRATIONS", vm.Tasks.Count.ToString(CultureInfo.CurrentCulture));
-            Metric("PACKS", vm.StoragePacksSize);
-            Gui.EndTable();
-        }
-        Gui.Spacing(); Gui.Separator(); Gui.Spacing();
-        ActionButton(vm, "+ Nouveau projet", "ToggleProjectCreatorCommand", true); Gui.SameLine();
-        ActionButton(vm, "+ Ajouter un moteur", "ToggleEngineImporterCommand", true); Gui.SameLine();
-        ActionButton(vm, "Actualiser", "RefreshCommand");
-        Gui.Spacing();
-        Gui.TextDisabled("MOTEURS INSTALLÉS");
-        DrawResourceTable(vm.Engines.Cast<object>().Concat(vm.LocalEngineInstallations).ToArray(), true, "home-engines", 210);
-        Gui.Spacing(); Gui.TextDisabled("PROJETS");
-        DrawResourceTable(vm.Projects.Cast<object>().ToArray(), false, "home-projects", 200);
-        Gui.Spacing(); Gui.TextDisabled("STOCKAGE");
-        foreach (var drive in vm.StorageDrives)
-        {
-            Gui.TextUnformatted(drive.Name + " · " + drive.Free + " libres");
-            Gui.ProgressBar((float)drive.UsedPercent / 100, new(-1, 4), "");
-        }
-        if (vm.StorageDrives.Count == 0) Gui.TextDisabled("Analyse manuelle depuis Stockage pour mesurer l’espace disponible.");
     }
     private static void Metric(string name, string value)
     {
@@ -189,8 +165,11 @@ internal sealed partial class ImGuiWorkspace
         Gui.SetNextItemWidth(-1);
         Gui.InputTextWithHint("###resource-search", "Rechercher par nom, version ou chemin…", ref _resourceQuery, 4096);
         Record("resource-search");
+        var actionFirst = true;
+        var actionRight = Gui.GetCursorScreenPos().X + Gui.GetContentRegionAvail().X;
         if (engines)
         {
+            ToolbarItem(ref actionFirst, actionRight, 145 * UiScale);
             Gui.SetNextItemWidth(145 * UiScale);
             if (Gui.BeginCombo("###engine-sort", vm.SelectedEngineSort))
             {
@@ -198,37 +177,37 @@ internal sealed partial class ImGuiWorkspace
                     if (Gui.Selectable(sort, sort == vm.SelectedEngineSort)) Set(vm, "{Binding SelectedEngineSort}", sort);
                 Gui.EndCombo();
             }
-            Gui.SameLine();
         }
+        ToolbarItem(ref actionFirst, actionRight, ButtonWidth(engines ? "+ Ajouter un moteur" : "+ Nouveau projet"));
         ActionButton(vm, engines ? "+ Ajouter un moteur" : "+ Nouveau projet", engines ? "ToggleEngineImporterCommand" : "ToggleProjectCreatorCommand", true);
-        if (!engines) { Gui.SameLine(); ActionButton(vm, "Importer des projets…", "ToggleManualProjectAddCommand"); }
-        else { Gui.SameLine(); ActionButton(vm, "Vérifier les mises à jour", "CheckOfficialEngineUpdatesCommand"); }
+        var secondaryLabel = engines ? "Vérifier les mises à jour" : "Importer des projets…";
+        ToolbarItem(ref actionFirst, actionRight, ButtonWidth(secondaryLabel));
+        ActionButton(vm, secondaryLabel, engines ? "CheckOfficialEngineUpdatesCommand" : "ToggleManualProjectAddCommand");
+        ToolbarItem(ref actionFirst, actionRight, ButtonWidth("Analyser les tailles"));
+        DrawSizeAnalysisMenu(vm, engines ? "engines" : "projects");
         if (engines) { Gui.TextDisabled(Elide(vm.OfficialEngineUpdateSummary, Gui.GetContentRegionAvail().X)); if (Gui.IsItemHovered()) Gui.SetTooltip(vm.OfficialEngineUpdateSummary); }
         IEnumerable<object> values = engines
             ? vm.VisibleEpicEngineDownloads.Cast<object>().Concat(vm.VisibleEngines).Concat(vm.VisibleLocalEngineInstallations)
             : vm.VisibleProjects.Cast<object>().Concat(vm.VisibleLocalEngineProjects);
-        var items = values.Where(item => string.IsNullOrWhiteSpace(_resourceQuery) ||
+        var items = values.Where(item => (!vm.FavoritesOnly || vm.IsResourceFavorite(item)) && (string.IsNullOrWhiteSpace(_resourceQuery) ||
             (ResourceName(item) + " " + ResourceVersion(item) + " " + Value(item, "Path"))
-            .Contains(_resourceQuery.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray();
+            .Contains(_resourceQuery.Trim(), StringComparison.OrdinalIgnoreCase))).ToArray();
+        if (vm.FavoritesFirst) items = items.OrderByDescending(vm.IsResourceFavorite).ToArray();
+        if (!engines) SynchronizeItemSelection("projects", items);
         var cards = engines ? vm.EngineCardsView : vm.ProjectCardsView;
-        foreach (var view in new[] { (Label: "Cartes", Cards: true), (Label: "Liste", Cards: false) })
-        {
-            if (cards == view.Cards) Gui.PushStyleColor(ImGuiCol.Button, ImGuiTheme.Selected);
-            if (Gui.Button(view.Label)) Set(vm, engines ? "{Binding EngineCardsView}" : "{Binding ProjectCardsView}", view.Cards);
-            Record("resource-view/" + view.Label);
-            if (cards == view.Cards) Gui.PopStyleColor();
-            Gui.SameLine();
-        }
-        Gui.TextDisabled(items.Length + (engines ? " moteur(s)" : " projet(s)"));
+        var minimal = engines ? vm.EngineImageOnlyCards : vm.ProjectImageOnlyCards;
+        var rowImages = engines ? vm.EngineRowImages : vm.ProjectRowImages;
+        var mode = cards ? minimal ? 1 : 0 : rowImages ? 3 : 2;
         if (engines)
         {
             var availablePaths = values.Select(item => Value(item, "Path")).ToHashSet(StringComparer.OrdinalIgnoreCase);
             _selectedEnginePaths.IntersectWith(availablePaths);
-            Gui.SameLine(); Gui.TextDisabled($"· {_selectedEnginePaths.Count} sélectionné(s) · Ctrl / Maj + clic · clic droit : actions");
         }
+        DrawResourceDisplayToolbar(vm, engines, mode, items.Length);
         if (_selectedResource is not null && !items.Contains(_selectedResource)) _selectedResource = null;
-        if (cards) DrawResourceCards(items, engines);
-        else DrawResourceTable(items, engines, "resources", Math.Max(180, Gui.GetContentRegionAvail().Y - 12));
+        if (cards && minimal) DrawMinimalResourceCards(items, engines);
+        else if (cards) DrawResourceCards(items, engines);
+        else DrawResourceTable(items, engines, "resources", Math.Max(180, Gui.GetContentRegionAvail().Y - 12), rowImages);
         Record("resources/full-width");
     }
     private static string ResourceName(object item) => Value(item, item is EngineCardViewModel ? "DisplayName" : "Name");
@@ -236,37 +215,50 @@ internal sealed partial class ImGuiWorkspace
     private static string ResourceType(object item) => item is ProjectCardViewModel project
         ? project.ModuleCount > 0 ? "C++" : "Blueprint"
         : Value(item, "Family");
-    private void DrawResourceTable(object[] items, bool engines, string id, float height)
+    private void DrawResourceTable(object[] items, bool engines, string id, float height, bool images = false)
     {
         id += engines ? "/engines" : "/projects";
-        if (!Gui.BeginTable(id, engines ? 5 : 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.Resizable |
+        if (!Gui.BeginTable(id, 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.Resizable |
             ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp, new(0, height))) return;
         Gui.TableSetupColumn(engines ? "Moteur" : "Projet", ImGuiTableColumnFlags.WidthStretch, 2);
         Gui.TableSetupColumn("Version", ImGuiTableColumnFlags.WidthFixed, 85);
         Gui.TableSetupColumn("Emplacement", ImGuiTableColumnFlags.WidthStretch, 3);
         Gui.TableSetupColumn(engines ? "Taille" : "Type", ImGuiTableColumnFlags.WidthFixed, 105);
         if (engines) Gui.TableSetupColumn("État / mise à jour", ImGuiTableColumnFlags.WidthFixed, 165 * UiScale);
+        else Gui.TableSetupColumn("Taille", ImGuiTableColumnFlags.WidthFixed, 120 * UiScale);
         Gui.TableSetupScrollFreeze(0, 1);
-        SortableHeaders(id, engines ? ["Moteur", "Version", "Emplacement", "Taille", "État / mise à jour"] : ["Projet", "Version", "Emplacement", "Type"]);
+        SortableHeaders(id, engines ? ["Moteur", "Version", "Emplacement", "Taille", "État / mise à jour"] : ["Projet", "Version", "Emplacement", "Type", "Taille"]);
         items = SortTableItems(id, items, (item, column) => column switch
-        { 0 => ResourceName(item), 1 => ResourceVersion(item), 2 => Value(item, "Path"), 4 => Value(item, "OfficialUpdateLabel"), _ => engines ? SizeSortValue(Value(item, "EffectiveSizeLabel")) : ResourceType(item) });
-        var rowHeight = Math.Max((items.Any(item => item is EngineDownloadCardViewModel) ? 62 : 30) * UiScale, Gui.GetFrameHeight() + Gui.GetStyle().CellPadding.Y * 2);
+        { 0 => ResourceName(item), 1 => ResourceVersion(item), 2 => Value(item, "Path"), 4 => engines ? Value(item, "OfficialUpdateLabel") : (_root as MainWindowViewModel)?.ResourceSizeBytes(item), _ => engines ? SizeSortValue(Value(item, "EffectiveSizeLabel")) : ResourceType(item) });
+        if (_root is MainWindowViewModel favoriteVm && favoriteVm.FavoritesFirst) items = items.OrderByDescending(favoriteVm.IsResourceFavorite).ToArray();
+        if (!engines) SynchronizeItemSelection("projects", items);
+        var rowHeight = Math.Max((items.Any(item => item is EngineDownloadCardViewModel) ? 62 : images ? 50 : 30) * UiScale, Gui.GetFrameHeight() + Gui.GetStyle().CellPadding.Y * 2);
         Clipped(items.Length, rowHeight, index =>
         {
             var item = items[index]; Gui.PushID(index); Gui.TableNextRow(ImGuiTableRowFlags.None, rowHeight);
             if (engines && Flag(item, "IsOfficialEpic") && Flag(item, "IsInstallationAvailable")) Gui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, Gui.ColorConvertFloat4ToU32(ImGuiTheme.OfficialRow));
             Gui.TableNextColumn();
             if (engines && Flag(item, "IsOfficialEpic")) Gui.PushStyleColor(ImGuiCol.Text, ImGuiTheme.Success);
-            if (Gui.Selectable(ResourceName(item) + (engines && Flag(item, "IsOfficialEpic") ? " · officiel" : "") + "###item", IsResourceSelected(item, engines),
+            var rowLabel = ResourceName(item) + (engines && Flag(item, "IsOfficialEpic") ? " · officiel" : "");
+            var favoriteRow = _root is MainWindowViewModel rowVm && rowVm.IsResourceFavorite(item);
+            if (favoriteRow) rowLabel = "     " + rowLabel;
+            var nameWidth = Gui.GetContentRegionAvail().X;
+            PushRowSelection();
+            if (Gui.Selectable((images ? "" : rowLabel) + "###item", IsResourceSelected(item, engines),
                 ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick | (item is EngineDownloadCardViewModel ? ImGuiSelectableFlags.AllowOverlap : ImGuiSelectableFlags.None), new(0, rowHeight - Gui.GetStyle().CellPadding.Y * 2)))
             {
                 SelectResource(item, items, engines);
                 if (Gui.IsMouseDoubleClicked(ImGuiMouseButton.Left)) Execute(item, "{Binding OpenDetailsCommand}");
             }
             Record("row/" + ResourceName(item));
+            if (IsResourceSelected(item, engines)) Record("selection/row/" + ResourceName(item));
+            if (!engines && Gui.IsItemClicked(ImGuiMouseButton.Right)) { _selectedResource = item; RequestItemContext(item); }
+            Gui.PopStyleColor(3);
             if (item is EngineDownloadCardViewModel rowDownload) Record("engine-download/row/" + rowDownload.TaskId);
             RecordEngineSelection(item, engines);
             if (engines && Gui.IsItemClicked(ImGuiMouseButton.Right)) RequestEngineContext(item);
+            if (images) DrawResourceRowImage(item, rowLabel, nameWidth, rowHeight);
+            if (favoriteRow) DrawFavoriteMarker(Gui.GetItemRectMin() + new Vector2(9, 10) * UiScale);
             if (engines && Flag(item, "IsOfficialEpic")) { Record("official-engine/" + Value(item, "Path")); Gui.PopStyleColor(); }
             Gui.TableNextColumn(); Gui.TextUnformatted(ResourceVersion(item));
             Gui.TableNextColumn(); Gui.TextUnformatted(Elide(Value(item, "Path"), Gui.GetContentRegionAvail().X));
@@ -290,6 +282,7 @@ internal sealed partial class ImGuiWorkspace
                     if (Gui.IsItemHovered()) TextTooltip(pending.Message);
                 }
             }
+            if (!engines) { Gui.TableNextColumn(); Gui.TextDisabled((_root as MainWindowViewModel)?.ResourceSizeLabel(item) ?? "À analyser"); }
             Gui.PopID();
         });
         if (items.Length == 0) { Gui.TableNextRow(); Gui.TableNextColumn(); Gui.TextDisabled("Aucun élément. Ajoutez un dossier ou actualisez la détection."); }
@@ -360,13 +353,18 @@ internal sealed partial class ImGuiWorkspace
     }
     private void DrawTasks(MainWindowViewModel vm)
     {
-        Gui.TextDisabled("TÉLÉCHARGEMENTS / INSTALLATIONS / OPÉRATIONS");
+        var actions = vm.IsActionsVisible;
+        var items = vm.VisibleActivityTasks.ToArray();
+        Gui.TextDisabled(actions ? "ACTIONS · INSTALLATIONS / COMPILATIONS / ANALYSES" : "TÉLÉCHARGEMENTS");
         var right = Gui.GetCursorScreenPos().X + Gui.GetContentRegionAvail().X;
-        ActionButton(vm, "Paramètres de téléchargement", "ShowDownloadSettingsCommand");
-        var options = $"{vm.DownloadConcurrency} transferts simultanés · {vm.EngineChunkConcurrency} connexions / moteur";
-        if (Gui.GetItemRectMax().X + Gui.GetStyle().ItemSpacing.X + Gui.CalcTextSize(options).X <= right) Gui.SameLine();
-        Gui.TextDisabled(options);
-        Gui.TextUnformatted(vm.Tasks.Count.ToString(CultureInfo.CurrentCulture) + " opération(s) · la file continue pendant la navigation");
+        if (!actions) ActionButton(vm, "Paramètres de téléchargement", "ShowDownloadSettingsCommand");
+        var options = $"{vm.DownloadConcurrency} transferts simultanés · {vm.EngineChunkConcurrency} connexions / moteur · {vm.AssetDownloadConnections} / Fab-Megascans";
+        if (!actions)
+        {
+            if (Gui.GetItemRectMax().X + Gui.GetStyle().ItemSpacing.X + Gui.CalcTextSize(options).X <= right) Gui.SameLine();
+            Gui.TextDisabled(options);
+        }
+        Gui.TextUnformatted($"{items.Length} opération(s) · {(actions ? vm.RunningActions : vm.RunningDownloads)} en cours · {(actions ? vm.QueuedActions : vm.QueuedDownloads)} en attente · la file continue pendant la navigation");
         if (!Gui.BeginTable("task-table", 5, ImGuiTableFlags.ScrollY | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable,
             new(0, Math.Max(100, Gui.GetContentRegionAvail().Y - 10)))) return;
         Gui.TableSetupColumn("Opération", ImGuiTableColumnFlags.WidthStretch, 4);
@@ -375,7 +373,7 @@ internal sealed partial class ImGuiWorkspace
         Gui.TableSetupColumn("Durée", ImGuiTableColumnFlags.WidthFixed, 65);
         Gui.TableSetupColumn("Actions", ImGuiTableColumnFlags.WidthFixed, 140);
         Gui.TableSetupScrollFreeze(0, 1); SortableHeaders("task-table", ["Opération", "État", "Progression", "Durée", "Actions"], 4);
-        foreach (var task in SortTableItems("task-table", vm.Tasks.ToArray(),
+        foreach (var task in SortTableItems("task-table", items,
             (task, column) => column switch { 0 => task.Title, 1 => task.Status, 2 => task.ProgressPercent, _ => (object)task.DurationSeconds }))
         {
             Gui.PushID(task.Id.ToString()); Gui.TableNextRow(); Gui.TableNextColumn();
@@ -395,7 +393,7 @@ internal sealed partial class ImGuiWorkspace
             foreach (var link in task.Links) { Gui.PushID(linkIndex++); ActionButton(link, link.Label, "OpenCommand"); Gui.PopID(); }
             Gui.PopID();
         }
-        if (vm.Tasks.Count == 0) { Gui.TableNextRow(); Gui.TableNextColumn(); Gui.TextDisabled("Aucune opération pour le moment."); }
+        if (items.Length == 0) { Gui.TableNextRow(); Gui.TableNextColumn(); Gui.TextDisabled("Aucune opération dans cette file pour le moment."); }
         Gui.EndTable();
     }
 }

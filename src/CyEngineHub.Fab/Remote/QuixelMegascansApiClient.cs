@@ -242,70 +242,8 @@ public sealed partial class QuixelMegascansApiClient : IQuixelMegascansClient
         var fileCount = 0;
         try
         {
-            for (var index = 0; index < urls.Length; index++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var uri = urls[index];
-                progress?.Report(new DirectFabDownloadProgress(
-                    (double)index / urls.Length,
-                    $"Fichier {index + 1:N0}/{urls.Length:N0}",
-                    totalDownloaded,
-                    null));
-                using var fileResponse = await _httpClient.GetAsync(
-                        uri,
-                        HttpCompletionOption.ResponseHeadersRead,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                await EnsureSuccessAsync(fileResponse, "Échec d’un fichier Megascans signé.", cancellationToken)
-                    .ConfigureAwait(false);
-                var announced = fileResponse.Content.Headers.ContentLength;
-                if (announced > MaximumSingleFileBytes)
-                {
-                    throw new QuixelException("Un fichier Megascans dépasse la limite de sécurité de 16 Gio.");
-                }
-                var target = Path.Combine(stagingDirectory, MakeSafeFileName(uri, index));
-                await using var source = await fileResponse.Content.ReadAsStreamAsync(cancellationToken)
-                    .ConfigureAwait(false);
-                await using var output = new FileStream(
-                    target,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.None,
-                    1024 * 128,
-                    FileOptions.Asynchronous | FileOptions.SequentialScan);
-                var buffer = new byte[1024 * 128];
-                long fileBytes = 0;
-                var lastReport = System.Diagnostics.Stopwatch.GetTimestamp();
-                void ReportTransfer()
-                {
-                    var ratio = announced > 0 ? Math.Clamp((double)fileBytes / announced.Value, 0, 1) : 0;
-                    var fileStatus = announced > 0 ? $" · {ratio * 100:N1} % du fichier" : " · taille du fichier inconnue";
-                    // Earlier URLs have no known sizes: never extrapolate a total from file count.
-                    long? knownTotal = index == urls.Length - 1 && announced > 0 ? totalDownloaded + announced.Value : null;
-                    progress?.Report(new DirectFabDownloadProgress((index + ratio) / urls.Length,
-                        $"Fichier {index + 1:N0}/{urls.Length:N0}{fileStatus}", totalDownloaded + fileBytes, knownTotal));
-                }
-                ReportTransfer();
-                while (true)
-                {
-                    var read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
-                    if (read == 0) break;
-                    fileBytes += read;
-                    if (fileBytes > MaximumSingleFileBytes)
-                    {
-                        throw new QuixelException("Un fichier Megascans dépasse la limite de sécurité de 16 Gio.");
-                    }
-                    await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-                    if (System.Diagnostics.Stopwatch.GetElapsedTime(lastReport).TotalMilliseconds >= 250)
-                    {
-                        ReportTransfer();
-                        lastReport = System.Diagnostics.Stopwatch.GetTimestamp();
-                    }
-                }
-                ReportTransfer();
-                totalDownloaded += fileBytes;
-                fileCount++;
-            }
+            totalDownloaded = await DownloadSignedFilesAsync(urls, stagingDirectory, progress, cancellationToken).ConfigureAwait(false);
+            fileCount = urls.Length;
             Directory.Move(stagingDirectory, finalDirectory);
         }
         catch

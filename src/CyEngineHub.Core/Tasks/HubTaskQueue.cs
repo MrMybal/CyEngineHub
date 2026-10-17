@@ -189,7 +189,7 @@ public sealed class HubTaskScheduler : IAsyncDisposable
                 DateTimeOffset.UtcNow,
                 null,
                 null,
-                null) { Links = definition.Links.ToArray() };
+                null) { Links = definition.Links.ToArray(), IsDownload = definition.IsDownload };
         }
 
         public Guid Id { get; }

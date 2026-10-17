@@ -22,6 +22,7 @@ using CyEngineHub.Infrastructure.AppData;
 using CyEngineHub.Infrastructure.Persistence;
 using CyEngineHub.Projects.Models;
 using CyEngineHub.Storage.Models;
+using CyEngineHub.Storage.Persistence;
 using CyEngineHub.Toolchains.Models;
 using CyEngineHub.Unreal.Integration;
 using CyEngineHub.Unreal.Models;
@@ -40,13 +41,16 @@ sealed class FixtureRegistration : IUnrealEngineRegistrationService
 sealed class RecordingLauncher : IPlatformLauncher
 {
     public List<(string Executable, IReadOnlyList<string> Arguments)> Launches { get; } = [];
+    public List<Uri> OpenedUris { get; } = [];
     public Task<int?> StartDetachedAsync(string fileName, IReadOnlyList<string>? arguments = null, string? workingDirectory = null, CancellationToken cancellationToken = default)
     { Launches.Add((fileName, arguments ?? [])); return Task.FromResult<int?>(123); }
     public Task OpenFolderAsync(string path, CancellationToken cancellationToken = default) => Task.CompletedTask;
-    public Task OpenUriAsync(Uri uri, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task OpenUriAsync(Uri uri, CancellationToken cancellationToken = default) { OpenedUris.Add(uri); return Task.CompletedTask; }
 }
 sealed class FixtureFab : IDirectFabClient
 {
+    public int DownloadConnections { get; private set; } = 12;
+    public void SetDownloadConnections(int connections) => DownloadConnections = connections;
     public Uri AuthorizationUri => new("https://example.invalid/fixture");
     public Task<DirectFabStatus> GetStatusAsync(CancellationToken cancellationToken = default) => Task.FromResult(new DirectFabStatus(DirectFabConnectionState.Connected, "Fixture"));
     public Task<DirectFabStatus> ConnectAsync(string code, CancellationToken cancellationToken = default) => throw new NotSupportedException();
@@ -55,6 +59,19 @@ sealed class FixtureFab : IDirectFabClient
     public Task<RemoteFabProductDetails> GetProductDetailsAsync(RemoteFabAsset asset, CancellationToken cancellationToken = default) => Task.FromResult(new RemoteFabProductDetails("Fixture", []));
     public Task<DirectFabDownloadResult> DownloadAsync(RemoteFabAsset asset, string root, IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<DirectFabDownloadResult> DownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version, string root, IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+}
+sealed class FixtureQuixel : IQuixelMegascansClient
+{
+    public int DownloadConnections { get; private set; } = 12;
+    public void SetDownloadConnections(int connections) => DownloadConnections = connections;
+    public Uri AuthorizationUri => new("https://example.invalid/fixture");
+    public Task<QuixelStatus> GetStatusAsync(CancellationToken cancellationToken = default) => Task.FromResult(new QuixelStatus(QuixelConnectionState.Connected, "Fixture"));
+    public Task<QuixelStatus> ConnectAsync(string code, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<QuixelStatus> ConnectFromEpicSessionAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task DisconnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    public Task<QuixelLibraryResult> GetLibraryAsync(CancellationToken cancellationToken = default) => Task.FromResult(new QuixelLibraryResult(0, [], 0));
+    public Task<RemoteFabProductDetails> GetProductDetailsAsync(RemoteFabAsset asset, CancellationToken cancellationToken = default) => Task.FromResult(new RemoteFabProductDetails("Fixture", []));
+    public Task<DirectFabDownloadResult> DownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version, string root, IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException("No real asset downloads permitted in UI fixtures.");
 }
 sealed class FixtureEngineBackend : IEpicBinaryEngineBackend
 {
@@ -74,10 +91,15 @@ sealed class FixtureEngineBackend : IEpicBinaryEngineBackend
         DownloadHandler?.Invoke(release, destinationDirectory, progress, cancellationToken) ?? throw new NotSupportedException("No real engine download permitted in UI fixtures.");
     public Task<EpicBinaryEngineComponentUpdateResult> UpdateComponentsAsync(EpicBinaryEngineRelease release, string existingDirectory, IReadOnlyCollection<string> components, IProgress<EpicBinaryEngineDownloadProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException("No engine modification permitted in UI fixtures.");
 }
-static class Program
+static partial class Program
 {
     static bool DownloadsOnly;
     static bool VariantsOnly;
+    static bool ToolsOnly;
+    static bool ActivityOnly;
+    static bool AnnotationsOnly;
+    static bool ResourcesOnly;
+    static bool ResourceLayoutOnly;
     static readonly FixtureEngineBackend EngineBackend = new();
     const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
     static readonly string Output = Path.GetFullPath("artifacts/usability-qa-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
@@ -87,9 +109,14 @@ static class Program
     {
         DownloadsOnly = args.Contains("--engine-downloads-only");
         VariantsOnly = args.Contains("--variants-only");
+        ToolsOnly = args.Contains("--tools-only");
+        ActivityOnly = args.Contains("--activity-only");
+        AnnotationsOnly = args.Contains("--annotations-only");
+        ResourcesOnly = args.Contains("--resources-only");
+        ResourceLayoutOnly = args.Contains("--resource-layout-only");
         Directory.CreateDirectory(Output);
         AppBuilder.Configure<FixtureApp>().UsePlatformDetect().SetupWithoutStarting();
-        using var stop = new CancellationTokenSource(args.Contains("--interactive") ? TimeSpan.FromMinutes(20) : TimeSpan.FromSeconds(180));
+        using var stop = new CancellationTokenSource(args.Contains("--interactive") ? TimeSpan.FromMinutes(20) : TimeSpan.FromSeconds(240));
         Dispatcher.UIThread.Post(async () =>
         {
             try { await Run(args.Contains("--interactive"), stop); }
@@ -112,7 +139,8 @@ static class Program
             "engineModules" => new EngineModuleRegistry([new UnrealEngineModule()]),
             "engineRegistration" => new FixtureRegistration(), "taskScheduler" => scheduler,
             "appData" => paths, "platformLauncher" => launcher,
-            "directFabClient" => new FixtureFab(), "epicBinaryEngineBackend" => EngineBackend, _ => null,
+            "storageSnapshotCache" => new StorageSnapshotCache(store),
+            "directFabClient" => new FixtureFab(), "quixelClient" => new FixtureQuixel(), "epicBinaryEngineBackend" => EngineBackend, _ => null,
         }).ToArray());
         var engineRoot = Path.Combine(Output, "UE_5.5");
         var editor = Path.Combine(engineRoot, "Engine", "Binaries", "Win64", "UnrealEditor.exe");
@@ -152,13 +180,19 @@ static class Program
         Call(vm, "RefreshStorageOverview");
         Call(vm, "ReplaceToolchainSnapshot", new ToolchainSnapshot([], [new(engine.Id, engine.DisplayName, "5.5.0",
             [new(ToolchainKind.DotNet, ".NET", ToolchainHealth.Ready, "fixture", "fixture", ""),
-             new(ToolchainKind.LinuxToolchain, "Linux", ToolchainHealth.Missing, "fixture", "absent", "SDK absent")], [])], [], [], [], DateTimeOffset.UtcNow));
+             new(ToolchainKind.LinuxToolchain, "Linux", ToolchainHealth.Missing, "fixture", "absent", "SDK absent"),
+             new(ToolchainKind.WindowsSdk, "Windows SDK", ToolchainHealth.Warning, "fixture", "fixture", "Version recommandée absente")], [])], [], [], [], DateTimeOffset.UtcNow));
         var window = new MainWindow { DataContext = vm, Title = "CyEngineHub — Interface QA (données fictives)", Width = 1280, Height = 820,
             ShowActivated = false, ShowInTaskbar = false, Position = new PixelPoint(-3000, -3000) };
         window.Show();
         if (ImGuiDiagnostics.IsHosted(window))
         {
-            if (VariantsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestVariantLabels(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            if (ResourceLayoutOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestResourceToolbarLayout(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (VariantsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestVariantLabels(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (ToolsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestTools(window, vm, launcher); Console.WriteLine("OUTPUT " + Output); }
+            else if (ActivityOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestEngineDetailsAndActivity(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (AnnotationsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestResourcePresentations(window, vm, launcher); await TestAsyncImages(window, vm); await TestAssetCards(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (ResourcesOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestAsyncImages(window, vm); await TestAssetCards(window, vm); await TestMultiSelectionToolbar(window, vm, launcher); await TestResourceActions(window, vm, launcher); Console.WriteLine("OUTPUT " + Output); }
             else if (DownloadsOnly) { vm.ShowEnginesCommand.Execute(null); await ImGuiDiagnostics.FramesAsync(window, 4); await TestEngineDownloadFlow(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else await TestImGui(window, vm, launcher);
             window.Close(); stop.Cancel(); return;
@@ -215,9 +249,9 @@ static class Program
     {
         await ImGuiDiagnostics.FramesAsync(window, 3);
         Check(!ImGuiDiagnostics.Elements(window).Contains("density") && !ImGuiDiagnostics.Elements(window).Contains("action/NavigateBackCommand"),
-            "Home has neither redundant history arrows nor a density checkbox");
-        Check(ImGuiDiagnostics.Elements(window).Contains("creation-action/ToggleProjectCreatorCommand") &&
-            ImGuiDiagnostics.Elements(window).Contains("creation-action/ToggleEngineImporterCommand"), "Dashboard creation actions use the dedicated colored button style");
+            "Startup has neither redundant history arrows nor a density checkbox");
+        Check(vm.IsEnginesVisible && !ImGuiDiagnostics.Elements(window).Contains("nav/Vue d’ensemble") &&
+            ImGuiDiagnostics.Elements(window).Contains("creation-action/ToggleEngineImporterCommand"), "Startup opens engines directly and overview navigation is removed");
         Check(!ImGuiDiagnostics.Elements(window).Contains("nav/Plugins"), "Plugins are reached through project and engine details, not the main navigation");
         var footer = ImGuiDiagnostics.ElementBounds(window, "nav/Stockage");
         Check(footer.Y > window.Height * .65 && ImGuiDiagnostics.ElementBounds(window, "nav/Paramètres").W < window.Height,
@@ -250,6 +284,9 @@ static class Program
         vm.ShowEnginesCommand.Execute(null);
         await ImGuiDiagnostics.FramesAsync(window, 3);
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-engines.png"));
+        await TestResourcePresentations(window, vm, launcher);
+        await TestResourceToolbarLayout(window, vm);
+        await TestEngineDetailsAndActivity(window, vm);
         await TestEngineSortingAndUpdates(window, vm);
         await TestEngineSelection(window, vm);
         await ImGuiDiagnostics.ClickAsync(window, "nav/Projets");
@@ -311,12 +348,12 @@ static class Program
         await ImGuiDiagnostics.ClickAsync(window, "section-tab/settings/project-profiles");
         Check(vm.IsSettingsProjectProfilesSelected && ImGuiDiagnostics.Elements(window).Contains("section-selected/settings/project-profiles"), "Settings tabs share a visible selected state");
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-settings.png"));
-        await ImGuiDiagnostics.ClickAsync(window, "nav/Vue d’ensemble");
-        Check(vm.IsHomeVisible, "ImGui navigation remains functional after settings and tabs");
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Projets");
+        Check(vm.IsProjectsVisible, "ImGui navigation remains functional after settings and tabs");
         await ImGuiDiagnostics.ClickAsync(window, "action/ToggleProjectCreatorCommand");
         Check(vm.IsProjectCreatorVisible, "Project creation modal opens through ImGui button");
         await ImGuiDiagnostics.ClickAsync(window, "nav/Moteurs", leadingEdge: true);
-        Check(vm.IsProjectCreatorVisible && vm.IsHomeVisible, "Modal blocks clicks on the uncovered backdrop navigation");
+        Check(vm.IsProjectCreatorVisible && vm.IsProjectsVisible, "Modal blocks clicks on the uncovered backdrop navigation");
         await ImGuiDiagnostics.ClickAsync(window, "field/NewProjectName");
         await ImGuiDiagnostics.TextAsync(window, "ImGuiFixtureProject");
         if (vm.NewProjectName != "ImGuiFixtureProject")
@@ -340,16 +377,292 @@ static class Program
         await ImGuiDiagnostics.ClickAsync(window, "nav/Paramètres");
         Check(vm.IsSettingsVisible, "Closed ImGui modal releases navigation input");
         await TestToolLists(window, vm);
+        await TestTools(window, vm, launcher);
+        await TestActivityLog(window, vm);
         await TestAsyncImages(window, vm);
         await ImGuiDiagnostics.ClickAsync(window, "nav/Téléchargements");
         Check(vm.IsTasksVisible, "Download queue remains accessible through ImGui navigation");
         await TestAssetCards(window, vm);
+        await TestMultiSelectionToolbar(window, vm, launcher);
+        await TestResourceActions(window, vm, launcher);
         await TestVariantLabels(window, vm);
         await ImGuiDiagnostics.ClickAsync(window, "nav/Moteurs");
         await ImGuiDiagnostics.ClickAsync(window, "action/ToggleEngineImporterCommand");
         Check(vm.IsEngineImporterVisible, "Add engine action exposes the complete engine importer");
         await TestEngineDownloadFlow(window, vm);
         Console.WriteLine("OUTPUT " + Output);
+    }
+    static async Task TestResourcePresentations(Window window, MainWindowViewModel vm, RecordingLauncher launcher)
+    {
+        var launches = launcher.Launches.Count;
+        foreach (var engines in new[] { true, false })
+        {
+            if (engines) vm.ShowEnginesCommand.Execute(null); else vm.ShowProjectsCommand.Execute(null);
+            await ImGuiDiagnostics.FramesAsync(window, 3);
+            Check(new[] { "Cartes", "Image + nom", "Lignes", "Lignes + image" }.All(label => ImGuiDiagnostics.Elements(window).Contains("resource-view/" + label)),
+                "Engines and projects expose the same four presentations as marketplaces");
+            var iconPrefix = "view-mode-icon/" + (engines ? "engines/" : "projects/");
+            Check(Enumerable.Range(0, 4).All(mode => ImGuiDiagnostics.Elements(window).Contains(iconPrefix + mode)),
+                "Resource presentation controls draw four vector icons instead of text labels");
+            var firstIcon = ImGuiDiagnostics.ElementBounds(window, iconPrefix + "0");
+            var lastIcon = ImGuiDiagnostics.ElementBounds(window, iconPrefix + "3");
+            Check(firstIcon.Z - firstIcon.X <= 40 && Math.Abs((firstIcon.Z - firstIcon.X) - (firstIcon.W - firstIcon.Y)) < 1 &&
+                lastIcon.Z - firstIcon.X < 180, "Four square icon buttons occupy less than 180 pixels");
+            foreach (var compact in new[] { true, false })
+            {
+                vm.UseCompactInterface = compact;
+                await ImGuiDiagnostics.FramesAsync(window, 3);
+                var standard = ImGuiDiagnostics.ElementBounds(window, engines ? "action/ToggleEngineImporterCommand" : "action/ToggleProjectCreatorCommand");
+                Check(Enumerable.Range(0, 4).All(mode =>
+                {
+                    var icon = ImGuiDiagnostics.ElementBounds(window, iconPrefix + mode);
+                    return Math.Abs((icon.W - icon.Y) - (standard.W - standard.Y)) < 1;
+                }), "Resource icons match standard button height in " + (compact ? "compact" : "comfortable") + " density");
+            }
+            vm.UseCompactInterface = true;
+            await ImGuiDiagnostics.FramesAsync(window, 3);
+            var name = engines ? vm.Engines[0].DisplayName : vm.Projects[0].Name;
+            var full = ImGuiDiagnostics.ElementBounds(window, "resource/card/" + name);
+            await ImGuiDiagnostics.ClickAsync(window, "resource-view/Image + nom");
+            Check(ImGuiDiagnostics.Elements(window).Contains("view-mode-tooltip/" + (engines ? "engines/1" : "projects/1")) &&
+                ImGuiDiagnostics.Elements(window).Contains("resource-view-selected/1"), "Resource icons retain tooltips and a visible selected state");
+            var minimal = ImGuiDiagnostics.ElementBounds(window, "resource/minimal/" + name);
+            Check(minimal.Z - minimal.X < full.Z - full.X && minimal.W - minimal.Y < full.W - full.Y &&
+                !ImGuiDiagnostics.Elements(window).Contains("action/LaunchCommand"), "Image and name resource cards are smaller and omit metadata/actions");
+            await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, engines ? "imgui-engine-minimal-cards.png" : "imgui-project-minimal-cards.png"));
+            await ImGuiDiagnostics.ClickAsync(window, "card/body/resource/" + name, clicks: 2, vertical: .25f);
+            Check((engines ? vm.IsEngineDetailsVisible : vm.IsProjectDetailsVisible) && launcher.Launches.Count == launches,
+                "Double-clicking a minimal resource card opens details without launching an editor");
+            if (engines) vm.ShowEnginesCommand.Execute(null); else vm.ShowProjectsCommand.Execute(null);
+            await ImGuiDiagnostics.FramesAsync(window, 3);
+            await ImGuiDiagnostics.ClickAsync(window, "resource-view/Lignes");
+            Check(!ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("resource-row/image/", StringComparison.Ordinal)), "Plain resource rows contain no image");
+            await ImGuiDiagnostics.ClickAsync(window, "resource-view/Lignes + image");
+            Check(ImGuiDiagnostics.Elements(window).Contains("resource-row/image/" + name), "Resource thumbnail rows draw small images inside the selectable name cell");
+            await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, engines ? "imgui-engine-thumbnail-rows.png" : "imgui-project-thumbnail-rows.png"));
+            await ImGuiDiagnostics.ClickAsync(window, "table-header/resources/" + (engines ? "engines" : "projects") + "/1");
+            await ImGuiDiagnostics.ClickAsync(window, "table-header/resources/" + (engines ? "engines" : "projects") + "/0");
+            await ImGuiDiagnostics.ClickAsync(window, "row/" + name, clicks: 2, horizontal: .06f);
+            Check((engines ? vm.IsEngineDetailsVisible : vm.IsProjectDetailsVisible) && launcher.Launches.Count == launches,
+                "Thumbnail resource rows retain sortable columns and double-click details behavior");
+            if (engines) vm.ShowEnginesCommand.Execute(null); else vm.ShowProjectsCommand.Execute(null);
+            await ImGuiDiagnostics.FramesAsync(window, 3);
+            await ImGuiDiagnostics.ClickAsync(window, "resource-view/Cartes");
+        }
+        vm.SetResourcePresentation(true, 1);
+        vm.SetResourcePresentation(false, 3);
+        var libraryRows = vm.IsLibraryRowsMode;
+        await vm.FlushMarketplaceSettingsWritesAsync();
+        foreach (var field in new[] { "_engineImageOnlyCards", "_projectRowImages" }) typeof(MainWindowViewModel).GetField(field, Private)!.SetValue(vm, false);
+        await (Task)typeof(MainWindowViewModel).GetMethod("LoadInterfaceAsync", Private)!.Invoke(vm, null)!;
+        Check(vm.EngineCardsView && vm.EngineImageOnlyCards && !vm.ProjectCardsView && vm.ProjectRowImages && vm.IsLibraryRowsMode == libraryRows,
+            "All resource presentations persist independently for engines, projects and marketplaces");
+        vm.SetResourcePresentation(true, 0); vm.SetResourcePresentation(false, 0);
+        vm.ShowEnginesCommand.Execute(null);
+        await ImGuiDiagnostics.FramesAsync(window, 3);
+    }
+
+    static async Task TestEngineDetailsAndActivity(Window window, MainWindowViewModel vm)
+    {
+        vm.Engines[0].OpenDetailsCommand.Execute(null);
+        await ImGuiDiagnostics.FramesAsync(window, 3);
+        Check(vm.EngineDetailsTab == 0 && ImGuiDiagnostics.Elements(window).Contains("engine-details/general") &&
+            !ImGuiDiagnostics.Elements(window).Contains("action/BuildEditorCommand"), "Engine details open on a compact General tab without compilation controls");
+        var content = ImGuiDiagnostics.ElementBounds(window, "pane/engine-details/content");
+        Check(content.Y < 210 && content.W > window.Height - 65, "Engine header stays compact and tab content fills the remaining height");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-engine-general-tabs.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "engine-detail-tab/1");
+        Check(vm.EngineDetailsTab == 1 && ImGuiDiagnostics.Elements(window).Contains("engine-details/installation") &&
+            !ImGuiDiagnostics.Elements(window).Contains("action/LaunchCommand"), "Installation options have their own tab and do not repeat General actions");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-engine-installation-tab.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "engine-detail-tab/2");
+        Check(vm.EngineDetailsTab == 2 && ImGuiDiagnostics.Elements(window).Contains("action/BuildEditorCommand") &&
+            ImGuiDiagnostics.Elements(window).Contains("action/GenerateProjectFilesCommand"), "Compilation and cross-compilation share their own engine tab");
+        Check(vm.SelectedEngineToolchains.SelectMany(card => card.Checks).Any(check => check.Health == "Ready" && check.HealthColor == "#5CD26E") &&
+            vm.SelectedEngineToolchains.SelectMany(card => card.Checks).Any(check => check.Health == "Missing" && check.HealthColor == "#E8747C") &&
+            vm.SelectedEngineToolchains.SelectMany(card => card.Checks).Any(check => check.Health == "Warning" && check.HealthColor == "#F5A623"), "Ready checks are green, warnings orange and missing requirements red");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-engine-compilation-tab.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Moteurs");
+        vm.Engines[0].OpenDetailsCommand.Execute(null);
+        await ImGuiDiagnostics.FramesAsync(window, 3);
+        Check(vm.EngineDetailsTab == 0, "Opening a new engine detail resets its selected tab to General");
+
+        var scheduler = (HubTaskScheduler)typeof(MainWindowViewModel).GetField("_taskScheduler", Private)!.GetValue(vm)!;
+        scheduler.SetDownloadConcurrency(1);
+        HubTaskHandle Start(string name, bool download) => scheduler.Enqueue(new HubTaskDefinition("QA", name,
+            async (context, token) => { context.Report(.25, "Synthetic operation, no executable launched"); await Task.Delay(Timeout.Infinite, token); }) { IsDownload = download });
+        var build = Start("QA compiler un projet", false);
+        var install = Start("QA installer un pack", false);
+        var transfer = Start("QA transférer un moteur", true);
+        var pending = Start("QA transférer un asset", true);
+        async Task Wait(Func<bool> condition)
+        {
+            var until = DateTime.UtcNow.AddSeconds(10);
+            while (!condition()) { if (DateTime.UtcNow > until) throw new TimeoutException("Activity queue did not settle"); await ImGuiDiagnostics.FramesAsync(window, 2); }
+        }
+        try
+        {
+            await Wait(() => vm.RunningActions == 1 && vm.QueuedActions == 1 && vm.RunningDownloads == 1 && vm.QueuedDownloads == 1);
+            await ImGuiDiagnostics.ClickAsync(window, "nav/Actions");
+            Check(vm.IsActionsVisible && ImGuiDiagnostics.Elements(window).Contains("task/" + build.Id) &&
+                ImGuiDiagnostics.Elements(window).Contains("task/" + install.Id) && !ImGuiDiagnostics.Elements(window).Contains("task/" + transfer.Id), "Actions contains builds and installations but excludes downloads");
+            Check(ImGuiDiagnostics.ElementBounds(window, "nav/Actions").Y < ImGuiDiagnostics.ElementBounds(window, "nav/Téléchargements").Y,
+                "Actions appears immediately above Downloads in the activity navigation");
+            Check(ImGuiDiagnostics.Elements(window).Contains("nav-count/actions/running/1") && ImGuiDiagnostics.Elements(window).Contains("nav-count/actions/queued/1") &&
+                ImGuiDiagnostics.Elements(window).Contains("nav-count/downloads/running/1") && ImGuiDiagnostics.Elements(window).Contains("nav-count/downloads/queued/1"), "Both navigation entries show independent running and waiting counters");
+            await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-actions-queue.png"));
+            await ImGuiDiagnostics.ClickAsync(window, "task/cancel/" + install.Id);
+            await Wait(() => vm.QueuedActions == 0);
+            Check(vm.RunningDownloads == 1 && vm.QueuedDownloads == 1, "Canceling a queued installation leaves download counters unchanged");
+            await ImGuiDiagnostics.ClickAsync(window, "task/cancel/" + build.Id);
+            await Wait(() => vm.RunningActions == 0);
+            await ImGuiDiagnostics.ClickAsync(window, "nav/Téléchargements");
+            Check(vm.IsTasksVisible && ImGuiDiagnostics.Elements(window).Contains("task/" + transfer.Id) &&
+                !ImGuiDiagnostics.Elements(window).Contains("task/" + build.Id), "Downloads shows only its own transfers and preserves their cancellation actions");
+            await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-downloads-separated.png"));
+            await ImGuiDiagnostics.ClickAsync(window, "task/cancel/" + pending.Id);
+            await Wait(() => vm.QueuedDownloads == 0);
+            await ImGuiDiagnostics.ClickAsync(window, "task/cancel/" + transfer.Id);
+            await Wait(() => vm.RunningDownloads == 0);
+            Check(vm.RunningActions == 0 && vm.QueuedActions == 0, "All counters clear after cancellation without moving terminal tasks to the other queue");
+        }
+        finally
+        {
+            foreach (var handle in new[] { build, install, transfer, pending }) handle.Cancel();
+            await Task.WhenAll(build.Completion, install.Completion, transfer.Completion, pending.Completion);
+            scheduler.SetDownloadConcurrency(3);
+        }
+        var localRoot = Directory.CreateDirectory(Path.Combine(Output, "GodotFixture")).FullName;
+        var localEditor = Path.Combine(localRoot, "Godot.exe");
+        await File.WriteAllTextAsync(localEditor, "synthetic editor - never executed");
+        var organization = new LibraryItemOrganizationViewModel(CyEngineHub.Core.Settings.WorkspaceItemKind.Engine, localRoot, "Godot QA", null,
+            (_, _, _, _) => Task.CompletedTask, null, error => throw error);
+        var localCard = new LocalEngineInstallationCardViewModel(new(EngineFamily.Godot, "godot", "qa-godot", "Godot QA", "4.4", localRoot, localEditor, "QA"),
+            organization, "Taille · à analyser", _ => throw new NotSupportedException("No local editor may run in fixtures"), _ => Task.CompletedTask,
+            card => Call(vm, "OpenLocalEngineDetails", card), error => throw error);
+        vm.LocalEngineInstallations.Add(localCard);
+        localCard.OpenDetailsCommand.Execute(null);
+        await ImGuiDiagnostics.FramesAsync(window, 3);
+        Check(ImGuiDiagnostics.Elements(window).Contains("action/ShowSelectedEnginePluginsCommand"), "Other engine providers retain their plugin and tool actions in General");
+        await ImGuiDiagnostics.ClickAsync(window, "engine-detail-tab/1");
+        Check(ImGuiDiagnostics.Elements(window).Contains("field/SelectedLocalEngineDetails.Organization.Alias"), "Other engine providers retain their organization settings in installation options");
+        await ImGuiDiagnostics.ClickAsync(window, "engine-detail-tab/0");
+        await ImGuiDiagnostics.ClickAsync(window, "action/AnalyzeSelectedEngineSizeCommand");
+        await Wait(() => !vm.IsEngineSelectionBusy);
+        var measured = (StorageSnapshot)typeof(MainWindowViewModel).GetField("_currentStorageSnapshot", Private)!.GetValue(vm)!;
+        Check(measured.Entries.Any(entry => entry.Category == StorageCategory.EngineInstallation && entry.OwnerRoot == localRoot && entry.Path == localRoot && entry.SizeBytes > 0),
+            "Local provider size analysis measures its installation root rather than only its editor executable");
+        vm.LocalEngineInstallations.Remove(localCard);
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Moteurs");
+    }
+    static async Task TestTools(Window window, MainWindowViewModel vm, RecordingLauncher launcher)
+    {
+        var root = vm.Engines[0].Engine.RootPath;
+        Check(Path.GetFullPath(root).StartsWith(Output + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase), "Tool fixtures stay inside the isolated output directory");
+        var prerequisite = Path.Combine(root, "Engine", "Extras", "Redist", "en-us", "UEPrereqSetup_x64.exe");
+        var selector = Path.Combine(root, "Engine", "Binaries", "Win64", "UnrealVersionSelector.exe");
+        var insights = Path.Combine(root, "Engine", "Binaries", "Win64", "UnrealInsights.exe");
+        foreach (var path in new[] { prerequisite, selector, insights })
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            await File.WriteAllTextAsync(path, "synthetic fixture - never executable");
+        }
+        var launches = launcher.Launches.Count;
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Outils");
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (vm.UnrealUtilities.Count != 4)
+        {
+            if (DateTime.UtcNow > until) throw new TimeoutException("Unreal tools inventory did not complete");
+            await ImGuiDiagnostics.FramesAsync(window, 2);
+        }
+        Check(vm.IsToolchainsVisible && vm.IsToolsNavigationActive && vm.HeaderTitle == "Outils", "Outils is an independent highlighted main navigation page");
+        Check(launcher.Launches.Count == launches && vm.UnrealUtilities.Count(item => item.IsAvailable) == 3, "Detecting tools never launches executables or fabricates missing files");
+        Check(!ImGuiDiagnostics.Elements(window).Contains("action/NavigateBackCommand"), "The main Tools page has no redundant back arrow");
+        await ImGuiDiagnostics.ClickAsync(window, "table-header/unreal-tools-list/0");
+        Check(ImGuiDiagnostics.ElementBounds(window, "unreal-tool/prerequisites").Y < ImGuiDiagnostics.ElementBounds(window, "unreal-tool/version-selector").Y, "Unreal utility columns sort ascending");
+        await ImGuiDiagnostics.ClickAsync(window, "table-header/unreal-tools-list/0");
+        Check(ImGuiDiagnostics.ElementBounds(window, "unreal-tool/prerequisites").Y > ImGuiDiagnostics.ElementBounds(window, "unreal-tool/version-selector").Y, "Clicking a utility column again reverses sorting");
+        await ImGuiDiagnostics.ClickAsync(window, "unreal-tool/prerequisites");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-tools-unreal.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "action/PrepareUnrealUtilityCommand");
+        Check(vm.IsUtilityLaunchConfirmationVisible && launcher.Launches.Count == launches, "Prerequisite installer requires confirmation showing the exact executable");
+        Check(vm.UtilityLaunchConfirmationText.Contains(prerequisite, StringComparison.Ordinal), "Confirmation identifies the selected engine's installer");
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Projets");
+        Check(vm.IsToolchainsVisible && vm.IsUtilityLaunchConfirmationVisible, "Tool confirmation blocks backdrop navigation");
+        await ImGuiDiagnostics.ClickAsync(window, "command/CancelUtilityLaunchCommand");
+        Check(!vm.IsUtilityLaunchConfirmationVisible && launcher.Launches.Count == launches, "Canceling a tool launch makes no system change");
+        await ImGuiDiagnostics.ClickAsync(window, "unreal-tool/version-selector");
+        await ImGuiDiagnostics.ClickAsync(window, "action/PrepareUnrealUtilityCommand");
+        await ImGuiDiagnostics.ClickAsync(window, "command/ConfirmUtilityLaunchCommand");
+        Check(launcher.Launches.Count == launches + 1 && launcher.Launches[^1].Executable == selector && launcher.Launches[^1].Arguments.Count == 0,
+            "Explicit confirmation launches only the chosen selector, without silent registration arguments");
+        await ImGuiDiagnostics.ClickAsync(window, "unreal-tool/swarm");
+        Check(!vm.PrepareUnrealUtilityCommand.CanExecute(null) && !vm.OpenUnrealUtilityFolderCommand.CanExecute(null), "Missing utility exposes no launch or folder action");
+        await ImGuiDiagnostics.ClickAsync(window, "tools-search");
+        await ImGuiDiagnostics.TextAsync(window, "Insights");
+        Check(ImGuiDiagnostics.Elements(window).Count(key => key.StartsWith("unreal-tool/", StringComparison.Ordinal)) == 1, "Tools search accepts keyboard text and filters utility rows");
+        await ImGuiDiagnostics.ClickAsync(window, "tools-tab/1");
+        var old = (ToolchainSnapshot)typeof(MainWindowViewModel).GetField("_currentToolchainSnapshot", Private)!.GetValue(vm)!;
+        ToolchainInstallation Installation(string id, string name, string version, ToolchainKind kind) => new(id, kind, name, version, root, "QA", ToolchainHealth.Ready, [], new Dictionary<string, string>());
+        Call(vm, "ReplaceToolchainSnapshot", old with { Installations = [Installation("dotnet8", ".NET", "8.0", ToolchainKind.DotNet), Installation("dotnet10", ".NET", "10.0", ToolchainKind.DotNet), Installation("msvc", "C++ / MSVC", "14.38", ToolchainKind.Msvc)] });
+        await ImGuiDiagnostics.FramesAsync(window, 3);
+        Check(ImGuiDiagnostics.Elements(window).Count(key => key.StartsWith("toolchain-row/", StringComparison.Ordinal)) == 3, "Toolchains tab displays detected SDK and C++ installations as compact rows");
+        await ImGuiDiagnostics.ClickAsync(window, "table-header/toolchain-list/1");
+        Check(ImGuiDiagnostics.ElementBounds(window, "toolchain-row/dotnet8").Y < ImGuiDiagnostics.ElementBounds(window, "toolchain-row/dotnet10").Y, "Toolchain versions sort numerically instead of alphabetically");
+        await ImGuiDiagnostics.ClickAsync(window, "toolchain-row/msvc");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-tools-toolchains.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "action/OpenDotNetDownloadsCommand");
+        Check(launcher.OpenedUris[^1].Host == "dotnet.microsoft.com" && launcher.Launches.Count == launches + 1, "Official .NET link opens a browser page, not an installer");
+        await ImGuiDiagnostics.ClickAsync(window, "tools-tab/2");
+        Check(ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("command/RefreshToolchainsCommand/", StringComparison.Ordinal)), "Detailed compatibility and device diagnostics remain accessible");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-tools-diagnostics.png"));
+        var engineChecks = vm.EngineToolchains[0].Checks;
+        Check(engineChecks.Where(check => check.Health == "Ready").All(check => !check.HasRemediation) &&
+            engineChecks.Where(check => check.Health != "Ready").All(check => check.HasRemediation),
+            "Only missing or warning prerequisites offer a contextual remedy");
+        await ImGuiDiagnostics.ClickAsync(window, "command/ObtainPrerequisiteCommand");
+        Check(vm.IsToolchainsVisible && vm.ToolsTabIndex == 1 && vm.PrerequisiteCheck is not null && vm.SelectedToolsEngine?.Engine.Id == vm.Engines[0].Engine.Id,
+            "Prerequisite remedy opens Tools for the correct engine");
+        var opened = launcher.OpenedUris.Count;
+        Check(vm.PrerequisiteRemediation?.DownloadPage is not null && launcher.OpenedUris.Count == opened, "Selecting a remedy never starts a download or installer automatically");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-tools-prerequisite-remedy.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "action/OpenPrerequisiteDownloadCommand");
+        Check(launcher.OpenedUris.Count == opened + 1 && launcher.OpenedUris[^1] == vm.PrerequisiteRemediation!.DownloadPage && launcher.Launches.Count == launches + 1,
+            "Explicit download action opens only the selected official prerequisite page");
+        await ImGuiDiagnostics.ClickAsync(window, "action/ClosePrerequisiteCommand");
+        Check(vm.PrerequisiteCheck is null, "Prerequisite help can be dismissed");
+        await ImGuiDiagnostics.ClickAsync(window, "tools-tab/0");
+        vm.RawLogSearchQuery = "";
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Moteurs");
+        Check(vm.IsEnginesVisible && !vm.IsToolsNavigationActive, "Leaving tools clears its navigation highlight without changing the selected engine");
+    }
+    static async Task TestActivityLog(Window window, MainWindowViewModel vm)
+    {
+        await ImGuiDiagnostics.ClickAsync(window, "nav/Journal");
+        var task = new HubTaskSnapshot(Guid.NewGuid(), "QA", "QA journal-test/lifecycle", HubTaskStatus.Queued, null, null, DateTimeOffset.UtcNow, null, null, null);
+        void Send(HubTaskSnapshot snapshot) => Call(vm, "OnTaskChanged", vm, new HubTaskChangedEventArgs(snapshot));
+        Send(task);
+        task = task with { Status = HubTaskStatus.Running };
+        Send(task);
+        for (var i = 0; i < 100; i++) Send(task with { Progress = i / 100d, Message = "QA journal-test/chunk " + i });
+        Send(task with { Status = HubTaskStatus.Completed, Progress = 1, Message = "QA terminé" });
+        Call(vm, "AppendRawLog", "WARN", "QA", "QA journal-test/avertissement");
+        Call(vm, "AppendRawLog", "ERROR", "QA", "QA journal-test/erreur\n   at QA.Technical.Stack()");
+        vm.RawLogSearchQuery = "QA journal-test/";
+        await ImGuiDiagnostics.FramesAsync(window, 4);
+        Check(!vm.ShowFullRawLog && vm.FilteredRawLogEntries.Count == 5, "Default journal shows lifecycle, warnings and errors, not chunk progress");
+        Check(vm.FilteredRawLogEntries.All(entry => !entry.DisplayText.Contains("Stack()")), "Default journal summarizes multiline errors");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-journal-important.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "check/ShowFullRawLog");
+        Check(vm.ShowFullRawLog && vm.FilteredRawLogEntries.Count == 105, "Complete journal reveals every technical progress entry");
+        Check(vm.FilteredRawLogEntries.Any(entry => entry.DisplayText.Contains("Stack()")), "Complete journal retains multiline diagnostics");
+        vm.RawLogSearchQuery = "QA journal-test/chunk 99";
+        Check(vm.FilteredRawLogEntries.Count == 1, "Technical log search finds an individual chunk");
+        vm.RefreshRawLogCommand.Execute(null);
+        Check(vm.FilteredRawLogEntries.Count == 1, "Complete log remains searchable after reloading from disk");
+        vm.RawLogSearchQuery = "";
+        await ImGuiDiagnostics.ClickAsync(window, "check/ShowFullRawLog");
+        Check(!vm.ShowFullRawLog && !vm.FilteredRawLogEntries.Any(entry => entry.Text.Contains("QA journal-test/chunk")), "Reload preserves default filtering of technical progress");
     }
     static async Task TestVariantLabels(Window window, MainWindowViewModel vm)
     {
@@ -384,6 +697,11 @@ static class Program
         await ImGuiDiagnostics.TextAsync(window, "24");
         await ImGuiDiagnostics.KeyAsync(window, Key.Enter);
         Check(vm.EngineChunkConcurrency == 24, "Keyboard configuration supports more than twelve engine connections");
+        await ImGuiDiagnostics.ClickAsync(window, "field/AssetDownloadConnections", leadingEdge: true);
+        await ImGuiDiagnostics.KeyAsync(window, Key.A, KeyModifiers.Control);
+        await ImGuiDiagnostics.TextAsync(window, "20");
+        await ImGuiDiagnostics.KeyAsync(window, Key.Enter);
+        Check(vm.AssetDownloadConnections == 20, "Fab and Megascans connections have their own editable setting");
         await ImGuiDiagnostics.ClickAsync(window, "field/DownloadConcurrency", leadingEdge: true);
         await ImGuiDiagnostics.KeyAsync(window, Key.A, KeyModifiers.Control);
         await ImGuiDiagnostics.TextAsync(window, "6");
@@ -392,14 +710,21 @@ static class Program
         await ImGuiDiagnostics.ClickAsync(window, "command/SaveDownloadQueueSettingsCommand");
         await ImGuiDiagnostics.FramesAsync(window, 5);
         Check(EngineBackend.ChunkConcurrency == 24 && vm.DownloadConcurrency == 6, "Saving independent download settings configures the engine backend");
+        var fab = (FixtureFab)typeof(MainWindowViewModel).GetField("_directFabClient", Private)!.GetValue(vm)!;
+        Check(fab.DownloadConnections == 20, "Saving download settings configures the Fab transfer client");
+        var quixel = (FixtureQuixel)typeof(MainWindowViewModel).GetField("_quixelClient", Private)!.GetValue(vm)!;
+        Check(quixel.DownloadConnections == 20 && vm.DownloadQueueStatus.StartsWith("Enregistré", StringComparison.Ordinal), "Saving configures Megascans as well and finishes successfully");
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-download-settings.png"));
         vm.EngineChunkConcurrency = 2;
+        vm.AssetDownloadConnections = 1;
         await (Task)typeof(MainWindowViewModel).GetMethod("LoadDownloadQueueAsync", Private)!.Invoke(vm, null)!;
         Check(vm.EngineChunkConcurrency == 24 && EngineBackend.ChunkConcurrency == 24 && vm.DownloadConcurrency == 6, "Chunk concurrency is restored from saved options independently of pack concurrency");
+        Check(vm.AssetDownloadConnections == 20 && fab.DownloadConnections == 20 && quixel.DownloadConnections == 20, "Asset connections are restored independently from saved settings");
         var settings = (CyEngineHub.Core.Settings.ISettingsStore)typeof(MainWindowViewModel).GetField("_settings", Private)!.GetValue(vm)!;
         await settings.SetAsync("downloads.queue.options.v1", "{\"Concurrency\":3,\"Resume\":false}");
         await (Task)typeof(MainWindowViewModel).GetMethod("LoadDownloadQueueAsync", Private)!.Invoke(vm, null)!;
         Check(vm.EngineChunkConcurrency == 12, "Older queue settings without a chunk field retain their values and default to twelve connections");
+        Check(vm.AssetDownloadConnections == 12 && fab.DownloadConnections == 12, "Old settings default Fab and Megascans connections to twelve");
         vm.EngineChunkConcurrency = 12;
         vm.ResumeDownloadsOnStartup = true;
         vm.SaveDownloadQueueSettingsCommand.Execute(null);
@@ -589,7 +914,14 @@ static class Program
         Check(ImGuiDiagnostics.Elements(window).Contains("engine-context/check") &&
             ImGuiDiagnostics.Elements(window).Count(key => key.StartsWith("engine/selected/", StringComparison.Ordinal)) == 2, "Right-click preserves the existing multi-selection");
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-engine-context.png"));
-        await ImGuiDiagnostics.EscapeAsync(window);
+        Check(ImGuiDiagnostics.Elements(window).Contains("engine-context/size"), "Engine context menu exposes targeted size analysis for a multi-selection");
+        await ImGuiDiagnostics.ClickAsync(window, "engine-context/size");
+        while (vm.IsEngineSelectionBusy) await ImGuiDiagnostics.FramesAsync(window, 2);
+        Check(fixtures.Skip(1).All(engine => { var label = vm.Engines.Single(item => item.Path == engine.RootPath).EffectiveSizeLabel; return !label.Contains("non mesurée", StringComparison.Ordinal) && !label.Contains("à analyser", StringComparison.Ordinal); }), "Selected engine sizes update after the targeted background scan");
+        var sizes = (StorageSnapshot)typeof(MainWindowViewModel).GetField("_currentStorageSnapshot", Private)!.GetValue(vm)!;
+        Check(fixtures.Skip(1).All(engine => sizes.Entries.Any(entry => entry.Category == StorageCategory.EngineInstallation && entry.OwnerRoot == engine.RootPath && entry.SizeBytes > 0)), "Targeted scan records measurements for both selected engines");
+        Check(sizes.Entries.Any(entry => entry.Category == StorageCategory.Project && entry.SizeBytes == 100) &&
+            sizes.Entries.Any(entry => entry.Category == StorageCategory.MarketplaceLibrary && entry.SizeBytes == 150), "Targeted size analysis preserves unrelated project and library measurements");
         var ordered = fixtures.OrderBy(engine => ImGuiDiagnostics.ElementBounds(window, "row/" + engine.DisplayName).Y).ToArray();
         await ImGuiDiagnostics.ClickAsync(window, "row/" + ordered[0].DisplayName);
         await ImGuiDiagnostics.ClickAsync(window, "row/" + ordered[^1].DisplayName, modifiers: KeyModifiers.Shift);
@@ -743,11 +1075,38 @@ static class Program
         var displayMode = ImGuiDiagnostics.ElementBounds(window, "library-view/images");
         var hiddenCheck = ImGuiDiagnostics.ElementBounds(window, "check/ShowHiddenFabAssets");
         var searchField = ImGuiDiagnostics.ElementBounds(window, "field/LibrarySearchQuery");
-        Check(displayMode.Y > searchField.W && hiddenCheck.X < displayMode.X, "Library display controls sit after the hidden checkbox below search");
+        Check(displayMode.Y > searchField.W && (hiddenCheck.X < displayMode.X || hiddenCheck.Y < displayMode.Y), "Library display and filter groups follow search without overlapping");
+        foreach (var id in new[] { "library-filters", "library-display", "library-pagination" })
+            Check(ImGuiDiagnostics.Elements(window).Contains("toolbar-group/" + id), "Catalog toolbar exposes a separate bordered group: " + id);
+        foreach (var property in new[] { "ShowDownloadedLibraryAssets", "ShowUndownloadedLibraryAssets", "ShowHiddenFabAssets" })
+        {
+            var initial = (bool)typeof(MainWindowViewModel).GetProperty(property)!.GetValue(vm)!;
+            await ImGuiDiagnostics.ClickAsync(window, "library-filter/" + property);
+            Check((bool)typeof(MainWindowViewModel).GetProperty(property)!.GetValue(vm)! != initial, "Catalog filter buttons toggle their bound property: " + property);
+            await ImGuiDiagnostics.ClickAsync(window, "library-filter/" + property);
+            Check((bool)typeof(MainWindowViewModel).GetProperty(property)!.GetValue(vm)! == initial, "Filter buttons can restore the initial state: " + property);
+        }
         window.Width = 1440;
         await ImGuiDiagnostics.FramesAsync(window, 3);
         Check(ImGuiDiagnostics.Elements(window).Contains("library-view/rows") && ImGuiDiagnostics.Elements(window).Contains("library-view/thumbs"),
             "All four library presentations are available from the same toolbar");
+        Check(new[] { "large", "images", "rows", "thumbs" }.All(id => ImGuiDiagnostics.Elements(window).Contains("view-mode-icon/library/" + id)),
+            "Marketplaces share the same four vector presentation icons as projects and engines");
+        var displayFrame = ImGuiDiagnostics.ElementBounds(window, "toolbar-group/library-display");
+        Check(displayFrame.Z - displayFrame.X < 210, "Icon-only marketplace presentation group stays compact");
+        foreach (var compact in new[] { true, false })
+        {
+            vm.UseCompactInterface = compact;
+            await ImGuiDiagnostics.FramesAsync(window, 3);
+            var standard = ImGuiDiagnostics.ElementBounds(window, "library-filter/ShowDownloadedLibraryAssets");
+            Check(new[] { "large", "images", "rows", "thumbs" }.All(id =>
+            {
+                var icon = ImGuiDiagnostics.ElementBounds(window, "view-mode-icon/library/" + id);
+                return Math.Abs((icon.W - icon.Y) - (standard.W - standard.Y)) < 1 && Math.Abs(icon.Y - standard.Y) < 1;
+            }), "Marketplace icons match adjacent button height and vertical alignment in " + (compact ? "compact" : "comfortable") + " density");
+        }
+        vm.UseCompactInterface = true;
+        await ImGuiDiagnostics.FramesAsync(window, 3);
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-library-wide-toolbar.png"));
         window.Width = 1050;
         await ImGuiDiagnostics.FramesAsync(window, 3);
@@ -779,6 +1138,19 @@ static class Program
         Check(!vm.IsRemoteFabProductVisible && ImGuiDiagnostics.Elements(window).Contains("card/selected/asset/card-0"), "Asset metadata selects the entire card without opening it");
         await ImGuiDiagnostics.ClickAsync(window, "card/body/asset/card-0", clicks: 2, horizontal: .9f, vertical: .67f);
         Check(vm.IsRemoteFabProductVisible && vm.SelectedRemoteFabAsset?.AssetId == "card-0", "Asset double-click follows the same details behavior");
+        Check(new[] { "download", "install", "web", "collections", "visibility" }.All(id => ImGuiDiagnostics.Elements(window).Contains("product-action/" + id)) &&
+            ImGuiDiagnostics.Elements(window).Contains("product-action-group/acquisition") && ImGuiDiagnostics.Elements(window).Contains("product-action-group/organization"),
+            "Product actions use explicit full-width text buttons grouped by purpose");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-product-action-panel.png"));
+        await ImGuiDiagnostics.ClickAsync(window, "product-action/download");
+        Check(vm.IsFabDownloadOptionsVisible, "Product download button opens variant selection instead of downloading immediately");
+        await ImGuiDiagnostics.ClickAsync(window, "command/CloseFabDownloadOptionsCommand");
+        await ImGuiDiagnostics.ClickAsync(window, "product-action/install");
+        Check(vm.IsFabInstallOptionsVisible, "Product install button keeps the project installation dialog");
+        await ImGuiDiagnostics.ClickAsync(window, "command/CloseFabInstallOptionsCommand");
+        await ImGuiDiagnostics.ClickAsync(window, "product-action/collections");
+        Check(vm.IsFabCollectionEditorVisible, "Product collections text button opens the original collection editor");
+        await ImGuiDiagnostics.ClickAsync(window, "command/CloseFabCollectionEditorCommand");
         Check(ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("command/CloseRemoteFabProductCommand", StringComparison.Ordinal)), "Product details expose an explicit Back to library action");
         Check(!ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("library-view/", StringComparison.Ordinal)), "Product details hide all catalog view controls");
         var originalHeight = window.Height;
@@ -821,6 +1193,8 @@ static class Program
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-asset-small-cards.png"));
         var detailedCount = ImGuiDiagnostics.Elements(window).Count(key => key.StartsWith("asset/card/", StringComparison.Ordinal));
         await ImGuiDiagnostics.ClickAsync(window, "library-view/images");
+        Check(ImGuiDiagnostics.Elements(window).Contains("view-mode-tooltip/library/images") &&
+            ImGuiDiagnostics.Elements(window).Contains("library-view-selected/images"), "Marketplace icons keep descriptive tooltips and their selected state");
         var minimal = ImGuiDiagnostics.ElementBounds(window, "asset/card/card-0");
         Check(vm.IsLibraryImageOnlyCards && minimal.W - minimal.Y < 190 &&
             ImGuiDiagnostics.Elements(window).Count(key => key.StartsWith("asset/card/", StringComparison.Ordinal)) > detailedCount,
