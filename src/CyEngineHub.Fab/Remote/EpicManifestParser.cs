@@ -16,6 +16,7 @@ public static class EpicManifestParser
 {
     private const uint ManifestMagic = 1_153_351_692;
     private const int MaximumManifestBytes = 64 * 1024 * 1024;
+    private const int MaximumExpandedManifestBytes = 256 * 1024 * 1024;
     private const int MaximumEntries = 1_000_000;
 
     public static EpicDownloadManifest Parse(ReadOnlyMemory<byte> manifestBytes, Uri sourceBaseUri)
@@ -56,7 +57,7 @@ public static class EpicManifestParser
         _ = reader.ReadFString();
         _ = reader.ReadFString();
         _ = reader.ReadFString();
-        if (metaVersion >= 1) buildVersion = reader.ReadFString();
+        if (metaVersion >= 1) _ = reader.ReadFString(); // Build ID, not the engine build version.
         if (metaVersion >= 2)
         {
             _ = reader.ReadFString();
@@ -201,6 +202,8 @@ public static class EpicManifestParser
         }
         uint? uncompressedSize = null;
         if (headerVersion >= 3) uncompressedSize = reader.ReadUInt32();
+        if (uncompressedSize > 256 * 1024 * 1024)
+            throw new DirectFabException($"La taille décompressée du chunk {expected.ChunkId} dépasse la limite autorisée.");
         if (headerSize < reader.Position || headerSize > bytes.Length)
         {
             throw new DirectFabException($"L’en-tête du chunk {expected.ChunkId} est invalide.");
@@ -217,11 +220,16 @@ public static class EpicManifestParser
         {
             using var input = new MemoryStream(payload, writable: false);
             using var zlib = new ZLibStream(input, CompressionMode.Decompress);
-            using var output = new MemoryStream(
-                uncompressedSize is > 0 and <= 256 * 1024 * 1024
-                    ? checked((int)uncompressedSize.Value)
-                    : 0);
-            zlib.CopyTo(output);
+            using var output = new MemoryStream();
+            var limit = uncompressedSize is > 0 ? uncompressedSize.Value : 256L * 1024 * 1024;
+            var buffer = new byte[64 * 1024];
+            int read;
+            while ((read = zlib.Read(buffer)) != 0)
+            {
+                if (output.Length + read > limit)
+                    throw new DirectFabException($"La décompression du chunk {expected.ChunkId} dépasse la taille autorisée.");
+                output.Write(buffer, 0, read);
+            }
             var result = output.ToArray();
             ValidateChunkSize(expected.ChunkId, result, uncompressedSize);
             return result;
@@ -250,11 +258,15 @@ public static class EpicManifestParser
         var uncompressedSize = checked((int)header.ReadUInt32());
         var compressedSize = checked((int)header.ReadUInt32());
         var expectedHash = header.ReadBytes(20).ToArray();
-        var compressed = header.ReadByte() != 0;
+        var storage = header.ReadByte();
+        if ((storage & ~1) != 0)
+            throw new DirectFabException("Le mode de stockage du manifest Epic n’est pas pris en charge.");
+        var compressed = (storage & 1) != 0;
         _ = header.ReadUInt32();
         if (headerSize < header.Position || headerSize > bytes.Length ||
-            uncompressedSize is <= 0 or > MaximumManifestBytes ||
-            compressedSize is < 0 or > MaximumManifestBytes)
+            uncompressedSize is <= 0 or > MaximumExpandedManifestBytes ||
+            compressedSize is < 0 or > MaximumManifestBytes ||
+            compressedSize != bytes.Length - headerSize)
         {
             throw new DirectFabException("L’en-tête du manifest Fab est invalide.");
         }
@@ -268,7 +280,14 @@ public static class EpicManifestParser
                 using var input = new MemoryStream(header.ReadBytes(header.Remaining).ToArray(), writable: false);
                 using var zlib = new ZLibStream(input, CompressionMode.Decompress);
                 using var output = new MemoryStream(uncompressedSize);
-                zlib.CopyTo(output);
+                var buffer = new byte[64 * 1024];
+                int read;
+                while ((read = zlib.Read(buffer)) > 0)
+                {
+                    if (output.Length + read > uncompressedSize)
+                        throw new DirectFabException("La taille décompressée du manifest Epic dépasse la taille annoncée.");
+                    output.Write(buffer, 0, read);
+                }
                 payload = output.ToArray();
             }
             catch (InvalidDataException exception)

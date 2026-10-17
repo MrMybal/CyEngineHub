@@ -4,6 +4,7 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../src/CyEngineHub.Desktop/Services/SafeFolderSelection.cs" Link="Desktop/SafeFolderSelection.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/ImGui/UiBinding.cs" Link="ImGui/UiBinding.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/ImGui/UiDocument.cs" Link="ImGui/UiDocument.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/ImGui/UiListViewport.cs" Link="ImGui/UiListViewport.cs" />

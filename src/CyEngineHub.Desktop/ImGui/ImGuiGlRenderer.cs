@@ -19,6 +19,10 @@ internal sealed unsafe class ImGuiGlRenderer : IDisposable
     private readonly int _projection;
     private readonly Dictionary<Bitmap, (uint Texture, long Frame)> _images = new(ReferenceEqualityComparer.Instance);
     private long _frame;
+    private int _uploads;
+    internal int ImageUploadCount => _uploads;
+    internal bool HasDeferredUploads { get; private set; }
+    internal void BeginFrame() { _uploads = 0; HasDeferredUploads = false; }
     internal GL Api => _gl;
 
     public ImGuiGlRenderer(GL gl)
@@ -108,6 +112,9 @@ internal sealed unsafe class ImGuiGlRenderer : IDisposable
             _images[bitmap] = (entry.Texture, _frame);
             return (nint)entry.Texture;
         }
+        // Decoding is asynchronous; GL uploads must stay on this context, with a frame budget.
+        if (_uploads >= 2) { HasDeferredUploads = true; return 0; }
+        _uploads++;
         using var pixels = new Avalonia.Media.Imaging.WriteableBitmap(bitmap.PixelSize, bitmap.Dpi, Avalonia.Platform.PixelFormat.Rgba8888, Avalonia.Platform.AlphaFormat.Unpremul);
         using var buffer = pixels.Lock();
         bitmap.CopyPixels(buffer);

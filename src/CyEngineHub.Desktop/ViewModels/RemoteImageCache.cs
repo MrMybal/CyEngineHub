@@ -9,7 +9,7 @@ public sealed class RemoteImageCache
 {
     private const long MaximumImageBytes = 16 * 1024 * 1024;
     private static readonly HttpClient SharedHttpClient = CreateHttpClient();
-    private static readonly SemaphoreSlim SharedDownloadGate = new(6, 6);
+    private static readonly SemaphoreSlim SharedDownloadGate = new(4, 4);
     private readonly Func<string> _cacheDirectoryResolver;
 
     public RemoteImageCache(string cacheDirectory)
@@ -23,24 +23,25 @@ public sealed class RemoteImageCache
                                   throw new ArgumentNullException(nameof(cacheDirectoryResolver));
     }
 
-    public async Task<Bitmap?> LoadAsync(Uri? uri, CancellationToken cancellationToken = default)
+    public Task<Bitmap?> LoadAsync(Uri? uri, CancellationToken cancellationToken = default) =>
+        Task.Run(() => LoadQueuedAsync(uri, 2048, cancellationToken), cancellationToken);
+
+    public Task<Bitmap?> LoadThumbnailAsync(Uri? uri, CancellationToken cancellationToken = default) =>
+        Task.Run(() => LoadQueuedAsync(uri, 640, cancellationToken), cancellationToken);
+
+    private async Task<Bitmap?> LoadQueuedAsync(Uri? uri, int maximumEdge, CancellationToken cancellationToken)
     {
         if (uri is null || !uri.IsAbsoluteUri || uri.Scheme != Uri.UriSchemeHttps)
         {
             return null;
         }
 
-        var cachePath = GetCachePath(uri);
-        var cached = TryLoadCached(cachePath);
-        if (cached is not null)
-        {
-            return cached;
-        }
-
         await SharedDownloadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            cached = TryLoadCached(cachePath);
+            cancellationToken.ThrowIfCancellationRequested();
+            var cachePath = GetCachePath(uri);
+            var cached = TryLoadCached(cachePath, maximumEdge);
             if (cached is not null)
             {
                 return cached;
@@ -119,7 +120,7 @@ public sealed class RemoteImageCache
                 }
             }
 
-            return TryLoad(cachePath);
+            return TryLoad(cachePath, maximumEdge);
         }
         catch (Exception exception) when (
             exception is HttpRequestException or IOException or UnauthorizedAccessException)
@@ -145,16 +146,16 @@ public sealed class RemoteImageCache
         return client;
     }
 
-    private static Bitmap? TryLoadCached(string path)
+    private static Bitmap? TryLoadCached(string path, int maximumEdge)
     {
         if (!File.Exists(path))
         {
             return null;
         }
-        return TryLoad(path);
+        return TryLoad(path, maximumEdge);
     }
 
-    private static Bitmap? TryLoad(string path)
+    private static Bitmap? TryLoad(string path, int maximumEdge)
     {
         try
         {
@@ -165,7 +166,10 @@ public sealed class RemoteImageCache
                 FileShare.Read,
                 81_920,
                 FileOptions.SequentialScan);
-            return new Bitmap(stream);
+            using var codec = SkiaSharp.SKCodec.Create(path) ?? throw new ArgumentException("Unsupported cached image.");
+            return codec.Info.Width >= codec.Info.Height
+                ? Bitmap.DecodeToWidth(stream, Math.Min(maximumEdge, codec.Info.Width))
+                : Bitmap.DecodeToHeight(stream, Math.Min(maximumEdge, codec.Info.Height));
         }
         catch (Exception exception) when (
             exception is IOException or UnauthorizedAccessException or ArgumentException)

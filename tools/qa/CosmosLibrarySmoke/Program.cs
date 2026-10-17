@@ -93,7 +93,9 @@ static class Program
             {
                 await ImGuiDiagnostics.FramesAsync(window);
                 Check(ImGuiDiagnostics.Elements(window).Contains("section-selected/source/" + manifest.Id), "Connector source has the same selected-tab indicator");
-                await ImGuiDiagnostics.ClickAsync(window, "section-tab/source/" + manifest.Id);
+                Check(!ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("library-view/", StringComparison.Ordinal)), "Connector product hides catalog presentation settings");
+                await ImGuiDiagnostics.ClickAsync(window, "command/BackCommand");
+                Check(vm.SelectedConnectorLibrary.IsListVisible, "Explicit product Back returns to the connector catalog");
             }
             else vm.SelectedConnectorLibrary.BackCommand.Execute(null);
             await Task.Delay(100);
@@ -101,6 +103,16 @@ static class Program
             {
                 await ImGuiDiagnostics.FramesAsync(window);
                 Check(ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("list/Assets/", StringComparison.Ordinal)), "Downloaded file rendered in ImGui list");
+                await ImGuiDiagnostics.ClickAsync(window, "library-view/images");
+                Check(ImGuiDiagnostics.Elements(window).Contains("minimal/card/Assets/0"), "Local connector catalogs support image and name cards");
+                await ImGuiDiagnostics.ClickAsync(window, "minimal/image/Assets/0", clicks: 2);
+                Check(vm.SelectedConnectorLibrary.IsProductVisible, "Connector minimal card double-click opens its native product");
+                await ImGuiDiagnostics.ClickAsync(window, "section-tab/source/" + manifest.Id);
+                await ImGuiDiagnostics.ClickAsync(window, "library-view/rows");
+                Check(ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("library-local-row/", StringComparison.Ordinal)), "Connector catalogs support sortable text rows");
+                await ImGuiDiagnostics.ClickAsync(window, "library-view/thumbs");
+                Check(ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("library-row-image/Assets/", StringComparison.Ordinal)), "Connector catalogs support thumbnail rows");
+                await ImGuiDiagnostics.ClickAsync(window, "library-view/large");
             }
             else
             {

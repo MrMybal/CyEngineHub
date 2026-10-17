@@ -20,6 +20,8 @@ public static class ImGuiDiagnostics
     public static int VisibleRows(Window window, string binding) => Host(window).Surface.Workspace?.VisibleRows.GetValueOrDefault(binding) ?? 0;
     public static Vector4 ElementBounds(Window window, string element) => Host(window).Surface.Workspace!.Elements[element];
     public static float FontSize(Window window) => Host(window).Surface.Workspace?.RenderedFontSize ?? 0;
+    public static int ImageUploads(Window window) => Host(window).Surface.LastImageUploads;
+    public static int TotalImageUploads(Window window) => Host(window).Surface.TotalImageUploads;
     public static void ScrollListToEnd(Window window, string binding) => Host(window).Surface.Workspace?.ScrollToEnd(binding);
     public static async Task FramesAsync(Window window, int frames = 2)
     {
@@ -34,7 +36,7 @@ public static class ImGuiDiagnostics
         }
         if (surface.RenderFailure is { } failure) throw new InvalidOperationException("ImGui render failed.", failure);
     }
-    public static async Task ClickAsync(Window window, string element, bool leadingEdge = false, int clicks = 1, float horizontal = .5f, float vertical = .5f)
+    public static async Task ClickAsync(Window window, string element, bool leadingEdge = false, int clicks = 1, float horizontal = .5f, float vertical = .5f, bool rightButton = false, KeyModifiers modifiers = KeyModifiers.None)
     {
         await FramesAsync(window).ConfigureAwait(true);
         var host = window.GetVisualDescendants().OfType<ImGuiHost>().FirstOrDefault(host => host.IsEffectivelyVisible &&
@@ -48,20 +50,40 @@ public static class ImGuiDiagnostics
         if (!ReferenceEquals(host.InputHitTest(position), host))
             throw new InvalidOperationException("The GPU host does not receive pointer hit tests.");
         host.Focus();
+        host.Surface.Input(io => { io.AddKeyEvent(ImGuiNET.ImGuiKey.ModCtrl, modifiers.HasFlag(KeyModifiers.Control)); io.AddKeyEvent(ImGuiNET.ImGuiKey.ModShift, modifiers.HasFlag(KeyModifiers.Shift)); });
+        // Let hover/overlap ownership settle after a modal or grid reflow, as with a real pointer move.
+        host.Surface.Input(io => io.AddMousePosEvent((float)position.X, (float)position.Y));
+        await FramesAsync(window, 2).ConfigureAwait(true);
         if (clicks > 1) await Task.Delay(400).ConfigureAwait(true);
         for (var click = 0; click < clicks; click++)
         {
-            host.Surface.Input(io => { io.AddFocusEvent(true); io.AddMousePosEvent((float)position.X, (float)position.Y); io.AddMouseButtonEvent(0, true); });
+            host.Surface.Input(io => { io.AddFocusEvent(true); io.AddMousePosEvent((float)position.X, (float)position.Y); io.AddMouseButtonEvent(rightButton ? 1 : 0, true); });
             await FramesAsync(window, clicks > 1 ? 1 : 3).ConfigureAwait(true);
-            host.Surface.Input(io => io.AddMouseButtonEvent(0, false));
+            host.Surface.Input(io => io.AddMouseButtonEvent(rightButton ? 1 : 0, false));
             await FramesAsync(window, clicks > 1 ? 1 : 3).ConfigureAwait(true);
         }
+        host.Surface.Input(io => { io.AddKeyEvent(ImGuiNET.ImGuiKey.ModCtrl, false); io.AddKeyEvent(ImGuiNET.ImGuiKey.ModShift, false); });
         await FramesAsync(window).ConfigureAwait(true);
     }
-    public static async Task TextAsync(Window window, string text)
+    public static async Task TextAsync(Window window, string text, KeyModifiers modifiers = KeyModifiers.None)
     {
-        Host(window).Surface.Input(io => io.AddInputCharactersUTF8(text));
-        await FramesAsync(window).ConfigureAwait(true);
+        // Exercise the Avalonia host, including Win32's handled-KeyDown gate,
+        // rather than bypassing it with direct ImGui text injection.
+        var host = Host(window);
+        var down = new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.A, KeyModifiers = modifiers };
+        host.RaiseEvent(down);
+        if (down.Handled) throw new InvalidOperationException("Printable KeyDown suppresses Windows text input.");
+        host.RaiseEvent(new TextInputEventArgs { RoutedEvent = InputElement.TextInputEvent, Text = text });
+        host.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyUpEvent, Key = Key.A });
+        await FramesAsync(window, 3).ConfigureAwait(true);
+    }
+    public static async Task KeyAsync(Window window, Key key, KeyModifiers modifiers = KeyModifiers.None)
+    {
+        var host = Host(window);
+        host.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = key, KeyModifiers = modifiers });
+        await FramesAsync(window, 2).ConfigureAwait(true);
+        host.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyUpEvent, Key = key });
+        await FramesAsync(window, 2).ConfigureAwait(true);
     }
     public static async Task EscapeAsync(Window window)
     {

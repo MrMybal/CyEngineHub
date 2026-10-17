@@ -9,13 +9,17 @@ public sealed class DownloadProgressText
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly object _gate = new();
 
-    public string Format(string message, long received, long? total)
+    public string Format(string message, long received, long? total, long cachedBytes = 0)
     {
         lock (_gate)
         {
             var complete = total > 0 && received >= total;
-            var snapshot = _telemetry.Update(string.Empty, received, total, _clock.Elapsed,
+            var networkBytes = Math.Max(0, received - cachedBytes);
+            var networkTotal = total is { } size ? Math.Max(0, size - cachedBytes) : (long?)null;
+            var snapshot = _telemetry.Update(string.Empty, networkBytes, networkTotal, _clock.Elapsed,
                 complete ? "Traitement" : "Téléchargement");
+            snapshot = snapshot with { ReceivedBytes = received, TotalBytes = total,
+                Percent = total > 0 ? Math.Clamp(100d * received / total.Value, 0, 100) : null };
             return message + "\n" + Summary(snapshot) + " · " + Timing(snapshot);
         }
     }

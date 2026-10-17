@@ -41,7 +41,7 @@ public sealed class QuixelCollectionCardViewModel : ObservableObject, IDisposabl
         Bitmap? bitmap = null;
         try
         {
-            bitmap = await Task.Run(() => _imageCache.LoadAsync(Collection.ThumbnailUri, token), token).ConfigureAwait(false);
+            bitmap = await _imageCache.LoadThumbnailAsync(Collection.ThumbnailUri, token).ConfigureAwait(false);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 if (_disposed || token.IsCancellationRequested) return;

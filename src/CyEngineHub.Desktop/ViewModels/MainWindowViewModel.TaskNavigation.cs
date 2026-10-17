@@ -58,6 +58,12 @@ public sealed partial class MainWindowViewModel
                 if (engine is not null) { OpenUnrealEngineDetails(engine); return; }
                 var local = LocalEngineInstallations.FirstOrDefault(item => SameWorkspaceKey(item.Installation.RootPath, link.Id));
                 if (local is not null) { OpenLocalEngineDetails(local); return; }
+                var pending = EpicEngineDownloads.FirstOrDefault(item => SameWorkspaceKey(item.Path, link.Id));
+                if (pending is not null)
+                {
+                    SelectedEngineTab = EngineTabs.FirstOrDefault(item => item.Family == CyEngineHub.Engines.EngineFamily.Unreal);
+                    ShowSection(PageSection.Engines); StatusMessage = pending.StatusLabel; return;
+                }
                 ShowSection(PageSection.Engines);
                 StatusMessage = "Installation du moteur en cours ou moteur absent du catalogue : " + link.Id;
             }

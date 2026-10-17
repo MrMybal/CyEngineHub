@@ -7,6 +7,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using CyEngineHub.Desktop.ViewModels;
+using CyEngineHub.Desktop.Services;
 using System.Runtime.CompilerServices;
 
 namespace CyEngineHub.Desktop.Views;
@@ -198,12 +199,7 @@ public sealed partial class MainWindow : Window
     private async void BrowseDerivedSourceFolder(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
     {
         if (_viewModel is null) return;
-        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-        {
-            Title = "Choisir le dossier déjà préparé à enregistrer comme dérivé",
-            AllowMultiple = false,
-        });
-        if (folders.Count > 0) _viewModel.DerivedSourceFolder = folders[0].Path.LocalPath;
+        await BrowseFolderAsync("Choisir le dossier déjà préparé à enregistrer comme dérivé", path => _viewModel.DerivedSourceFolder = path);
     }
 
     private void OnFabAuthorizationCaptureRequested(object? sender, EventArgs args)
@@ -378,15 +374,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-        {
-            Title = "Choisir l’installation du moteur",
-            AllowMultiple = false,
-        });
-        if (folders.Count > 0)
-        {
-            _viewModel.ManualEnginePath = folders[0].Path.LocalPath;
-        }
+        await BrowseFolderAsync("Choisir l’installation du moteur", path => _viewModel.ManualEnginePath = path);
     }
 
     private async void BrowseSourceEngineTarget(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
@@ -396,15 +384,7 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-        {
-            Title = "Choisir le dossier cible Unreal Engine",
-            AllowMultiple = false,
-        });
-        if (folders.Count > 0)
-        {
-            _viewModel.SourceEngineTargetDirectory = folders[0].Path.LocalPath;
-        }
+        await BrowseFolderAsync("Choisir le dossier cible Unreal Engine", path => _viewModel.SourceEngineTargetDirectory = path);
     }
 
     private async void BrowseEpicEngineTarget(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
@@ -414,18 +394,13 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-        {
-            Title = "Choisir le dossier parent du moteur Unreal",
-            AllowMultiple = false,
-        });
-        if (folders.Count > 0)
+        await BrowseFolderAsync("Choisir le dossier parent du moteur Unreal", path =>
         {
             var selected = _viewModel.SelectedEpicEngineRelease;
             _viewModel.EpicEngineTargetDirectory = Path.Combine(
-                folders[0].Path.LocalPath,
+                path,
                 selected?.AppName ?? "UE_Official");
-        }
+        });
     }
 
     private async void BrowseNativeStoreSource(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
@@ -435,14 +410,12 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-        {
-            Title = _viewModel.PendingNativeStoreTitle,
-            AllowMultiple = false,
-        });
-        if (folders.Count > 0)
-        {
-            _viewModel.PendingNativeStorePath = folders[0].Path.LocalPath;
-        }
+        await BrowseFolderAsync(_viewModel.PendingNativeStoreTitle, path => _viewModel.PendingNativeStorePath = path);
     }
+
+    private Task BrowseFolderAsync(string title, Action<string> apply) => SafeFolderSelection.SelectAsync(async () =>
+    {
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = title, AllowMultiple = false });
+        return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+    }, apply, message => _viewModel?.ReportFolderSelectionError(message));
 }

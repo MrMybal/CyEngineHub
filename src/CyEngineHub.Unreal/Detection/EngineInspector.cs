@@ -116,6 +116,7 @@ public sealed class EngineInspector : IEngineInspector
         var candidates = new[]
         {
             Path.Combine(rootPath, "Engine", "Binaries", "Win64", "UnrealEditor.exe"),
+            Path.Combine(rootPath, "Engine", "Binaries", "Win64", "UE4Editor.exe"),
             Path.Combine(rootPath, "Engine", "Binaries", "Linux", "UnrealEditor"),
             Path.Combine(rootPath, "Engine", "Binaries", "Mac", "UnrealEditor.app"),
         };

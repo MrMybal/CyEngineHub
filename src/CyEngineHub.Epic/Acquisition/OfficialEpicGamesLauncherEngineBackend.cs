@@ -27,7 +27,10 @@ public sealed record EpicBinaryEngineDownloadProgress(
     double? Fraction,
     string Message,
     long DownloadedBytes,
-    long? TotalBytes);
+    long? TotalBytes)
+{
+    public long CachedBytes { get; init; }
+}
 
 public sealed record EpicBinaryEngineDownloadResult(
     EpicBinaryEngineRelease Release,
@@ -46,6 +49,7 @@ public sealed record EpicBinaryEngineComponentUpdateResult(
 
 public interface IEpicBinaryEngineBackend
 {
+    void SetChunkConcurrency(int concurrency) { }
     Uri InstallationGuideUri { get; }
 
     Task<EpicBinaryEngineBackendStatus> GetStatusAsync(
@@ -53,6 +57,7 @@ public interface IEpicBinaryEngineBackend
 
     Task<IReadOnlyList<EpicBinaryEngineRelease>> GetAvailableReleasesAsync(
         CancellationToken cancellationToken = default);
+    Task<EpicEngineBuild?> GetLatestBuildAsync(EpicBinaryEngineRelease release, CancellationToken cancellationToken = default) => Task.FromResult<EpicEngineBuild?>(null);
 
     Task<EpicBinaryEngineDownloadResult> DownloadAsync(
         EpicBinaryEngineRelease release,
@@ -68,7 +73,7 @@ public interface IEpicBinaryEngineBackend
         CancellationToken cancellationToken = default);
 }
 
-public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBackend
+public sealed partial class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBackend
 {
     private const int MaximumManifestBytes = 64 * 1024 * 1024;
     private const int MaximumChunkBytes = 256 * 1024 * 1024;
@@ -212,83 +217,26 @@ public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBa
         Directory.CreateDirectory(stagingFiles);
         Directory.CreateDirectory(chunkCache);
 
-        long completedBytes = 0;
         var totalBytes = Math.Max(1, manifest.DownloadSize);
-        foreach (var chunk in manifest.Chunks.Values)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var cachePath = Path.Combine(chunkCache, chunk.ChunkId + ".chunk");
-            if (!File.Exists(cachePath))
-            {
-                var bytes = await ReadBoundedBytesAsync(
-                        chunk.DownloadUri,
-                        MaximumChunkBytes,
-                        cancellationToken,
-                        received => progress?.Report(new EpicBinaryEngineDownloadProgress(
-                            Math.Clamp((double)(completedBytes + received) / totalBytes * 0.74, 0, 0.74),
-                            "Téléchargement des chunks Unreal", completedBytes + received, totalBytes)))
-                    .ConfigureAwait(false);
-                await File.WriteAllBytesAsync(cachePath, bytes.ToArray(), cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            completedBytes = checked(completedBytes + Math.Max(0, new FileInfo(cachePath).Length));
-            progress?.Report(new EpicBinaryEngineDownloadProgress(
-                Math.Clamp((double)completedBytes / totalBytes * 0.74, 0, 0.74),
-                $"Chunks Unreal · {completedBytes / 1024d / 1024d / 1024d:0.00} GB",
-                completedBytes,
-                totalBytes));
-        }
+        var (completedBytes, cachedBytes) = await DownloadChunksAsync(manifest.Chunks.Values.ToArray(), chunkCache,
+            totalBytes, 0.74, progress, cancellationToken).ConfigureAwait(false);
 
+        using var decodedChunks = CreateReconstructionCache(chunkCache, manifest);
+        long lastProgress = 0;
         for (var index = 0; index < manifest.Files.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var file = manifest.Files[index];
             var destination = GetSafeDestination(stagingFiles, file.RelativePath);
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            if (!EpicManifestParser.MatchesSha1(destination, file.Sha1))
-            {
-                var temporary = destination + ".partial";
-                await using (var output = new FileStream(
-                                 temporary,
-                                 FileMode.Create,
-                                 FileAccess.Write,
-                                 FileShare.None,
-                                 1024 * 1024,
-                                 FileOptions.Asynchronous | FileOptions.SequentialScan))
-                {
-                    foreach (var part in file.Parts)
-                    {
-                        var chunkInfo = manifest.Chunks[part.ChunkGuid];
-                        var rawChunk = await File.ReadAllBytesAsync(
-                                Path.Combine(chunkCache, part.ChunkGuid + ".chunk"),
-                                cancellationToken)
-                            .ConfigureAwait(false);
-                        var chunkData = EpicManifestParser.ParseChunk(rawChunk, chunkInfo);
-                        var end = checked((long)part.Offset + part.Size);
-                        if (end > chunkData.LongLength)
-                        {
-                            throw new InvalidOperationException(
-                                $"Le fragment {part.ChunkGuid} dépasse son chunk.");
-                        }
-                        await output.WriteAsync(
-                                chunkData.AsMemory(checked((int)part.Offset), checked((int)part.Size)),
-                                cancellationToken)
-                            .ConfigureAwait(false);
-                    }
-                }
-                if (!EpicManifestParser.MatchesSha1(temporary, file.Sha1))
-                {
-                    throw new InvalidOperationException(
-                        $"L’intégrité de {file.RelativePath} est invalide après reconstruction.");
-                }
-                File.Move(temporary, destination, overwrite: true);
-            }
+            await ReconstructFileAsync(file, destination, decodedChunks,
+                () => InvalidateFileChunks(chunkCache, file), cancellationToken).ConfigureAwait(false);
 
-            progress?.Report(new EpicBinaryEngineDownloadProgress(
+            if (ReportReconstructionProgress(ref lastProgress, index, manifest.Files.Count))
+                progress?.Report(new EpicBinaryEngineDownloadProgress(
                 0.74 + 0.25 * (index + 1d) / manifest.Files.Count,
                 $"Reconstruction · {index + 1:N0}/{manifest.Files.Count:N0} fichier(s)",
                 completedBytes,
-                totalBytes));
+                totalBytes) { CachedBytes = cachedBytes });
         }
 
         if (Directory.Exists(target))
@@ -305,7 +253,7 @@ public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBa
             1,
             "Installation Unreal téléchargée et vérifiée.",
             completedBytes,
-            totalBytes));
+            totalBytes) { CachedBytes = cachedBytes });
         return new EpicBinaryEngineDownloadResult(
             release,
             target,
@@ -376,84 +324,28 @@ public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBa
         Directory.CreateDirectory(stagingFiles);
         Directory.CreateDirectory(chunkCache);
 
-        long completedBytes = 0;
         var totalBytes = Math.Max(1, selectedChunks.Sum(chunk => Math.Max(0, chunk.DownloadSize)));
-        foreach (var chunk in selectedChunks)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var cachePath = Path.Combine(chunkCache, chunk.ChunkId + ".chunk");
-            if (!File.Exists(cachePath))
-            {
-                var bytes = await ReadBoundedBytesAsync(
-                        chunk.DownloadUri,
-                        MaximumChunkBytes,
-                        cancellationToken,
-                        received => progress?.Report(new EpicBinaryEngineDownloadProgress(
-                            Math.Clamp((double)(completedBytes + received) / totalBytes * 0.68, 0, 0.68),
-                            "Téléchargement des composants Unreal", completedBytes + received, totalBytes)))
-                    .ConfigureAwait(false);
-                await File.WriteAllBytesAsync(cachePath, bytes.ToArray(), cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            completedBytes = checked(completedBytes + Math.Max(0, new FileInfo(cachePath).Length));
-            progress?.Report(new EpicBinaryEngineDownloadProgress(
-                Math.Clamp((double)completedBytes / totalBytes * 0.68, 0, 0.68),
-                $"Composants Unreal · {completedBytes / 1024d / 1024d / 1024d:0.00} GB",
-                completedBytes,
-                totalBytes));
-        }
+        var (completedBytes, cachedBytes) = await DownloadChunksAsync(selectedChunks, chunkCache,
+            totalBytes, 0.68, progress, cancellationToken).ConfigureAwait(false);
 
+        using var decodedChunks = CreateReconstructionCache(chunkCache, manifest);
+        long lastProgress = 0;
         for (var index = 0; index < selectedFiles.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var file = selectedFiles[index];
             var destination = GetSafeDestination(stagingFiles, file.RelativePath);
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            if (!EpicManifestParser.MatchesSha1(destination, file.Sha1))
-            {
-                var temporary = destination + ".partial";
-                await using (var output = new FileStream(
-                                 temporary,
-                                 FileMode.Create,
-                                 FileAccess.Write,
-                                 FileShare.None,
-                                 1024 * 1024,
-                                 FileOptions.Asynchronous | FileOptions.SequentialScan))
-                {
-                    foreach (var part in file.Parts)
-                    {
-                        var chunkInfo = manifest.Chunks[part.ChunkGuid];
-                        var rawChunk = await File.ReadAllBytesAsync(
-                                Path.Combine(chunkCache, part.ChunkGuid + ".chunk"),
-                                cancellationToken)
-                            .ConfigureAwait(false);
-                        var chunkData = EpicManifestParser.ParseChunk(rawChunk, chunkInfo);
-                        var end = checked((long)part.Offset + part.Size);
-                        if (end > chunkData.LongLength)
-                        {
-                            throw new InvalidOperationException(
-                                $"Le fragment {part.ChunkGuid} dépasse son chunk.");
-                        }
-                        await output.WriteAsync(
-                                chunkData.AsMemory(checked((int)part.Offset), checked((int)part.Size)),
-                                cancellationToken)
-                            .ConfigureAwait(false);
-                    }
-                }
-                if (!EpicManifestParser.MatchesSha1(temporary, file.Sha1))
-                {
-                    throw new InvalidOperationException(
-                        $"L’intégrité de {file.RelativePath} est invalide après reconstruction.");
-                }
-                File.Move(temporary, destination, overwrite: true);
-            }
-            progress?.Report(new EpicBinaryEngineDownloadProgress(
+            await ReconstructFileAsync(file, destination, decodedChunks,
+                () => InvalidateFileChunks(chunkCache, file), cancellationToken).ConfigureAwait(false);
+            if (ReportReconstructionProgress(ref lastProgress, index, selectedFiles.Length))
+                progress?.Report(new EpicBinaryEngineDownloadProgress(
                 0.68 + 0.24 * (index + 1d) / selectedFiles.Length,
                 $"Préparation · {index + 1:N0}/{selectedFiles.Length:N0} fichier(s)",
                 completedBytes,
-                totalBytes));
+                totalBytes) { CachedBytes = cachedBytes });
         }
 
+        lastProgress = 0;
         for (var index = 0; index < selectedFiles.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -473,11 +365,12 @@ public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBa
                 }
                 File.Move(temporary, destination, overwrite: true);
             }
-            progress?.Report(new EpicBinaryEngineDownloadProgress(
+            if (ReportReconstructionProgress(ref lastProgress, index, selectedFiles.Length))
+                progress?.Report(new EpicBinaryEngineDownloadProgress(
                 0.92 + 0.08 * (index + 1d) / selectedFiles.Length,
                 $"Installation · {index + 1:N0}/{selectedFiles.Length:N0} fichier(s)",
                 completedBytes,
-                totalBytes));
+                totalBytes) { CachedBytes = cachedBytes });
         }
 
         TryDeleteCompletedStaging(stagingRoot, target);
@@ -485,7 +378,7 @@ public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBa
             1,
             "Composants Unreal installés et vérifiés.",
             completedBytes,
-            totalBytes));
+            totalBytes) { CachedBytes = cachedBytes });
         return new EpicBinaryEngineComponentUpdateResult(
             release,
             target,
@@ -511,6 +404,20 @@ public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBa
         }
         return await _sessionStore!.LoadAsync(cancellationToken).ConfigureAwait(false)
                ?? throw new InvalidOperationException("La session Epic sécurisée est introuvable.");
+    }
+
+    public async Task<EpicEngineBuild?> GetLatestBuildAsync(EpicBinaryEngineRelease release, CancellationToken cancellationToken = default)
+    {
+        var session = await GetSessionAsync(cancellationToken).ConfigureAwait(false);
+        var distribution = await GetDistributionAsync(release, session, cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(distribution.BuildVersion))
+        {
+            var metadata = EpicEngineBuild.Parse(distribution.BuildVersion);
+            if (metadata.Version is not null) return metadata;
+        }
+        // Only the manifest is read. No engine chunks or installation files are downloaded.
+        var bytes = await ReadBoundedBytesAsync(distribution.ManifestUri, MaximumManifestBytes, cancellationToken).ConfigureAwait(false);
+        return await Task.Run(() => EpicEngineBuild.Parse(EpicManifestParser.Parse(bytes, distribution.BaseUri).BuildVersion), cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<EpicDistribution> GetDistributionAsync(
@@ -566,7 +473,7 @@ public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBa
         {
             Path = manifestBuilder.Path[..(slash + 1)],
         };
-        return new EpicDistribution(baseBuilder.Uri, manifestBuilder.Uri);
+        return new EpicDistribution(baseBuilder.Uri, manifestBuilder.Uri, OptionalString(element, "buildVersion"));
     }
 
     private async Task<JsonDocument> GetAuthorizedJsonAsync(
@@ -794,5 +701,5 @@ public sealed class OfficialEpicGamesLauncherEngineBackend : IEpicBinaryEngineBa
                 .Any(tag => tag.Contains(value, StringComparison.Ordinal));
     }
 
-    private sealed record EpicDistribution(Uri BaseUri, Uri ManifestUri);
+    private sealed record EpicDistribution(Uri BaseUri, Uri ManifestUri, string? BuildVersion);
 }

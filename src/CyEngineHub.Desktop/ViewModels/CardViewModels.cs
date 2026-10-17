@@ -1007,7 +1007,7 @@ public sealed class EngineCardViewModel : ObservableObject
         Organization = organization;
         _effectiveSizeLabel = effectiveSizeLabel;
         InstallationOptions = BuildInstallationOptions(engine.RootPath);
-        LaunchCommand = new AsyncRelayCommand(() => launch(engine), () => File.Exists(engine.EditorPath), onError);
+        LaunchCommand = new AsyncRelayCommand(() => launch(engine), () => IsInstallationAvailable && File.Exists(engine.EditorPath), onError);
         OpenFolderCommand = new AsyncRelayCommand(() => openFolder(engine.RootPath), onError: onError);
         var canSetup = File.Exists(System.IO.Path.Combine(engine.RootPath, "Setup.bat"));
         SetupCommand = new AsyncRelayCommand(() => setup(engine), () => canSetup, onError);
@@ -1051,6 +1051,16 @@ public sealed class EngineCardViewModel : ObservableObject
     public string TypeLabel => Engine.Type.ToString();
 
     public bool IsOfficialEpic => Engine.Type == EngineInstallationType.EpicBinary;
+    private string _officialUpdateLabel = "Non vérifiée";
+    private bool _officialUpdateAvailable;
+    public bool IsInstallationAvailable => Engine.Health != EngineHealth.Broken;
+    public string OfficialUpdateLabel => !IsInstallationAvailable ? "Installation indisponible" : IsOfficialEpic ? _officialUpdateLabel : "—";
+    public bool OfficialUpdateAvailable => _officialUpdateAvailable;
+    public void ApplyOfficialUpdate(string label, bool available)
+    {
+        SetProperty(ref _officialUpdateLabel, label, nameof(OfficialUpdateLabel));
+        SetProperty(ref _officialUpdateAvailable, available, nameof(OfficialUpdateAvailable));
+    }
     public bool CanBuildEditor => Engine.Type is EngineInstallationType.Source or EngineInstallationType.SourceFork or EngineInstallationType.Custom &&
         File.Exists(System.IO.Path.Combine(Engine.RootPath, "Engine", "Build", "BatchFiles", "Build.bat"));
 
@@ -2897,14 +2907,15 @@ public sealed class RemoteFabAssetRowViewModel : IDisposable
 
     public BulkObservableCollection<RemoteFabAssetCardViewModel> Cards { get; } = [];
     public int AssetCount => _assets.Length;
+    public RemoteFabAsset AssetAt(int index) => _assets[index];
 
-    public void Realize()
+    public void Realize(bool loadThumbnails = true)
     {
         if (_isRealized) return;
         _isRealized = true;
         var cards = _assets.Select(_createCard).ToArray();
         Cards.ReplaceWith(cards);
-        foreach (var card in cards) card.EnsureThumbnailLoaded();
+        if (loadThumbnails) foreach (var card in cards) card.EnsureThumbnailLoaded();
     }
 
     public void Recycle()
@@ -2923,6 +2934,7 @@ public sealed class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
 {
     private readonly CancellationTokenSource _thumbnailCancellation = new();
     private readonly Func<Uri?, CancellationToken, Task<Bitmap?>> _loadThumbnail;
+    private readonly Func<Uri?, CancellationToken, Task<Bitmap?>> _loadPreview;
     private Bitmap? _thumbnail;
     private bool _isThumbnailLoading;
     private bool _thumbnailLoadStarted;
@@ -2948,11 +2960,13 @@ public sealed class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
         Func<RemoteFabAssetCardViewModel, Task>? download = null,
         Action<RemoteFabAssetCardViewModel>? openInstall = null,
         Action<RemoteFabAssetCardViewModel>? openCollections = null,
-        bool isHidden = false)
+        bool isHidden = false,
+        Func<Uri?, CancellationToken, Task<Bitmap?>>? loadPreview = null)
     {
         Asset = asset;
         Organization = organization;
         _loadThumbnail = loadThumbnail;
+        _loadPreview = loadPreview ?? loadThumbnail;
         _fullDescription = asset.Description;
         _galleryUris = asset.GalleryUris;
         _isHidden = isHidden;
@@ -3374,7 +3388,7 @@ public sealed class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
         {
             foreach (var uri in _galleryUris.Take(16))
             {
-                var bitmap = await _loadThumbnail(uri, _thumbnailCancellation.Token);
+                var bitmap = await _loadPreview(uri, _thumbnailCancellation.Token);
                 if (_disposed)
                 {
                     bitmap?.Dispose();
@@ -3649,6 +3663,7 @@ public sealed class TaskItemViewModel : ObservableObject
     public double ProgressPercent => (_snapshot.Progress ?? 0) * 100;
 
     public string Duration => FormatDuration(_snapshot);
+    public double DurationSeconds => _snapshot.StartedAt is { } start ? ((_snapshot.FinishedAt ?? DateTimeOffset.UtcNow) - start).TotalSeconds : 0;
 
     public bool CanCancel => _snapshot.Status is HubTaskStatus.Queued or HubTaskStatus.Running;
 

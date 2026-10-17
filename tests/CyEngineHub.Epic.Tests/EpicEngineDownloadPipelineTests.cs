@@ -14,7 +14,25 @@ namespace CyEngineHub.Epic.Tests;
 public sealed class EpicEngineDownloadPipelineTests
 {
     [Theory]
+    [InlineData("metadata", 1)]
+    [InlineData("success", 2)]
+    [InlineData("binary", 2)]
+    public async Task UpdateChecksReadMetadataOrManifestButNeverEngineChunks(string scenario, int requests)
+    {
+        using var cancellation = new CancellationTokenSource();
+        using var handler = new FixtureHandler(scenario, cancellation);
+        using var http = new HttpClient(handler);
+        var store = new FixtureSession();
+        using var direct = new DirectFabApiClient(http, store);
+        var backend = new OfficialEpicGamesLauncherEngineBackend(http, direct, store);
+        var build = await backend.GetLatestBuildAsync(new("qa", "UE_QA", "5.6", "QA"));
+        Assert.NotNull(build);
+        Assert.Equal(requests, handler.RequestCount);
+        Assert.Equal(new Version(5, 6, 1), build.Version);
+    }
+    [Theory]
     [InlineData("success")]
+    [InlineData("binary")]
     [InlineData("corrupt")]
     [InlineData("cancel")]
     [InlineData("occupied")]
@@ -41,7 +59,7 @@ public sealed class EpicEngineDownloadPipelineTests
             }
             var operation = backend.DownloadAsync(new("qa", "UE_QA", "5.6", "QA engine"), target,
                 new InlineProgress(messages.Add), cancellation.Token);
-            if (scenario == "success")
+            if (scenario is "success" or "binary")
             {
                 var result = await operation;
                 Assert.Equal(1, result.FileCount);
@@ -98,12 +116,14 @@ public sealed class EpicEngineDownloadPipelineTests
             {
                 Assert.Equal("fake-token-not-a-credential", request.Headers.Authorization?.Parameter);
                 return Task.FromResult(new HttpResponseMessage(scenario == "unauthorized" ? HttpStatusCode.Unauthorized : HttpStatusCode.OK)
-                { Content = new StringContent("{\"elements\":[{\"manifests\":[{\"uri\":\"https://qa.invalid/build.manifest\"}]}]}") });
+                { Content = new StringContent(scenario == "metadata"
+                    ? "{\"elements\":[{\"buildVersion\":\"5.6.1-42+++UE5+Release-5.6\",\"manifests\":[{\"uri\":\"https://qa.invalid/build.manifest\"}]}]}"
+                    : "{\"elements\":[{\"manifests\":[{\"uri\":\"https://qa.invalid/build.manifest\"}]}]}") });
             }
             Assert.Equal("qa.invalid", uri.Host); // Any unexpected request fails, never delegates to a network handler.
             var chunk = Chunk();
             byte[] bytes;
-            if (uri.AbsolutePath == "/build.manifest") bytes = Manifest(chunk.Length);
+            if (uri.AbsolutePath == "/build.manifest") bytes = scenario == "binary" ? EpicBinaryManifestTests.Create(Payload) : Manifest(chunk.Length);
             else
             {
                 Assert.EndsWith(".chunk", uri.AbsolutePath, StringComparison.Ordinal);

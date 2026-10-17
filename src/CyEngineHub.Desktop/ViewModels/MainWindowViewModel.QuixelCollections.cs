@@ -123,6 +123,11 @@ public sealed partial class MainWindowViewModel
             }
             if (!force && _quixelCollectionsUpdatedAt is { } updated &&
                 (!AutoRefreshQuixelOnStartup || DateTimeOffset.UtcNow - updated < TimeSpan.FromDays(1))) return;
+            if (!IsHistoricalMegascansSearchAvailable)
+            {
+                QuixelCollectionsStatus = "Actualisation désactivée : aucune clé de recherche autorisée configurée. Les collections déjà en cache sont conservées.";
+                return;
+            }
             if (_quixelClient is not IQuixelCollectionsClient client) throw new NotSupportedException();
             QuixelCollectionsStatus = _quixelCollections.Length == 0 ? "Lecture des collections officielles Megascans…"
                 : "Actualisation en arrière-plan · le dernier cache reste affiché.";

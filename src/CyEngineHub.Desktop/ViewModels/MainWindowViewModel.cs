@@ -780,7 +780,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SettingsCategories.Add(new SettingsCategoryOptionViewModel(
             "library",
             "Bibliothèque",
-            "Téléchargements et catalogue"));
+            "Catalogue, cache et dossiers"));
+        SettingsCategories.Add(new SettingsCategoryOptionViewModel(
+            "downloads",
+            "Téléchargements",
+            "Parallélisme, connexions et reprise"));
         SettingsCategories.Add(new SettingsCategoryOptionViewModel(
             "marketplaces",
             "Marketplaces",
@@ -1173,7 +1177,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         DisconnectQuixelCommand = new AsyncRelayCommand(DisconnectQuixelAsync, () => !IsEpicBusy && !IsFabWebLoginActive, ShowError);
         _refreshQuixelLibraryCommand = new AsyncRelayCommand(
             RefreshQuixelLibraryAsync,
-            () => IsQuixelConnected && IsQuixelLibrarySourceAvailable && !IsQuixelLibraryRefreshing,
+            () => IsQuixelConnected && IsHistoricalMegascansSearchAvailable && IsQuixelLibrarySourceAvailable && !IsQuixelLibraryRefreshing,
             ShowError);
         RefreshQuixelLibraryCommand = _refreshQuixelLibraryCommand;
         _downloadSelectedFabAssetCommand = new AsyncRelayCommand(
@@ -1317,8 +1321,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SelectAllLibraryAssetTypeFacetsCommand = new RelayCommand(() => SetAllFacets(LibraryAssetTypeFacets, true));
         SelectAllLibraryCategoryFacetsCommand = new RelayCommand(() => SetAllFacets(LibraryCategoryFacets, true));
         SelectAllLibraryCollectionFacetsCommand = new RelayCommand(() => SetAllFacets(LibraryCollectionFacets, true));
-        ShowLargeLibraryCardsCommand = new RelayCommand(() => IsLibraryCompactCards = false);
-        ShowCompactLibraryCardsCommand = new RelayCommand(() => IsLibraryCompactCards = true);
+        ShowLargeLibraryCardsCommand = new RelayCommand(() => { SetLibraryRows(false, false); IsLibraryImageOnlyCards = false; IsLibraryCompactCards = false; });
+        ShowCompactLibraryCardsCommand = new RelayCommand(() => { SetLibraryRows(false, false); IsLibraryImageOnlyCards = false; IsLibraryCompactCards = true; });
+        ShowImageOnlyLibraryCardsCommand = new RelayCommand(() => { SetLibraryRows(false, false); IsLibraryImageOnlyCards = true; });
+        ShowLibraryRowsCommand = new RelayCommand(() => { IsLibraryImageOnlyCards = false; SetLibraryRows(true, false); });
+        ShowLibraryThumbnailRowsCommand = new RelayCommand(() => { IsLibraryImageOnlyCards = false; SetLibraryRows(true, true); });
         ShowPagedLibraryCommand = new RelayCommand(() => IsLibraryInfiniteMode = false);
         ShowInfiniteLibraryCommand = new RelayCommand(() => IsLibraryInfiniteMode = true);
         PrepareSourceEngineDownloadCommand = new AsyncRelayCommand(
@@ -1614,7 +1621,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public BulkObservableCollection<LibraryFacetOptionViewModel> LibraryCollectionFacets { get; } = [];
 
     public IReadOnlyList<string> LibrarySortOptions { get; } =
-        ["Acquisition · récent", "Acquisition · ancien", "Nom · A → Z", "Nom · Z → A", "Catégorie", "Dossier / collection", "Versions moteur", "Téléchargeables d’abord"];
+        ["Acquisition · récent", "Acquisition · ancien", "Nom · A → Z", "Nom · Z → A", "Catégorie", "Catégorie · Z → A", "Dossier / collection", "Versions moteur", "Versions moteur · croissant", "Téléchargeables d’abord"];
 
     public IReadOnlyList<string> PresetKinds { get; } = Enum.GetNames<UnrealBuildPresetKind>();
 
@@ -1723,6 +1730,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ICommand ShowLargeLibraryCardsCommand { get; }
 
     public ICommand ShowCompactLibraryCardsCommand { get; }
+    public ICommand ShowImageOnlyLibraryCardsCommand { get; }
+    public ICommand ShowLibraryRowsCommand { get; }
+    public ICommand ShowLibraryThumbnailRowsCommand { get; }
 
     public ICommand ShowPagedLibraryCommand { get; }
 
@@ -2312,6 +2322,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 OnPropertyChanged(nameof(IsSettingsEnginesSelected));
                 OnPropertyChanged(nameof(IsSettingsProjectProfilesSelected));
                 OnPropertyChanged(nameof(IsSettingsLibrarySelected));
+                OnPropertyChanged(nameof(IsSettingsDownloadsSelected));
                 OnPropertyChanged(nameof(IsSettingsMarketplacesSelected));
                 OnPropertyChanged(nameof(IsSettingsStorageSelected));
                 OnPropertyChanged(nameof(IsSettingsAdvancedSelected));
@@ -2335,6 +2346,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public bool IsSettingsEnginesSelected => SelectedSettingsCategory?.Id == "engines";
 
     public bool IsSettingsLibrarySelected => SelectedSettingsCategory?.Id == "library";
+    public bool IsSettingsDownloadsSelected => SelectedSettingsCategory?.Id == "downloads";
 
     public bool IsSettingsMarketplacesSelected => SelectedSettingsCategory?.Id == "marketplaces";
 
@@ -3918,8 +3930,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         string query)
     {
         var search = query.Trim();
-        var matches = source.Where(item => search.Length == 0 ||
-            item.Value.Contains(search, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var matches = source.Where(item => item.HasResults && (search.Length == 0 ||
+            item.Value.Contains(search, StringComparison.OrdinalIgnoreCase))).ToArray();
         if (!visible.SequenceEqual(matches)) visible.ReplaceWith(matches);
     }
 
@@ -4104,7 +4116,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    public bool IsLibraryLargeCards => !IsLibraryCompactCards;
+    public bool IsLibraryLargeCards => !IsLibraryCompactCards && !IsLibraryImageOnlyCards && !IsLibraryRowsMode;
 
     public double LibraryCardWidth => IsLibraryCompactCards ? 230 : 310;
 
@@ -4192,7 +4204,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ? "FICHE PRODUIT MEGASCANS"
         : "FICHE PRODUIT FAB";
 
-    public bool IsSelectedRemoteConnectionReady => IsLibraryFabWebSelected || (IsLibraryQuixelSelected
+    public bool IsSelectedRemoteConnectionReady => IsLibraryFabWebSelected || HasCachedSelectedRemoteCatalog || (IsLibraryQuixelSelected
         ? IsQuixelConnected
         : IsDirectFabConnected);
 
@@ -4204,7 +4216,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ? QuixelAccount
         : DirectFabAccount;
 
-    public bool IsQuixelBridgeLocalPanelVisible => IsLibraryQuixelSelected && !IsQuixelConnected;
+    public bool IsQuixelBridgeLocalPanelVisible => IsLibraryQuixelSelected && !IsQuixelConnected &&
+        IsQuixelAssetsTabSelected && !IsQuixelCollectionScopeVisible && !HasCachedSelectedRemoteCatalog;
 
     public bool IsLibraryLocalSelected => LibrarySource == "Local";
 
@@ -4966,6 +4979,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private async Task LoadCachedCatalogAsync()
     {
         var engines = await _engineCatalog.GetAllAsync().ConfigureAwait(true);
+        engines = await EngineCatalogValidation.ValidateAsync(engines).ConfigureAwait(true);
         var projects = await _projectCatalog.GetAllAsync().ConfigureAwait(true);
         ReplaceCatalog(engines, projects);
     }
@@ -6786,6 +6800,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             : $"Compte : {status.DisplayName}";
         FabStatusSummary = status.Message;
         OnPropertyChanged(nameof(IsDirectFabConnected));
+        OnPropertyChanged(nameof(IsSelectedRemoteConnectionReady));
+        OnPropertyChanged(nameof(LibraryRemoteAccount));
+        OnPropertyChanged(nameof(RemoteCatalogNotice));
         OnPropertyChanged(nameof(IsQuixelBridgeLocalPanelVisible));
         OnPropertyChanged(nameof(EpicConnectionStatus));
         OnPropertyChanged(nameof(EpicConnectionIndicator));
@@ -6793,6 +6810,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(FabConnectionIndicator));
         _refreshDirectFabLibraryCommand.NotifyCanExecuteChanged();
         (OpenEmbeddedFabAuthorizationCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+        QueueOfficialEngineUpdateCheck();
     }
 
     private async Task LoadQuixelStatusAsync()
@@ -6811,6 +6829,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? string.Empty
             : $"Compte : {status.DisplayName}";
         OnPropertyChanged(nameof(IsQuixelConnected));
+        OnPropertyChanged(nameof(RemoteCatalogNotice));
         OnPropertyChanged(nameof(QuixelConnectionStatus));
         OnPropertyChanged(nameof(IsQuixelBridgeLocalPanelVisible));
         OnPropertyChanged(nameof(IsSelectedRemoteConnectionReady));
@@ -7263,16 +7282,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 asset.Title,
                 canHide: true),
             OpenRemoteFabProduct,
-            imageCache.LoadAsync,
+            imageCache.LoadThumbnailAsync,
             OpenRemoteFabCardListingAsync,
             DownloadRemoteFabCardAsync,
             OpenRemoteFabInstall,
             OpenFabCollectionEditor,
-            preference?.IsHidden == true);
+            preference?.IsHidden == true,
+            imageCache.LoadAsync);
         if (_fabCollections.TryGetValue(asset.AssetId, out var collections)) card.SetCollections(collections);
         card.SetStoredLocally(_libraryLocalIndex.Contains(
             NormalizeAssetSource(asset), asset.AssetId, asset.Title));
         card.UpdateInstalledEngineVersions(_currentEngines
+            .Where(engine => engine.Health != EngineHealth.Broken)
             .Select(engine => $"{engine.Version.Major}.{engine.Version.Minor}")
             .ToHashSet(StringComparer.OrdinalIgnoreCase));
         card.UpdatePresentation(IsLibraryCompactCards);
@@ -8391,6 +8412,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase),
             "Dossier / collection" => filtered
                 .OrderBy(entry => entry.Folder, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase),
+            "Catégorie · Z → A" => filtered.OrderByDescending(entry => entry.Categories[0], StringComparer.OrdinalIgnoreCase)
+                .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase),
+            "Versions moteur · croissant" => filtered.OrderBy(entry => entry.Engines.Length == 0 ? new Version(0, 0) : ParseEngineVersion(entry.Engines[0]))
                 .ThenBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase),
             "Versions moteur" => filtered
                 .OrderByDescending(entry => ParseEngineVersion(
@@ -10347,7 +10372,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             var releases = await _epicBinaryEngineBackend.GetAvailableReleasesAsync()
                 .ConfigureAwait(true);
             var installedOfficialVersions = _currentEngines
-                .Where(engine => engine.Type == EngineInstallationType.EpicBinary)
+                .Where(engine => engine.Type == EngineInstallationType.EpicBinary && engine.Health != EngineHealth.Broken)
                 .Select(engine => $"{engine.Version.Major}.{engine.Version.Minor}")
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var downloadable = releases
@@ -10380,20 +10405,29 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    private async Task DownloadEpicEngineAsync()
+    private Task DownloadEpicEngineAsync()
     {
         var release = SelectedEpicEngineRelease
             ?? throw new InvalidOperationException("Sélectionnez une version Unreal officielle.");
-        if (string.IsNullOrWhiteSpace(EpicEngineTargetDirectory))
+        return EnqueueEpicEngineDownloadAsync(release, EpicEngineTargetDirectory, navigate: true);
+    }
+
+    private Task EnqueueEpicEngineDownloadAsync(EpicBinaryEngineRelease release, string directory, bool navigate = false)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
         {
             throw new InvalidOperationException("Sélectionnez un dossier cible vide.");
         }
 
-        IsEpicBusy = true;
-        IsEpicEngineDownloadActive = true;
+        var targetDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory.Trim().Trim('"')));
+        if (_currentEngines.Any(item => item.Health != EngineHealth.Broken && SameWorkspaceKey(item.RootPath, targetDirectory)))
+            throw new InvalidOperationException("Un moteur est déjà installé dans ce dossier. Choisissez un dossier cible vide.");
+        if (EpicEngineDownloads.Any(item => item.CanCancel && SameWorkspaceKey(item.Path, targetDirectory)))
+            throw new InvalidOperationException("Un téléchargement est déjà en attente ou en cours pour ce dossier.");
+        foreach (var previous in EpicEngineDownloads.Where(item => SameWorkspaceKey(item.Path, targetDirectory)).ToArray())
+            EpicEngineDownloads.Remove(previous);
         EpicEngineDownloadProgress = 0;
         EpicBinaryEngineDownloadResult? result = null;
-        var targetDirectory = EpicEngineTargetDirectory;
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
             "Moteurs · Epic",
             $"Télécharger {release.DisplayName}",
@@ -10403,12 +10437,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 var transfer = new CyEngineHub.Core.Marketplaces.DownloadProgressText();
                 var progress = new InlineProgress<EpicBinaryEngineDownloadProgress>(value =>
                 {
-                    var message = transfer.Format(value.Message, value.DownloadedBytes, value.TotalBytes);
+                    var message = transfer.Format(value.Message, value.DownloadedBytes, value.TotalBytes, value.CachedBytes);
                     context.Report(value.Fraction, message);
                     Dispatcher.UIThread.Post(() =>
                     {
                         EpicEngineDownloadProgress = value.Fraction ?? EpicEngineDownloadProgress;
-                        EngineBinaryDownloadSummary = message;
+                        if (!IsEngineImporterVisible) EngineBinaryDownloadSummary = message;
                     });
                 });
                 result = await _epicBinaryEngineBackend.DownloadAsync(
@@ -10417,35 +10451,24 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         progress,
                         cancellationToken)
                     .ConfigureAwait(false);
-            }));
-
-        var completed = await handle.Completion.ConfigureAwait(true);
-        IsEpicBusy = false;
-        IsEpicEngineDownloadActive = false;
-        if (completed.Status == HubTaskStatus.Canceled)
-        {
-            EngineBinaryDownloadSummary =
-                "Téléchargement annulé · le cache de chunks validés est conservé pour la reprise.";
-            return;
-        }
-        if (completed.Status == HubTaskStatus.Failed || result is null)
-        {
-            EngineBinaryDownloadSummary = $"Échec du téléchargement Unreal : {completed.Error}";
-            return;
-        }
-
-        EpicEngineDownloadProgress = 1;
-        await AddUniquePathAsync(EngineRootsSetting, result.DestinationDirectory).ConfigureAwait(true);
-        await SetWorkspaceEngineHiddenAsync(result.DestinationDirectory, hidden: false).ConfigureAwait(true);
-        EngineBinaryDownloadSummary =
-            $"{release.DisplayName} installé · build {result.BuildVersion} · {result.FileCount:N0} fichier(s).";
-        StatusMessage = $"{release.DisplayName} ajouté aux moteurs de CyEngineHub.";
-        AppendRawLog(
-            "INFO",
-            "Engines/Epic",
-            $"{release.DisplayName} téléchargé vers {result.DestinationDirectory} · build {result.BuildVersion}.");
+            }) { IsDownload = true });
+        var snapshot = _taskScheduler.GetSnapshot().First(item => item.Id == handle.Id);
+        var download = new EngineDownloadCardViewModel(release, targetDirectory, snapshot, CancelTask,
+            () => ShowSection(PageSection.Tasks), () => EnqueueEpicEngineDownloadAsync(release, targetDirectory));
+        EpicEngineDownloads.Add(download);
+        IsEpicEngineDownloadActive = true;
+        // Show the task immediately, even before the scheduler's coalesced UI notification.
+        if (!Tasks.Any(item => item.Id == snapshot.Id)) Tasks.Insert(0, new TaskItemViewModel(snapshot, CancelTask, NavigateTaskLink));
+        EngineBinaryDownloadSummary = $"{release.DisplayName} ajouté à la file de téléchargement.";
+        StatusMessage = EngineBinaryDownloadSummary;
         IsEngineImporterVisible = false;
-        await RefreshCatalogAsync().ConfigureAwait(true);
+        if (navigate)
+        {
+            SelectedEngineTab = EngineTabs.FirstOrDefault(item => item.Family == EngineFamily.Unreal);
+            ShowSection(PageSection.Engines);
+        }
+        _ = CompleteEpicEngineDownloadAsync(handle, download, () => result);
+        return Task.CompletedTask;
     }
 
     private async Task RefreshSourceEngineVersionsAsync()
@@ -11666,6 +11689,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var selectedId = SelectedProjectCreationEngine?.Engine.Id;
         ProjectCreationEngines.Clear();
         foreach (var engine in _currentEngines
+                     .Where(engine => engine.Health != EngineHealth.Broken)
                      .OrderByDescending(engine => engine.Version.Major)
                      .ThenByDescending(engine => engine.Version.Minor)
                      .ThenByDescending(engine => engine.Version.Patch))
@@ -12214,6 +12238,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     .ConfigureAwait(false);
                 context.Report(0.9, "Lecture du catalogue Unreal local");
                 engines = await _engineCatalog.GetAllAsync(cancellationToken).ConfigureAwait(false);
+                engines = await EngineCatalogValidation.ValidateAsync(engines, cancellationToken).ConfigureAwait(false);
                 projects = await _projectCatalog.GetAllAsync(cancellationToken).ConfigureAwait(false);
             }));
 
@@ -12363,6 +12388,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 ShowError));
         }
         var installedEngineVersions = engines
+            .Where(engine => engine.Health != EngineHealth.Broken)
             .Select(engine => $"{engine.Version.Major}.{engine.Version.Minor}")
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var asset in GetRealizedRemoteFabCards())
@@ -12404,6 +12430,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RebuildPluginTargets();
         NotifyCatalogProperties();
         ApplyEngineFamilyFilters();
+        QueueOfficialEngineUpdateCheck();
     }
 
     private async Task AddEnginePathAsync()
@@ -13605,6 +13632,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         var selectedId = SelectedPluginTarget?.Target.Id;
         var targets = _currentEngines
+            .Where(engine => engine.Health != EngineHealth.Broken)
             .Select(engine => new PluginInstallTarget(
                 $"engine:{engine.Id}",
                 $"Moteur · {engine.DisplayName}",
@@ -14669,7 +14697,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             return null;
         }
 
-        var direct = _currentEngines.FirstOrDefault(engine =>
+        var direct = _currentEngines.Where(engine => engine.Health != EngineHealth.Broken).FirstOrDefault(engine =>
             string.Equals(engine.AssociationId, association, StringComparison.OrdinalIgnoreCase));
         if (direct is not null)
         {
@@ -14677,7 +14705,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         var normalized = association.Replace("UE_", string.Empty, StringComparison.OrdinalIgnoreCase);
-        return _currentEngines.FirstOrDefault(engine =>
+        return _currentEngines.Where(engine => engine.Health != EngineHealth.Broken).FirstOrDefault(engine =>
             string.Equals(
                 $"{engine.Version.Major}.{engine.Version.Minor}",
                 normalized,
@@ -14690,12 +14718,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
         AppendRawLog(
             eventArgs.Task.Status == HubTaskStatus.Failed ? "ERROR" : "TASK",
             eventArgs.Task.Category,
-            $"{eventArgs.Task.Title} · {eventArgs.Task.Status} · {eventArgs.Task.Message ?? eventArgs.Task.Error ?? string.Empty}");
+            $"{eventArgs.Task.Title} · {eventArgs.Task.Status} · {eventArgs.Task.Error ?? eventArgs.Task.Message ?? string.Empty}");
         if (Interlocked.Exchange(ref _taskRefreshPending, 1) != 0) return;
         Dispatcher.UIThread.Post(() =>
         {
             Interlocked.Exchange(ref _taskRefreshPending, 0);
             var snapshot = _taskScheduler.GetSnapshot();
+            foreach (var download in EpicEngineDownloads)
+            {
+                var task = snapshot.FirstOrDefault(item => item.Id == download.TaskId);
+                if (task is not null) download.ApplySnapshot(task);
+            }
+            IsEpicEngineDownloadActive = EpicEngineDownloads.Any(item => item.CanCancel);
             foreach (var task in snapshot)
             {
                 if (_fabVersionDownloadsByTaskId.TryGetValue(task.Id, out var versionDownload))
@@ -14731,6 +14765,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void CancelTask(Guid taskId)
     {
+        EpicEngineDownloads.FirstOrDefault(item => item.TaskId == taskId)?.MarkCancellationRequested();
         if (_durableDownloadTasks.TryGetValue(taskId, out var id) && DownloadJournal.Read().TryGetValue(id, out var saved))
             DownloadJournal.Upsert(id, saved with { State = "Canceled" });
         if (_taskScheduler.Cancel(taskId))
@@ -14903,7 +14938,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     var transfer = new CyEngineHub.Core.Marketplaces.DownloadProgressText();
                     var progress = new InlineProgress<EpicBinaryEngineDownloadProgress>(value =>
                     {
-                        var message = transfer.Format(value.Message, value.DownloadedBytes, value.TotalBytes);
+                        var message = transfer.Format(value.Message, value.DownloadedBytes, value.TotalBytes, value.CachedBytes);
                         context.Report(value.Fraction, message);
                         Dispatcher.UIThread.Post(() => EngineComponentUpdateStatus = message);
                     });

@@ -13,6 +13,7 @@ public sealed partial class QuixelMegascansApiClient : IQuixelMegascansClient
     private const string QuixelBase = "https://quixel.com";
     private const string AlgoliaApplicationId = "6UJ1I5A072";
     private readonly string? _algoliaSearchKey;
+    public bool IsCatalogSearchConfigured => !string.IsNullOrWhiteSpace(_algoliaSearchKey);
     private string AlgoliaSearchKey => !string.IsNullOrWhiteSpace(_algoliaSearchKey)
         ? _algoliaSearchKey
         : throw new QuixelException("La recherche du catalogue Megascans est désactivée : aucune clé autorisée n'est configurée. Consultez la documentation de configuration locale.");

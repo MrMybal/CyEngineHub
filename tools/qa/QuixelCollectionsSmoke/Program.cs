@@ -100,14 +100,14 @@ static class Program
         var client = new QuixelMegascansApiClient(http, new NoSession(), new NoSession(),
             algoliaSearchKey: live ? null : "fixture-search-only");
         var ctor = typeof(MainWindowViewModel).GetConstructors().Single();
-        MainWindowViewModel MakeVm()
+        MainWindowViewModel MakeVm(IQuixelMegascansClient? clientOverride = null)
         {
             var vm = (MainWindowViewModel)ctor.Invoke(ctor.GetParameters().Select(p => p.Name switch
             {
                 "database" or "settings" or "engineCatalog" => (object)store,
                 "engineModules" => new EngineModuleRegistry([new UnrealEngineModule()]),
                 "engineRegistration" => new Registration(), "taskScheduler" => scheduler,
-                "appData" => paths, "quixelClient" => client, _ => null
+                "appData" => paths, "quixelClient" => clientOverride ?? client, _ => null
             }).ToArray());
             var assets = Enumerable.Range(0, 18800).Select(i => new RemoteFabAsset("owned" + i.ToString("D4"), "megascans",
                 "Owned asset " + i, "Demo", "quixel", "quixel-download", null, null, ["Megascans"], [])).Append(
@@ -135,6 +135,18 @@ static class Program
             {
                 await ImGuiDiagnostics.FramesAsync(window);
                 Check(ImGuiDiagnostics.VisibleRows(window, "QuixelCollectionCards") is > 0 and < 25, "Only visible ImGui collection rows are built");
+                Check(ImGuiDiagnostics.Elements(window).Contains("library-subtab-selected/collections"), "Collections is styled as the selected tab, not the external Fab action");
+                var pane = ImGuiDiagnostics.ElementBounds(window, "list-pane/QuixelCollectionCards");
+                Check(pane.W - pane.Y > window.Height / 2, "Megascans collections use the remaining page height instead of a fixed short list");
+                await ImGuiDiagnostics.ClickAsync(window, "library-view/images");
+                Check(ImGuiDiagnostics.Elements(window).Contains("minimal/card/QuixelCollectionCards/0"), "Megascans collections support image and name mode");
+                await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "collections-image-name.png"));
+                await ImGuiDiagnostics.ClickAsync(window, "library-view/rows");
+                Check(ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("library-local-row/", StringComparison.Ordinal)) &&
+                    ImGuiDiagnostics.VisibleRows(window, "QuixelCollectionCards") < 25, "Megascans collections have virtualized text rows");
+                await ImGuiDiagnostics.ClickAsync(window, "library-view/thumbs");
+                Check(ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("library-row-image/QuixelCollectionCards/", StringComparison.Ordinal)), "Megascans collection rows can show small thumbnails");
+                await ImGuiDiagnostics.ClickAsync(window, "library-view/large");
             }
             else
             {
@@ -164,6 +176,15 @@ static class Program
             Check(vm.IsQuixelCollectionScopeVisible && vm.IsRemoteMarketplaceContentVisible, "Collection opens regular asset catalog");
             Check(SourceAssets(vm).Select(a => a.AssetId).SequenceEqual(["owned0001", "owned0002"]), "Only owned collection assets shown");
             Check(vm.QuixelCollectionScopeSummary.StartsWith("2 / 3", StringComparison.Ordinal), "Membership versus owned count is explicit");
+            if (ImGuiDiagnostics.IsHosted(window))
+            {
+                await ImGuiDiagnostics.ClickAsync(window, "library-view/rows");
+                Check(ImGuiDiagnostics.Elements(window).Contains("library-row/owned0001"), "Megascans assets use the same sortable row view as Fab");
+                await ImGuiDiagnostics.ClickAsync(window, "library-view/thumbs");
+                Check(ImGuiDiagnostics.Elements(window).Contains("library-row-image/asset/owned0001"), "Megascans assets support thumbnail rows");
+                await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "assets-thumbnail-rows.png"));
+                await ImGuiDiagnostics.ClickAsync(window, "library-view/large");
+            }
             await Capture(window, "collection-assets");
             vm.ShowQuixelAssetsTabCommand.Execute(null);
             Check(SourceAssets(vm).Count() == 18800, "Mes assets restores full library");
@@ -188,6 +209,19 @@ static class Program
             Check(SourceAssets(restored).Count() == 2, "Visited collection content works offline");
             await Call(restored, "LoadQuixelCollectionsAsync", true);
             Check(restored.QuixelCollectionCards.Count == 208 && !restored.IsQuixelCollectionsBusy, "Failed refresh preserves cache and releases spinner");
+            typeof(MainWindowViewModel).GetMethod("ApplyQuixelStatus", Private)!.Invoke(vm, [new QuixelStatus(QuixelConnectionState.Disconnected, "Fixture offline")]);
+            vm.ShowQuixelAssetsTabCommand.Execute(null);
+            Check(vm.IsSelectedRemoteConnectionReady && vm.HasCachedSelectedRemoteCatalog && !vm.IsQuixelBridgeLocalPanelVisible,
+                "A disconnected Megascans session does not hide the cached asset catalog");
+            vm.ShowQuixelCollectionsTabCommand.Execute(null);
+            await WaitFor(() => !vm.IsQuixelCollectionsBusy);
+            Check(!vm.IsQuixelBridgeLocalPanelVisible, "Bridge fallback cannot overlap the collections tab");
+            var disabledClient = new QuixelMegascansApiClient(http, new NoSession(), new NoSession(), algoliaSearchKey: "");
+            var disabled = MakeVm(disabledClient);
+            await Call(disabled, "LoadQuixelCollectionsAsync", true);
+            Check(!disabled.IsHistoricalMegascansSearchAvailable && disabled.QuixelCollectionCards.Count == 208 &&
+                disabled.QuixelCollectionsStatus.Contains("clé", StringComparison.Ordinal),
+                "Missing authorized search configuration preserves cached collections with an explicit explanation");
         }
         finally { window.Close(); Console.WriteLine("OUTPUT " + Output); }
     }

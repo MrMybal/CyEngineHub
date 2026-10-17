@@ -90,7 +90,15 @@ internal sealed class ImGuiHost : Border
             io.AddKeyEvent(ImGuiKey.ModSuper, mods.HasFlag(KeyModifiers.Meta));
             if (key != ImGuiKey.None) io.AddKeyEvent(key, down);
         });
-        args.Handled = true;
+        // Win32 suppresses WM_CHAR after a handled KeyDown. Printable keys must
+        // reach TextInput (keyboard layout, dead keys and AltGr included).
+        var shortcut = mods.HasFlag(KeyModifiers.Control) && !mods.HasFlag(KeyModifiers.Alt) &&
+            args.Key is Avalonia.Input.Key.A or Avalonia.Input.Key.C or Avalonia.Input.Key.V or
+                Avalonia.Input.Key.X or Avalonia.Input.Key.Y or Avalonia.Input.Key.Z;
+        args.Handled = shortcut || args.Key is Avalonia.Input.Key.Tab or Avalonia.Input.Key.Left or Avalonia.Input.Key.Right or
+            Avalonia.Input.Key.Up or Avalonia.Input.Key.Down or Avalonia.Input.Key.PageUp or Avalonia.Input.Key.PageDown or
+            Avalonia.Input.Key.Home or Avalonia.Input.Key.End or Avalonia.Input.Key.Delete or Avalonia.Input.Key.Back or
+            Avalonia.Input.Key.Enter or Avalonia.Input.Key.Escape;
     }
     internal static ImGuiKey MapKey(Key key)
     {
@@ -139,6 +147,8 @@ internal sealed class ImGuiSurface : OpenGlControlBase
     internal Action? FrameCompleted { get; set; }
     internal Exception? RenderFailure { get; private set; }
     internal int Frames { get; private set; }
+    internal int LastImageUploads { get; private set; }
+    internal int TotalImageUploads { get; private set; }
     public ImGuiSurface(string layout, Action<string>? nativeAction)
     {
         _layout = layout; _nativeAction = nativeAction;
@@ -191,6 +201,7 @@ internal sealed class ImGuiSurface : OpenGlControlBase
         io.DisplaySize = new((float)Bounds.Width, (float)Bounds.Height);
         io.DisplayFramebufferScale = new((float)scale);
         while (_input.TryDequeue(out var input)) input(io);
+        _renderer.BeginFrame();
         Gui.NewFrame();
         try
         {
@@ -209,9 +220,12 @@ internal sealed class ImGuiSurface : OpenGlControlBase
         }
         Gui.Render();
         _renderer.Render(Gui.GetDrawData(), fb, (int)(Bounds.Width * scale), (int)(Bounds.Height * scale));
+        LastImageUploads = _renderer.ImageUploadCount;
+        TotalImageUploads += LastImageUploads;
         Frames++;
         CaptureRequested?.Invoke(_renderer.Api, (int)(Bounds.Width * scale), (int)(Bounds.Height * scale));
         FrameCompleted?.Invoke();
+        if (_renderer.HasDeferredUploads) RequestNextFrameRendering();
     }
     protected override void OnOpenGlDeinit(GlInterface gl)
     {

@@ -3,21 +3,84 @@
 Hub de développement multi-moteur, local-first, pour Windows. Unreal Engine est
 le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers locaux.
 
-**Version de test : `2.0.0-alpha.3`.** Sauvegardez vos projets avant d'essayer les
+**Version publiée : `2.0.0-alpha.15`.** Sauvegardez vos projets avant d'essayer les
 opérations d'installation, de déplacement ou de conversion d'assets.
 
-## Interface V2
+## Interface officielle V2
 
-L’interface utilise Dear ImGui : panneaux anthracite, listes compactes à colonnes
+Dear ImGui est désormais l’interface officielle et l’interface par défaut de CyEngineHub.
+Le logiciel reste distribué sur le canal alpha.
+L’interface propose une palette gris moyen/orange inspirée de CyDAW, des listes compactes à colonnes
 redimensionnables, inspecteur latéral, recherche et formulaires à onglets. La densité
 est réglable et mémorisée. Les téléchargements, profils, scripts d’installation,
 connexions et outils MCP utilisent les services existants.
+
+Les boutons Nouveau projet et Ajouter un moteur se distinguent en vert. Les options
+propres à un projet sont accessibles dans sa fiche via Paramètres du projet ;
+la vue Projets conserve la création, les profils et l’import de projets.
+Les vues Moteurs et Projets utilisent toute la largeur, sans inspecteur latéral ;
+les profils se préparent dans Paramètres et les plugins se gèrent depuis les fiches
+des projets ou moteurs. La navigation Stockage et Activité est ancrée en bas.
+Les sources de bibliothèque sont sur une ligne, avec l’aide en bas ; les options
+d’affichage sont regroupées sous la recherche et s’adaptent à la largeur disponible.
+Les bibliothèques proposent quatre vues mémorisées : cartes détaillées, Image + nom,
+lignes sans image et lignes avec miniature. Les colonnes de données se trient au clic
+(ascendant/descendant). Le tri Fab/Megascans porte sur tous les résultats filtrés,
+avant pagination. Les facettes sans résultat sont masquées et réapparaissent
+automatiquement lorsque les autres filtres le permettent. La saisie clavier Windows
+laisse passer les caractères, les accents et AltGr vers les champs de texte ImGui.
+Les installations Unreal officielles sont distinguées en vert. Avec la connexion
+Epic/Fab, le hub vérifie les révisions de la même branche et indique les mises à jour
+disponibles, sans télécharger ni remplacer automatiquement le moteur.
+Les dossiers absents sont exclus après validation du catalogue ; un lecteur
+indisponible reste signalé comme tel. Ctrl/Maj + clic sélectionne plusieurs moteurs
+en cartes ou en liste. Le clic droit permet de vérifier les installations,
+rechercher leurs mises à jour officielles et les retirer du catalogue avec
+confirmation, sans supprimer leurs fichiers. Le lecteur de manifests accepte
+les catalogues binaires Unreal volumineux avec décompression bornée.
+Le téléchargement d’un moteur officiel ferme le formulaire et crée immédiatement
+une entrée de suivi dans Moteurs et Téléchargements. Le transfert continue pendant
+la navigation, respecte la concurrence des téléchargements et peut être annulé en
+attente ou en cours depuis les deux vues. Une destination active ne peut pas être
+ajoutée deux fois. La fin du transfert ajoute le moteur validé sans changer de page.
+Les variantes à télécharger affichent leurs libellés Unreal, plateformes et formats
+RAW/Megascans ; le texte et la case permettent de sélectionner une variante.
+Les moteurs et composants officiels téléchargent leurs chunks en parallèle :
+12 connexions par moteur par défaut, réglables de 1 à 32 dans Paramètres → Téléchargements.
+Le bouton Paramètres de téléchargement de la file ouvre directement ces réglages,
+avec le nombre de transferts simultanés distinct du nombre de connexions par moteur.
+Ce réglage est distinct du nombre de packs simultanés et s’applique aux prochains
+transferts. Les chunks sont écrits progressivement, les fichiers incomplets ne sont
+pas réutilisés, et les erreurs réseau temporaires font l’objet de nouvelles tentatives
+bornées. Le débit agrégé exclut les octets réutilisés du cache ; la progression réseau
+est rafraîchie au maximum quatre fois par seconde. Le débit effectif dépend aussi
+du CDN, de la connexion, du disque et du processeur.
+La reconstruction réutilise les chunks décompressés dans un cache mémoire LRU
+limité à 128 Mio par transfert et calcule le contrôle d’intégrité pendant l’écriture,
+sans relire les nouveaux fichiers. Sa progression est limitée à quatre mises à jour
+par seconde, en plus du début et de la fin de chaque phase. La sélection d’un dossier
+supprimé ou inaccessible affiche une erreur sans quitter l’application.
+Les chunks tronqués, les interruptions réseau et les timeouts sont retentés jusqu’à
+six fois avec attente progressive annulable. Après un échec ou une annulation,
+Reprendre est disponible dans Téléchargements, les cartes et les lignes Moteurs,
+ainsi que le menu contextuel. La reprise conserve la version et la destination
+d’origine et revalide les chunks du cache avant de télécharger les manquants.
+Pour une demande créée dans une ancienne version du hub, sélectionnez à nouveau
+la même version officielle et le même dossier cible : le cache adjacent est réutilisé.
 
 Les moteurs et projets disposent de modes Cartes/Liste mémorisés séparément. Les
 cartes d’assets gardent une taille fixe ; un clic sélectionne la carte entière,
 un double-clic ouvre sa fiche et les boutons d’action restent indépendants. Les
 panneaux Sources et Paramètres occupent toute la hauteur, avec l’onglet actif
-surligné. Cliquez sur la source active pour revenir de sa fiche à son catalogue.
+surligné. Les fiches produit Fab, Megascans et des connecteurs proposent un retour
+explicite au catalogue, sans afficher les options de présentation de la liste.
+Cliquez aussi sur la source active pour revenir de sa fiche à son catalogue.
+Les variantes déjà téléchargées sont présentées dans des cadres séparés :
+compatibilités et tailles en haut, actions propres à chaque variante en dessous.
+Les extensions et plugins Unreal ont une liste avec inspecteur. Les miniatures
+sont chargées et décodées en arrière-plan ; les transferts vers le GPU sont limités
+par image rendue pour préserver la navigation. Le catalogue Megascans déjà en cache
+reste consultable hors ligne, sans remplacer une configuration de recherche autorisée.
 
 Avalonia assure les fenêtres natives, le rendu GPU, les sélecteurs de fichiers et
 l’hébergement de WebView2. Les pages web restent affichées par WebView2 ; les
@@ -94,7 +157,7 @@ vérifiés avant la fermeture de l'application et le lancement externe de l'inst
 ## Compiler et tester
 
 - .NET SDK 9.0.306 (ou une révision compatible avec `global.json`).
-- Cible runtime .NET 8 ; interface Avalonia.
+- Cible runtime .NET 8 ; interface Dear ImGui, hébergée par Avalonia.
 
 ```powershell
 dotnet restore .\CyEngineHub.sln

@@ -7,6 +7,15 @@ namespace CyEngineHub.Epic.Tests;
 
 public sealed class QuixelCollectionsTests
 {
+    [Theory]
+    [InlineData("", false)]
+    [InlineData("fixture-search-only", true)]
+    public void CatalogAvailabilityExposesOnlyWhetherLocalConfigurationExists(string key, bool configured)
+    {
+        using var http = new HttpClient();
+        var client = new QuixelMegascansApiClient(http, new ForbiddenSessionStore(), new ForbiddenSessionStore(), algoliaSearchKey: key);
+        Assert.Equal(configured, client.IsCatalogSearchConfigured);
+    }
     [Fact]
     public void QuixelLoginHasExactCallbackCompatibleWithEmbeddedCapture()
     {

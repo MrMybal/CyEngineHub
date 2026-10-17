@@ -5,6 +5,35 @@ namespace CyEngineHub.Core.Tests;
 
 public sealed class ImGuiInterfaceTests
 {
+    [Fact]
+    public void DownloadControlsHaveTheirOwnSettingsSection()
+    {
+        var nodes = UiDocument.Load("Main").Root.Descendants().ToArray();
+        var downloads = nodes.Single(node => node.Kind == "StackPanel" && UiBinding.Path(node["IsVisible"]) == "IsSettingsDownloadsSelected");
+        Assert.Contains(downloads.Descendants(), node => UiBinding.Path(node["Value"]) == "DownloadConcurrency");
+        Assert.Contains(downloads.Descendants(), node => UiBinding.Path(node["Value"]) == "EngineChunkConcurrency" && node["Maximum"] == "32");
+        var library = nodes.Single(node => node.Kind == "StackPanel" && UiBinding.Path(node["IsVisible"]) == "IsSettingsLibrarySelected");
+        Assert.DoesNotContain(library.Descendants(), node => UiBinding.Path(node["Value"]) == "EngineChunkConcurrency");
+    }
+
+    [Fact]
+    public void ProductBackIsScopedToDetailsRatherThanRootCatalogs()
+    {
+        var product = UiDocument.Load("Main").Root.Descendants().Single(node => node.Kind == "ScrollViewer" &&
+            UiBinding.Path(node["IsVisible"]) == "IsRemoteFabProductVisible");
+        Assert.Contains(product.Descendants(), node => UiBinding.Path(node["Command"]) == "CloseRemoteFabProductCommand");
+    }
+
+    [Fact]
+    public void StoredVariantsUseSeparateCardsWithIndependentActionsAndConfirmation()
+    {
+        var row = UiDocument.Load("Main").Root.Descendants().Single(node => node["Name"] == "DownloadedVersionCard");
+        Assert.Contains("card", row["Classes"], StringComparison.Ordinal);
+        Assert.Contains(row.Descendants(), node => node.Kind == "WrapPanel");
+        Assert.Contains(row.Descendants(), node => UiBinding.Path(node["IsVisible"]) == "IsDeleteConfirmationVisible");
+        Assert.Contains(row.Descendants(), node => UiBinding.Path(node["Command"]) == "CancelDeleteCommand");
+    }
+
     [Theory]
     [InlineData("IsLibraryVisible")]
     [InlineData("IsSettingsVisible")]

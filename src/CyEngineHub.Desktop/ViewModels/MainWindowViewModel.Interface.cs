@@ -5,6 +5,27 @@ public sealed partial class MainWindowViewModel
     private bool _useCompactInterface = true;
     private bool _engineCardsView = true;
     private bool _projectCardsView = true;
+    private bool _libraryImageOnlyCards;
+    private bool _libraryRows;
+    private bool _libraryRowImages;
+    public bool IsLibraryRowsMode => _libraryRows;
+    public bool IsLibraryRowImages => _libraryRowImages;
+    private void SetLibraryRows(bool rows, bool images)
+    {
+        if (SetProperty(ref _libraryRows, rows, nameof(IsLibraryRowsMode))) SaveInterfacePreference("interface.library.rows.v2", rows);
+        if (SetProperty(ref _libraryRowImages, images, nameof(IsLibraryRowImages))) SaveInterfacePreference("interface.library.row-images.v2", images);
+        OnPropertyChanged(nameof(IsLibraryLargeCards));
+    }
+    public bool IsLibraryImageOnlyCards
+    {
+        get => _libraryImageOnlyCards;
+        private set
+        {
+            if (!SetProperty(ref _libraryImageOnlyCards, value)) return;
+            OnPropertyChanged(nameof(IsLibraryLargeCards));
+            SaveInterfacePreference("interface.library.image-only.v2", value);
+        }
+    }
     private Task _interfaceWrite = Task.CompletedTask;
     public bool UseCompactInterface
     {
@@ -43,5 +64,13 @@ public sealed partial class MainWindowViewModel
         _projectCardsView = !bool.TryParse(projects, out var projectCards) || projectCards;
         OnPropertyChanged(nameof(EngineCardsView));
         OnPropertyChanged(nameof(ProjectCardsView));
+        var imageOnly = await _settings.GetAsync("interface.library.image-only.v2").ConfigureAwait(true);
+        _libraryImageOnlyCards = bool.TryParse(imageOnly, out var minimal) && minimal;
+        _libraryRows = bool.TryParse(await _settings.GetAsync("interface.library.rows.v2").ConfigureAwait(true), out var rows) && rows;
+        _libraryRowImages = bool.TryParse(await _settings.GetAsync("interface.library.row-images.v2").ConfigureAwait(true), out var rowImages) && rowImages;
+        OnPropertyChanged(nameof(IsLibraryRowsMode));
+        OnPropertyChanged(nameof(IsLibraryRowImages));
+        OnPropertyChanged(nameof(IsLibraryImageOnlyCards));
+        OnPropertyChanged(nameof(IsLibraryLargeCards));
     }
 }

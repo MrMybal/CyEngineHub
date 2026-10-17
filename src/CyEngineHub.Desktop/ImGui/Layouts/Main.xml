@@ -393,7 +393,7 @@
                             <Button Grid.Column="3" Classes="accent" Content="Télécharger" Command="{Binding DownloadEpicEngineCommand}" />
                           </Grid>
                           <TextBlock Text="{Binding EngineBinaryDownloadSummary}" FontSize="10" Foreground="#D9A55C" TextWrapping="Wrap" />
-                          <ProgressBar Minimum="0" Maximum="1" Value="{Binding EpicEngineDownloadProgress}" Height="8" IsVisible="{Binding IsEpicEngineDownloadActive}" />
+                          <TextBlock Text="Le transfert sera ajouté dans Moteurs et Téléchargements, avec progression et annulation." FontSize="10" Foreground="#8294A8" TextWrapping="Wrap" />
                         </StackPanel>
                       </Border>
                     </StackPanel>
@@ -422,6 +422,7 @@
                       </StackPanel>
                       <TextBlock Text="{Binding SelectedEngineDetails.Path}" FontSize="11" Foreground="#718398" TextWrapping="Wrap" />
                       <TextBlock Text="{Binding SelectedEngineDetails.IssueSummary}" FontSize="11" Foreground="#D9A55C" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding SelectedEngineDetails.OfficialUpdateLabel}" IsVisible="{Binding SelectedEngineDetails.IsOfficialEpic}" FontSize="11" Foreground="#D9A55C" />
                     </StackPanel>
                     <WrapPanel Grid.Column="1" MaxWidth="520">
                       <Button Classes="accent" Content="Lancer · accueil Unreal" Command="{Binding SelectedEngineDetails.LaunchCommand}" />
@@ -430,6 +431,7 @@
                       <Button Classes="ghost" Content="Build Editor" Command="{Binding SelectedEngineDetails.BuildEditorCommand}" />
                       <Button Classes="ghost" Content="GPF" Command="{Binding SelectedEngineDetails.GenerateProjectFilesCommand}" />
                       <Button Classes="ghost" Content="Ouvrir le dossier" Command="{Binding SelectedEngineDetails.OpenFolderCommand}" />
+                      <Button Classes="ghost" Content="Vérifier la révision officielle" Command="{Binding CheckOfficialEngineUpdatesCommand}" IsVisible="{Binding SelectedEngineDetails.IsOfficialEpic}" />
                       <Button Classes="ghost" Content="Retirer de CyEngineHub" Command="{Binding RequestRemoveSelectedEngineCommand}" />
                       <Button Classes="danger" Content="Désinstaller" Command="{Binding RequestUninstallSelectedEngineCommand}" />
                     </WrapPanel>
@@ -833,7 +835,7 @@
               <Grid ColumnDefinitions="Auto,*,Auto">
                 <Button Classes="ghost" Content="← Retour aux projets" Command="{Binding BackFromProjectDetailsCommand}" />
                 <StackPanel Grid.Column="1">
-                  <TextBlock Text="PROFIL DU PROJET" FontSize="10" Foreground="#65788D" />
+                  <TextBlock Text="PARAMÈTRES DU PROJET" FontSize="10" Foreground="#65788D" />
                   <TextBlock Text="Moteur, plugins, build, packaging et organisation" FontSize="11" Foreground="#8294A8" />
                 </StackPanel>
                 <WrapPanel Grid.Column="2">
@@ -1681,7 +1683,7 @@
                               </StackPanel>
                             </Button>
                           </Grid>
-                          <Grid ColumnDefinitions="*,190,Auto,Auto">
+                          <Grid Name="LibrarySearchToolbar" ColumnDefinitions="*,190,Auto,Auto">
                             <TextBox Classes="path" Text="{Binding LibrarySearchQuery}" PlaceholderText="Rechercher par nom, description, catégorie ou version moteur…" />
                             <ComboBox Grid.Column="1" ItemsSource="{Binding LibrarySortOptions}" SelectedItem="{Binding SelectedLibrarySort}" PlaceholderText="Trier par" />
                             <Button Grid.Column="2" Classes="ghost" Content="☷ Filtres avancés" Command="{Binding ToggleAdvancedLibraryFilterCommand}" />
@@ -1692,17 +1694,13 @@
                               </StackPanel>
                             </Border>
                           </Grid>
-                          <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                          <Grid Name="LibraryDisplayToolbar" ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                             <WrapPanel Orientation="Horizontal">
                               <TextBlock Text="{Binding LibraryResultsSummary}" FontSize="10" Foreground="#8294A8" />
                               <CheckBox Content="Téléchargés" IsChecked="{Binding ShowDownloadedLibraryAssets}" FontSize="10" ToolTip.Tip="Au moins une version est présente dans une bibliothèque locale." />
                               <CheckBox Content="Non téléchargés" IsChecked="{Binding ShowUndownloadedLibraryAssets}" FontSize="10" ToolTip.Tip="Aucune version locale détectée. Cochez les deux cases pour tout afficher." />
                             </WrapPanel>
                             <CheckBox Grid.Column="1" Content="Afficher les masqués" IsChecked="{Binding ShowHiddenFabAssets}" FontSize="10" />
-                            <Button Grid.Column="2" Classes="ghost view-mode" Content="Grand" Command="{Binding ShowLargeLibraryCardsCommand}" IsVisible="{Binding IsLibraryCompactCards}" />
-                            <Button Grid.Column="2" Classes="ghost view-mode active" Content="Grand" Command="{Binding ShowLargeLibraryCardsCommand}" IsVisible="{Binding IsLibraryLargeCards}" />
-                            <Button Grid.Column="3" Classes="ghost view-mode" Content="Petit" Command="{Binding ShowCompactLibraryCardsCommand}" IsVisible="{Binding IsLibraryLargeCards}" />
-                            <Button Grid.Column="3" Classes="ghost view-mode active" Content="Petit" Command="{Binding ShowCompactLibraryCardsCommand}" IsVisible="{Binding IsLibraryCompactCards}" />
                             <Button Grid.Column="4" Classes="ghost view-mode" Content="Pages" Command="{Binding ShowPagedLibraryCommand}" IsVisible="{Binding IsLibraryInfiniteMode}" />
                             <Button Grid.Column="4" Classes="ghost view-mode" Content="Infini" Command="{Binding ShowInfiniteLibraryCommand}" IsVisible="{Binding IsLibraryPagedMode}" />
                             <Button Grid.Column="5" Classes="ghost" Content="←" Command="{Binding PreviousLibraryPageCommand}" IsEnabled="{Binding CanShowPreviousLibraryPage}" IsVisible="{Binding IsLibraryPagedMode}" />
@@ -1873,7 +1871,7 @@
                             <Grid ColumnDefinitions="*,170,150,224">
                               <TextBlock Text="VERSIONS DÉJÀ TÉLÉCHARGÉES" FontSize="10" Foreground="#65788D" />
                               <Button Grid.Column="1" Classes="ghost" Content="Importer un dérivé" Command="{Binding OpenDerivedFolderImporterCommand}" />
-                              <Button Grid.Column="2" Classes="accent" Content="Create Derived" Command="{Binding OpenDerivedWorkspaceCreatorCommand}" IsEnabled="{Binding HasSelectedFabStoredDownloads}" />
+                              <Button Grid.Column="2" Classes="accent" Content="Créer un dérivé" Command="{Binding OpenDerivedWorkspaceCreatorCommand}" IsEnabled="{Binding HasSelectedFabStoredDownloads}" />
                               <Button Grid.Column="3" Classes="danger" Content="Supprimer toutes" Command="{Binding RequestDeleteAllFabDownloadsCommand}" IsVisible="{Binding HasSelectedFabStoredDownloads}" />
                             </Grid>
                             <Border IsVisible="{Binding IsDeleteAllFabDownloadsConfirmationVisible}">
@@ -1887,33 +1885,39 @@
                             <ItemsControl ItemsSource="{Binding SelectedFabStoredDownloads}">
                               <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                  <Border>
-                                    <Grid ColumnDefinitions="1.2*,*,80,80,80,80,90">
-                                      <StackPanel>
-                                        <TextBlock Text="{Binding Version}" />
-                                        <TextBlock Text="{Binding PackageSummary}" FontSize="9" Foreground="#65CCA9" />
-                                        <TextBlock Text="{Binding OriginLabel}" FontSize="8" Foreground="#8CC2FF" />
-                                        <TextBlock Text="{Binding DerivationNotes}" FontSize="8" Foreground="#718398" TextTrimming="CharacterEllipsis" />
-                                        <TextBlock Text="{Binding ArtifactId}" FontSize="8" Foreground="#718398" TextTrimming="CharacterEllipsis" />
-                                      </StackPanel>
-                                      <StackPanel Grid.Column="1">
-                                        <TextBlock Text="{Binding RawSizeLabel}" FontSize="10" />
-                                        <TextBlock Text="{Binding StoredSizeLabel}" FontSize="10" Foreground="#65CCA9" />
-                                        <TextBlock Text="{Binding DownloadedAt}" FontSize="8" Foreground="#718398" />
-                                      </StackPanel>
-                                      <Button Grid.Column="2" Classes="accent" Content="Installer" Command="{Binding InstallDerivedCommand}" IsVisible="{Binding IsDerived}" />
-                                      <Button Grid.Column="3" Classes="ghost" Content="Dériver" Command="{Binding CreateDerivedCommand}" />
-                                      <Button Grid.Column="4" Classes="ghost" Content="Tester" Command="{Binding CreateTestCommand}" />
-                                      <Button Grid.Column="5" Classes="ghost" Content="Dossier" Command="{Binding OpenFolderCommand}" ToolTip.Tip="{Binding Path}" />
-                                      <Button Grid.Column="6" Classes="danger" Content="Supprimer" Command="{Binding RequestDeleteCommand}" />
-                                      <Border Grid.ColumnSpan="7" IsVisible="{Binding IsDeleteConfirmationVisible}">
-                                        <Grid ColumnDefinitions="*,Auto,Auto">
+                                  <Border Classes="card downloaded-version" Name="DownloadedVersionCard">
+                                    <StackPanel>
+                                      <Grid ColumnDefinitions="*,*">
+                                        <StackPanel>
+                                          <TextBlock Text="{Binding Version}" TextWrapping="Wrap" />
+                                          <TextBlock Text="{Binding PackageSummary}" Foreground="#65CCA9" />
+                                          <TextBlock Text="{Binding OriginLabel}" Foreground="#8CC2FF" />
+                                          <TextBlock Text="{Binding DerivationNotes}" TextWrapping="Wrap" />
+                                          <TextBlock Text="{Binding ArtifactId}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ArtifactId}" Foreground="#A4B3C2" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                          <TextBlock Text="{Binding RawSizeLabel}" />
+                                          <TextBlock Text="{Binding StoredSizeLabel}" Foreground="#65CCA9" />
+                                          <TextBlock Text="{Binding DownloadedAt}" Foreground="#A4B3C2" />
+                                        </StackPanel>
+                                      </Grid>
+                                      <WrapPanel>
+                                        <Button Classes="accent" Content="Installer" Command="{Binding InstallDerivedCommand}" IsVisible="{Binding IsDerived}" />
+                                        <Button Classes="ghost" Content="Dériver" Command="{Binding CreateDerivedCommand}" />
+                                        <Button Classes="ghost" Content="Tester" Command="{Binding CreateTestCommand}" />
+                                        <Button Classes="ghost" Content="Dossier" Command="{Binding OpenFolderCommand}" ToolTip.Tip="{Binding Path}" />
+                                        <Button Classes="danger" Content="Supprimer" Command="{Binding RequestDeleteCommand}" />
+                                      </WrapPanel>
+                                      <Border IsVisible="{Binding IsDeleteConfirmationVisible}">
+                                        <StackPanel>
                                           <TextBlock Text="Supprimer cette version et tous ses fichiers ?" TextWrapping="Wrap" />
-                                          <Button Grid.Column="1" Classes="danger" Content="Confirmer" Command="{Binding ConfirmDeleteCommand}" />
-                                          <Button Grid.Column="2" Classes="ghost" Content="Annuler" Command="{Binding CancelDeleteCommand}" />
-                                        </Grid>
+                                          <WrapPanel>
+                                            <Button Classes="danger" Content="Confirmer" Command="{Binding ConfirmDeleteCommand}" />
+                                            <Button Classes="ghost" Content="Annuler" Command="{Binding CancelDeleteCommand}" />
+                                          </WrapPanel>
+                                        </StackPanel>
                                       </Border>
-                                    </Grid>
+                                    </StackPanel>
                                   </Border>
                                 </DataTemplate>
                               </ItemsControl.ItemTemplate>
@@ -3282,7 +3286,7 @@
                       </StackPanel>
                     </Border>
                   </StackPanel>
-                  <StackPanel IsVisible="{Binding IsSettingsLibrarySelected}">
+                  <StackPanel IsVisible="{Binding IsSettingsDownloadsSelected}">
                     <Border Classes="card">
                       <StackPanel>
                         <TextBlock Text="FILE DE TÉLÉCHARGEMENT PERSISTANTE" FontSize="16" />
@@ -3292,6 +3296,11 @@
                           <NumericUpDown Grid.Column="1" Minimum="1" Maximum="16" FormatString="0" Value="{Binding DownloadConcurrency}" />
                         </Grid>
                         <CheckBox Content="Reprendre les téléchargements interrompus au lancement" IsChecked="{Binding ResumeDownloadsOnStartup}" />
+                        <Grid ColumnDefinitions="*,140">
+                          <TextBlock Text="Connexions de chunks par moteur Unreal (1 à 32)" />
+                          <NumericUpDown Grid.Column="1" Minimum="1" Maximum="32" FormatString="0" Value="{Binding EngineChunkConcurrency}" />
+                        </Grid>
+                        <TextBlock Text="12 par défaut. Réglage distinct du nombre de packs simultanés ; s’applique aux prochains téléchargements de moteurs et composants. Le disque, le processeur et le serveur peuvent limiter le débit." FontSize="10" TextWrapping="Wrap" />
                         <StackPanel Orientation="Horizontal">
                           <Button Content="Enregistrer" Command="{Binding SaveDownloadQueueSettingsCommand}" />
                           <Button Content="Reprendre / réessayer les échecs" Command="{Binding ResumeDownloadQueueCommand}" />
@@ -3302,6 +3311,9 @@
                         <Button Content="Importer la sauvegarde sans lancer" Command="{Binding ImportDownloadRecoveryCommand}" />
                       </StackPanel>
                     </Border>
+                  </StackPanel>
+                  <StackPanel IsVisible="{Binding IsSettingsLibrarySelected}">
+
                     <Border Classes="card">
                       <StackPanel>
                         <TextBlock Text="CACHE DES CATALOGUES ET MINIATURES" FontSize="16" />

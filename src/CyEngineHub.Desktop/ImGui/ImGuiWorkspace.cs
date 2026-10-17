@@ -158,9 +158,6 @@ internal sealed partial class ImGuiWorkspace : IDisposable
     }
 
     private static bool Visible(UiNode node, object? context) => UiBinding.Boolean(context, node["IsVisible"]);
-    private bool RedundantBack(UiNode node, object? context) => node.Kind == "Button" && _root is MainWindowViewModel { IsLibraryVisible: true } &&
-        (UiBinding.Path(node["Command"]) == "CloseRemoteFabProductCommand" ||
-         context is ConnectorLibraryViewModel && UiBinding.Path(node["Command"]) == "BackCommand");
     private static string Text(object? context, string? expression) => UiBinding.Text(context, expression);
     private void Set(object? context, string? expression, object? value) => _actions.Enqueue(() => UiBinding.Write(context, expression, value));
     private void Execute(object? context, string? expression)
@@ -172,7 +169,6 @@ internal sealed partial class ImGuiWorkspace : IDisposable
     private void DrawNode(UiNode node, object? context)
     {
         if (node.IsModal || !Visible(node, context)) return;
-        if (RedundantBack(node, context)) return;
         if (_focusCompilation && node["Name"] == "EngineCompilationPanel")
         { Gui.Dummy(new(1, 1)); Gui.SetScrollHereY(0); _focusCompilation = false; }
         if (node["DataContext"] is { } dataContext) context = UiBinding.Read(context, dataContext);
@@ -198,13 +194,29 @@ internal sealed partial class ImGuiWorkspace : IDisposable
                 var value = UiBinding.Boolean(context, node["IsChecked"], false);
                 if (Gui.Checkbox(Text(context, node["Content"]) + "###value", ref value)) Set(context, node["IsChecked"], value);
                 Record("check/" + (UiBinding.Path(node["IsChecked"]) ?? node.Id));
+                if (node.Children.Length > 0)
+                {
+                    Gui.SameLine(); Gui.BeginGroup();
+                    DrawChildren(node, context);
+                    Gui.EndGroup();
+                    if (context is FabInstallVersionOptionViewModel variant) Record("variant-label/" + variant.Version.ArtifactId);
+                    if (Gui.IsItemClicked()) Set(context, node["IsChecked"], !value);
+                }
                 break;
             case "ComboBox": DrawCombo(node, context); break;
             case "ListBox":
             case "ItemsControl": DrawItems(node, context); break;
-            case "Grid": DrawGrid(node, context); break;
+            case "Grid":
+                if (_root is MainWindowViewModel { IsLibraryVisible: true } toolbar && node["Name"] == "LibrarySearchToolbar") DrawLibrarySearchToolbar(toolbar, node);
+                else if (_root is MainWindowViewModel { IsLibraryVisible: true } display && node["Name"] == "LibraryDisplayToolbar") DrawLibraryDisplayToolbar(display);
+                else DrawGrid(node, context);
+                break;
             case "WrapPanel":
-            case "StackPanel": DrawStack(node, context); break;
+            case "StackPanel":
+                if (_root is MainWindowViewModel { IsLibraryVisible: true } library && node["Orientation"] == "Horizontal" &&
+                    UiBinding.Path(node["IsVisible"]) == "IsLibraryQuixelSelected") DrawQuixelSubTabs(library);
+                else DrawStack(node, context);
+                break;
             case "Border": DrawPanel(node, context); break;
             case "TabControl": DrawTabs(node, context); break;
             case "Expander":
@@ -325,14 +337,17 @@ internal sealed partial class ImGuiWorkspace : IDisposable
                 "ShowQuixelCollectionsTabCommand" => Flag(_root, "IsQuixelCollectionsTabSelected"),
                 _ => false,
             };
-        if (selected || accent || danger) Gui.PushStyleColor(ImGuiCol.Button, selected ? ImGuiTheme.Rgb(0x51445F) : danger ? new Vector4(.48f, .15f, .22f, 1) : ImGuiTheme.Rgb(0x5A497E));
+        var colorCount = ImGuiTheme.PushActionColors(UiBinding.Path(node["Command"]), accent);
+        if (selected || danger) { Gui.PushStyleColor(ImGuiCol.Button, selected ? ImGuiTheme.Selected : new Vector4(.48f, .15f, .22f, 1)); colorCount++; }
         if (Gui.Button(NormalizeLabel(label) + "###button"))
         {
             if (node["Click"] is { } action) _actions.Enqueue(() => _nativeAction?.Invoke(action));
             else Execute(context, node["Command"]);
         }
         Record("command/" + (UiBinding.Path(node["Command"]) ?? node["Click"] ?? node.Id) + "/" + node.Id);
-        if (selected || accent || danger) Gui.PopStyleColor();
+        if (context is FabStoredDownloadViewModel stored)
+            Record("stored-version-action/" + stored.ArtifactId + "/" + UiBinding.Path(node["Command"]));
+        if (colorCount > 0) Gui.PopStyleColor(colorCount);
         Gui.EndDisabled();
     }
 
@@ -400,9 +415,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
 
     private void DrawGrid(UiNode node, object? context)
     {
-        var children = node.Children.Where(child => !child.IsModal && Visible(child, context) && !RedundantBack(child, context)).ToArray();
-        if (children.Length == 1 && node.Children.Any(child => RedundantBack(child, context)))
-        { DrawNode(children[0], context); return; }
+        var children = node.Children.Where(child => !child.IsModal && Visible(child, context)).ToArray();
         var columns = node["ColumnDefinitions"]?.Split(',') ?? [];
         if (columns.Length <= 1) { foreach (var child in children.OrderBy(child => child.Number("Grid.Row", 0))) DrawNode(child, context); return; }
         float AutoWidth(int column)
@@ -463,7 +476,13 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         {
             if (Gui.Button("Ouvrir la fiche")) Execute(context, "{Binding OpenDetailsCommand}");
         }
-        if (card) { Gui.EndChild(); Gui.Spacing(); }
+        if (card)
+        {
+            Gui.EndChild();
+            if (node["Name"] == "DownloadedVersionCard" && context is FabStoredDownloadViewModel download)
+                Record("stored-version/" + download.ArtifactId);
+            Gui.Spacing();
+        }
     }
 
     private void DrawTabs(UiNode node, object? context)
@@ -478,7 +497,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
             var tab = tabs[index]; var label = Text(context, tab["Header"]);
             if (!first && Gui.GetContentRegionAvail().X > Gui.CalcTextSize(label).X + 24) Gui.SameLine();
             var wasSelected = index == selected;
-            if (wasSelected) Gui.PushStyleColor(ImGuiCol.Button, ImGuiTheme.Rgb(0x51445F));
+            if (wasSelected) Gui.PushStyleColor(ImGuiCol.Button, ImGuiTheme.Selected);
             if (Gui.Button(label + "###" + tab.Id))
             {
                 selected = index; _tabSelections[node.Id] = index;
@@ -505,11 +524,24 @@ internal sealed partial class ImGuiWorkspace : IDisposable
             DrawAssetCatalog(values.Cast<RemoteFabAssetRowViewModel>().ToArray(), binding);
             return;
         }
+        if (_root is MainWindowViewModel { IsLibraryVisible: true, IsLibraryRowsMode: true } rowVm &&
+            (binding is "QuixelCollectionCards" or "QuixelLocalAssets" || binding == "Assets" && context is ConnectorLibraryViewModel))
+        {
+            DrawLocalLibraryRows(values.Cast<object>().ToArray(), binding, rowVm.IsLibraryRowImages);
+            return;
+        }
+        if (_root is MainWindowViewModel { IsLibraryVisible: true, IsLibraryImageOnlyCards: true } &&
+            (binding is "QuixelCollectionCards" or "QuixelLocalAssets" || binding == "Assets" && context is ConnectorLibraryViewModel))
+        {
+            DrawMinimalLibraryCatalog(values.Cast<object>().ToArray(), binding);
+            return;
+        }
         if (scroll)
         {
             var height = node.Number("MaxHeight", node.Number("Height", 0));
             if (height <= 0) height = node["ItemsSource"]?.Contains("PagedRemoteFabRows", StringComparison.Ordinal) == true ? Math.Max(300, Gui.GetContentRegionAvail().Y - 25) : 320;
-            Gui.BeginChild("list", new(0, Math.Clamp(height, 120, 650)), ImGuiChildFlags.Borders);
+            if (binding == "QuixelCollectionCards") height = Math.Max(180, Gui.GetContentRegionAvail().Y - 8);
+            Gui.BeginChild("list", new(0, binding == "QuixelCollectionCards" ? height : Math.Clamp(height, 120, 650)), ImGuiChildFlags.Borders);
             if (_scrollRequests.Remove(binding)) Gui.SetScrollY(Gui.GetScrollMaxY());
         }
         void Item(int index)
@@ -580,6 +612,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         {
             if (node["ItemsSource"]?.Contains("PagedRemoteFabRows", StringComparison.Ordinal) == true && Gui.GetScrollMaxY() - Gui.GetScrollY() < 500 && _root is MainWindowViewModel viewModel) _actions.Enqueue(viewModel.LoadMoreLibraryItems);
             Gui.EndChild();
+            Record("list-pane/" + binding);
         }
     }
 
@@ -600,7 +633,9 @@ internal sealed partial class ImGuiWorkspace : IDisposable
             width *= 145 / height;
             height = 145;
         }
-        Gui.Image(_image(bitmap), new(width, Math.Min(height, preview ? 900 : 450)));
+        var texture = _image(bitmap);
+        var size = new Vector2(width, Math.Min(height, preview ? 900 : 450));
+        if (texture != 0) Gui.Image(texture, size); else Gui.Dummy(size);
     }
 
     internal static string NormalizeLabel(string label) => label.Replace("✕", "Fermer", StringComparison.Ordinal)

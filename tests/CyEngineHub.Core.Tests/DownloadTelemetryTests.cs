@@ -4,6 +4,24 @@ namespace CyEngineHub.Core.Tests;
 public sealed class DownloadTelemetryTests
 {
     [Fact]
+    public void ReusedCacheDoesNotCountAsNetworkThroughput()
+    {
+        var meter = new DownloadProgressText();
+        meter.Format("Cache", 1024, 16384, cachedBytes: 1024);
+        var text = meter.Format("Cache", 8192, 16384, cachedBytes: 8192);
+        Assert.DoesNotContain("Kio/s", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Mio/s", text, StringComparison.Ordinal);
+        Assert.Contains("50,0", text.Replace("50.0", "50,0", StringComparison.Ordinal), StringComparison.Ordinal);
+    }
+    [Fact]
+    public void AllCachedDownloadStillShowsCompletionButNoNetworkEta()
+    {
+        var text = new DownloadProgressText().Format("Cache vérifié", 4096, 4096, cachedBytes: 4096);
+        Assert.Contains("100", text, StringComparison.Ordinal);
+        Assert.Contains("Vitesse : —", text, StringComparison.Ordinal);
+        Assert.Contains("Restant estimé : —", text, StringComparison.Ordinal);
+    }
+    [Fact]
     public void TextShowsAllMetricsAndDoesNotInventPostDownloadEta()
     {
         var sample = new DownloadTelemetrySnapshot("pack", 2048, 4096, 50, 1024, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2), "Téléchargement");

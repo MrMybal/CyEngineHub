@@ -21,25 +21,41 @@ public sealed partial class MainWindowViewModel
     private readonly SemaphoreSlim _storedDownloadsPersistenceGate = new(1, 1);
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> AssetDownloadLocks = new(StringComparer.OrdinalIgnoreCase);
     private int _downloadConcurrency = 3;
+    private int _engineChunkConcurrency = 12;
     private bool _resumeDownloadsOnStartup = true;
     private string _downloadQueueStatus = "File persistante Fab / Megascans · téléchargements seuls. Installations et moteurs exclus.";
     private string _downloadRecoveryPath = "";
     internal bool ImportDownloadRecoveryOnStartup { get; set; }
     public int DownloadConcurrency { get => _downloadConcurrency; set => SetProperty(ref _downloadConcurrency, value); }
+    public int EngineChunkConcurrency { get => _engineChunkConcurrency; set => SetProperty(ref _engineChunkConcurrency, value); }
     public bool ResumeDownloadsOnStartup { get => _resumeDownloadsOnStartup; set => SetProperty(ref _resumeDownloadsOnStartup, value); }
     public string DownloadQueueStatus { get => _downloadQueueStatus; private set => SetProperty(ref _downloadQueueStatus, value); }
     public string DownloadRecoveryPath { get => _downloadRecoveryPath; set => SetProperty(ref _downloadRecoveryPath, value); }
-    private ICommand? _saveDownloadQueueSettingsCommand, _resumeDownloadQueueCommand, _importDownloadRecoveryCommand;
+    private ICommand? _saveDownloadQueueSettingsCommand, _resumeDownloadQueueCommand, _importDownloadRecoveryCommand, _showDownloadSettingsCommand;
+    public ICommand ShowDownloadSettingsCommand => _showDownloadSettingsCommand ??= new RelayCommand(() =>
+    {
+        OpenSettings();
+        SelectedSettingsCategory = SettingsCategories.Single(category => category.Id == "downloads");
+    });
     public ICommand SaveDownloadQueueSettingsCommand => _saveDownloadQueueSettingsCommand ??= new AsyncRelayCommand(async () =>
     {
         if (DownloadConcurrency is < 1 or > 16) throw new InvalidOperationException("Choisissez de 1 à 16 téléchargements simultanés.");
-        await _settings.SetAsync("downloads.queue.options.v1", JsonSerializer.Serialize(new DownloadQueueOptions(DownloadConcurrency, ResumeDownloadsOnStartup))).ConfigureAwait(true);
+        if (EngineChunkConcurrency is < 1 or > 32) throw new InvalidOperationException("Choisissez de 1 à 32 connexions de chunks Unreal.");
+        await _settings.SetAsync("downloads.queue.options.v1", JsonSerializer.Serialize(new DownloadQueueOptions(DownloadConcurrency, ResumeDownloadsOnStartup, EngineChunkConcurrency))).ConfigureAwait(true);
         _taskScheduler.SetDownloadConcurrency(DownloadConcurrency);
-        DownloadQueueStatus = $"Enregistré · {DownloadConcurrency} téléchargements simultanés maximum. Les tâches déjà actives ne sont pas interrompues.";
+        _epicBinaryEngineBackend.SetChunkConcurrency(EngineChunkConcurrency);
+        DownloadQueueStatus = $"Enregistré · {DownloadConcurrency} téléchargements simultanés maximum · {EngineChunkConcurrency} connexions par moteur Unreal. Le réglage des chunks s’applique aux prochains transferts ; les tâches actives ne sont pas interrompues.";
     }, onError: ShowError);
-    public ICommand ResumeDownloadQueueCommand => _resumeDownloadQueueCommand ??= new AsyncRelayCommand(() => ResumeLibraryDownloadsAsync(true), onError: ShowError);
+    public ICommand ResumeDownloadQueueCommand => _resumeDownloadQueueCommand ??= new AsyncRelayCommand(async () =>
+    {
+        var engineRequests = 0;
+        foreach (var download in EpicEngineDownloads.Where(item => item.CanRetry && item.StatusLabel == "Échec").ToArray())
+            if (download.RetryCommand.CanExecute(null)) { download.RetryCommand.Execute(null); engineRequests++; }
+        await ResumeLibraryDownloadsAsync(true).ConfigureAwait(true);
+        if (engineRequests > 0) DownloadQueueStatus = $"{engineRequests} demande(s) de reprise moteur · " + DownloadQueueStatus;
+    }, onError: ShowError);
     public ICommand ImportDownloadRecoveryCommand => _importDownloadRecoveryCommand ??= new AsyncRelayCommand(ImportDownloadRecoveryAsync, onError: ShowError);
-    private sealed record DownloadQueueOptions(int Concurrency = 3, bool Resume = true);
+    private sealed record DownloadQueueOptions(int Concurrency = 3, bool Resume = true, int EngineChunkConcurrency = 12);
     private static string DurableDownloadId(RemoteFabAsset asset, RemoteFabProjectVersion version) =>
         NormalizeAssetSource(asset) + ":" + asset.AssetId + ":" + version.ArtifactId;
 
@@ -51,6 +67,8 @@ public sealed partial class MainWindowViewModel
             var options = json is null ? new DownloadQueueOptions() : JsonSerializer.Deserialize<DownloadQueueOptions>(json) ?? new();
             DownloadConcurrency = Math.Clamp(options.Concurrency, 1, 16);
             ResumeDownloadsOnStartup = options.Resume;
+            EngineChunkConcurrency = Math.Clamp(options.EngineChunkConcurrency, 1, 32);
+            _epicBinaryEngineBackend.SetChunkConcurrency(EngineChunkConcurrency);
             _taskScheduler.SetDownloadConcurrency(DownloadConcurrency);
             if (ImportDownloadRecoveryOnStartup) await ImportDownloadRecoveryAsync().ConfigureAwait(true);
             if (ResumeDownloadsOnStartup || ImportDownloadRecoveryOnStartup) await ResumeLibraryDownloadsAsync(false).ConfigureAwait(true);
