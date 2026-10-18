@@ -70,4 +70,4 @@ dotnet build src/CyEngineHub.Desktop -c Release -p:NativeBridgeAdapterRoot=$Fres
 
 Les builds et projets QA restent sous artifacts. Le test rejette une publication partielle et vérifie les originaux. Seuls le descripteur, la DLL et le fichier .modules sont injectés dans les projets de conversion, jamais dans les moteurs installés ni le projet utilisateur. Le BuildId impose une recompilation pour une distribution Unreal incompatible.
 
-Les données du pack détenu par l’utilisateur ne sont pas ajoutées au dépôt. Les binaires locaux n’ont pas été publiés sur GitHub ; leur distribution publique nécessite encore l’audit de confidentialité de release.
+Les données du pack détenu par l’utilisateur ne sont pas ajoutées au dépôt. Les rapports finaux sont conservés localement ; les projets temporaires et intermédiaires de compilation peuvent être supprimés puis régénérés. La distribution Windows embarque les adaptateurs des quatre versions ciblées ; un autre BuildId impose une recompilation depuis les sources du plugin.

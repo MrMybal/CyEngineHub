@@ -5,11 +5,17 @@
 Hub de développement multi-moteur, local-first, pour Windows. Unreal Engine est
 le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers locaux.
 
-**Version publiée : `2.0.0-alpha.25`.** Sauvegardez vos projets avant d'essayer les
+**Version publiée : `2.0.0-alpha.30`.** Sauvegardez vos projets avant d'essayer les
 opérations d'installation, de déplacement ou de conversion d'assets.
 
-Les changements depuis l’alpha.15 sont récapitulés dans les
-[notes de version](docs/releases/v2.0.0-alpha.25.md).
+Les changements depuis l’alpha.25 sont récapitulés dans les
+[notes de version](docs/releases/v2.0.0-alpha.30.md).
+
+Cette préversion ajoute les groupes de packs, chaînes de scripts, destinations
+Cosmos par projet, paramètres réorganisés et contrôles d’identité/Git des moteurs.
+Le downgrade natif 5.7 vers 5.5 et 5.3 a été validé sur un pack complet de 54 assets,
+meshes et deux niveaux inclus. Ce n’est pas une compatibilité universelle : voir
+le [périmètre validé et les limites Alpha](docs/native-57-bridge-validation.md).
 
 ## Interface officielle V2
 
@@ -246,7 +252,8 @@ dotnet run --project .\src\CyEngineHub.Desktop\CyEngineHub.Desktop.csproj
 Créer les paquets Windows avec Inno Setup 7 installé :
 
 ```powershell
-.\tools\release\build-windows.ps1 -InnoCompiler 'C:\chemin\Inno Setup 7\ISCC.exe'
+.\tools\release\build-native-adapters.ps1 -EngineRoots $MoteursUnreal -OutputRoot $NouveauxAdaptateurs
+.\tools\release\build-windows.ps1 -InnoCompiler 'C:\chemin\Inno Setup 7\ISCC.exe' -NativeAdapterRoot $NouveauxAdaptateurs
 ```
 
 Le script crée un nouveau dossier sous `artifacts`, exécute les tests, publie les

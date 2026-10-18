@@ -5,10 +5,16 @@
 A local-first, multi-engine development hub for Windows. Unreal Engine has the deepest
 integration; Unity, Godot and CRYENGINE have local providers.
 
-**Published version: `2.0.0-alpha.25`.** Back up projects before trying installation,
+**Published version: `2.0.0-alpha.30`.** Back up projects before trying installation,
 move or asset-conversion operations.
 
-Changes since alpha.15 are summarized in the [release notes](docs/releases/v2.0.0-alpha.25.md).
+Changes since alpha.25 are summarized in the [release notes](docs/releases/v2.0.0-alpha.30.md).
+
+This preview adds reusable pack groups, per-pack script chains, Cosmos project
+destinations, reorganized settings and engine identity/Git controls. Native Unreal
+5.7 conversion was validated on a complete 54-asset pack to 5.5 and 5.3, including
+meshes and two levels. This is not universal asset compatibility: see the
+[validated scope and Alpha limits](docs/native-57-bridge-validation.md).
 
 <a id="interface-officielle-v2"></a>
 
@@ -221,7 +227,8 @@ dotnet run --project .\src\CyEngineHub.Desktop\CyEngineHub.Desktop.csproj
 Create Windows packages with Inno Setup 7 installed:
 
 ```powershell
-.\tools\release\build-windows.ps1 -InnoCompiler 'C:\path\Inno Setup 7\ISCC.exe'
+.\tools\release\build-native-adapters.ps1 -EngineRoots $UnrealEngineRoots -OutputRoot $NewAdapters
+.\tools\release\build-windows.ps1 -InnoCompiler 'C:\path\Inno Setup 7\ISCC.exe' -NativeAdapterRoot $NewAdapters
 ```
 
 The script creates a new folder under `artifacts`, runs tests, publishes self-contained
