@@ -29,7 +29,7 @@ foreach ($engine in $EngineRoots) {
         # Pass options explicitly: accelerated compiler processes need not inherit
         # _CL_. Never reuse an unrelated PCH, and inspect the resulting DLL.
         $compilerArguments = "/d1trimfile:`"$repository`" /d1trimfile:`"$engine`""
-        & (Join-Path $engine 'Engine/Build/BatchFiles/Build.bat') UnrealEditor Win64 Development "-Project=$project" "-plugin=$package/CyHubNativeBridge.uplugin" -NoPCH -NoSharedPCH -DisableUnity -OverrideBuildEnvironment "-CompilerArguments=$compilerArguments" -WaitMutex -nohotreload
+        & (Join-Path $engine 'Engine/Build/BatchFiles/Build.bat') UnrealEditor Win64 Development "-Project=$project" "-plugin=$package/CyHubNativeBridge.uplugin" -NoPCH -NoSharedPCH -OverrideBuildEnvironment "-CompilerArguments=$compilerArguments" -WaitMutex -nohotreload
         if ($LASTEXITCODE -ne 0) { throw "Native compilation failed for $name" }
         $destination = Join-Path $output $name
         foreach ($relative in @('CyHubNativeBridge.uplugin', 'Binaries/Win64/UnrealEditor-CyHubNativeBridge.dll', 'Binaries/Win64/UnrealEditor.modules')) {
