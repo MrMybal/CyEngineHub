@@ -1,238 +1,215 @@
 # CyEngineHub — Alpha
 
-Hub de développement multi-moteur, local-first, pour Windows. Unreal Engine est
-le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers locaux.
+**English** · [Français](README.fr.md)
 
-**Version publiée : `2.0.0-alpha.25`.** Sauvegardez vos projets avant d'essayer les
-opérations d'installation, de déplacement ou de conversion d'assets.
+A local-first, multi-engine development hub for Windows. Unreal Engine has the deepest
+integration; Unity, Godot and CRYENGINE have local providers.
 
-Les changements depuis l’alpha.15 sont récapitulés dans les
-[notes de version](docs/releases/v2.0.0-alpha.25.md).
+**Published version: `2.0.0-alpha.25`.** Back up projects before trying installation,
+move or asset-conversion operations.
 
-## Interface officielle V2
+Changes since alpha.15 are summarized in the [release notes](docs/releases/v2.0.0-alpha.25.md).
 
-Le hub s’ouvre directement sur les moteurs ; la vue d’ensemble a été supprimée.
-Les fiches moteur sont organisées en trois onglets : Général, Options d’installation
-et Compilation / cross-compilation. Les contrôles prêts sont verts, les avertissements
-orange et les prérequis manquants rouges. Le clic droit sur un ou plusieurs moteurs
-permet de lancer une analyse de taille ciblée, en lecture seule et annulable.
-Les mesures partielles sont indiquées explicitement et les autres mesures sont conservées.
-Les sélections de cartes ont un cadre contrasté, un fond teinté et une coche ; les lignes
-sélectionnées sont surlignées sur toute leur largeur. Les produits et projets proposent
-leurs actions au clic droit. Ctrl + clic ajoute ou retire une carte ; Maj + clic
-sélectionne une plage dans l’ordre affiché. Le clic droit conserve le groupe sélectionné,
-avec favoris et analyse de taille groupés ; les actions individuelles restent réservées
-à une seule sélection. Les favoris sont mémorisés ; un unique bouton étoile encadré
-active le filtre des favoris et le désactive pour tout afficher, avant pagination.
-L’analyse de taille est à côté d’Actualiser dans le catalogue ; les filtres, modes
-d’affichage et l’étoile partagent la barre, avec pagination alignée à droite.
-Dans Moteurs et Projets, les modes d’affichage et l’étoile sont regroupés sur une
-même ligne, dans des cadres alignés ; le compteur est centré à leur côté.
-Les actions restent sur leur propre ligne et se replient lorsque l’espace manque.
-Moteurs, projets et packs disposent de deux analyses de taille : compléter les mesures
-manquantes ou tout revérifier sur disque. Les tailles déclarées dans les manifestes des
-packs sont reprises sans parcours disque complet ; une revérification inclut les annexes.
-Chaque version locale téléchargée, fournisseur ou dérivée, possède une action Installer
-qui prépare cette version précise sans téléchargement de remplacement.
-Dans Activité, Actions regroupe installations, compilations et analyses ; Téléchargements
-reste réservé aux transferts. Chaque entrée possède un pictogramme et deux compteurs :
-en cours et en attente. Les tâches terminées conservent leur file d’origine.
+<a id="interface-officielle-v2"></a>
 
-Dear ImGui est désormais l’interface officielle et l’interface par défaut de CyEngineHub.
-Le logiciel reste distribué sur le canal alpha.
-L’interface propose une palette gris moyen/orange inspirée de CyDAW, des listes compactes à colonnes
-redimensionnables, inspecteur latéral, recherche et formulaires à onglets. La densité
-est réglable et mémorisée. Les téléchargements, profils, scripts d’installation,
-connexions et outils MCP utilisent les services existants.
+## Official V2 interface
 
-L’onglet principal Outils regroupe les utilitaires Unreal, l’inventaire des toolchains
-et le diagnostic détaillé de compatibilité. Choisissez un moteur pour retrouver
-son installateur de prérequis, Unreal Version Selector, Unreal Insights et Swarm
-Agent lorsqu’ils sont présents. Les listes sont recherchables et triables ;
-l’exécutable et son rôle sont présentés avant un lancement explicitement confirmé.
-La présence de l’installateur Unreal ne signifie pas que ses prérequis sont installés.
-Les ressources officielles .NET, Visual Studio/C++, Windows SDK et Unreal s’ouvrent
-dans le navigateur, sans installation automatique. Les analyses restent manuelles.
-Les prérequis absents ou à vérifier proposent une aide contextuelle dans Outils,
-avec la version requise et un accès aux téléchargements officiels. Le wrapper Gradle
-se répare avec son moteur, pas avec une version globale arbitraire. Les runtimes
-.NET et wrappers Unreal sont rattachés à leur propre installation ; les toolchains
-Linux standard et les variables d’environnement sont prises en compte.
-Les actions de lancement et compilation sont vertes, les retraits rouges, les actions
-principales bleues ; l’orange reste réservé à la sélection et aux avertissements.
+The hub opens directly on Engines; the overview has been removed. Engine detail pages have
+three tabs: General, Installation options and Build / cross-compilation. Ready checks are
+green, warnings orange and missing prerequisites red. Right-click one or more engines to run
+a targeted, read-only, cancellable size analysis. Partial measurements are explicitly marked;
+other measurements are retained.
 
-Les boutons Nouveau projet et Ajouter un moteur se distinguent en vert. Les options
-propres à un projet sont accessibles dans sa fiche via Paramètres du projet ;
-la vue Projets conserve la création, les profils et l’import de projets.
-Les vues Moteurs et Projets utilisent toute la largeur, sans inspecteur latéral ;
-elles proposent les mêmes quatre présentations que les markets : cartes détaillées,
-image et nom, lignes sans image, lignes avec vignette. Les préférences des moteurs,
-projets et markets sont enregistrées séparément. Le double-clic ouvre toujours la fiche,
-sans lancer l’éditeur. Les colonnes restent triables dans les deux modes lignes.
-Les filtres du catalogue sont des boutons à état sélectionné ; filtres, affichage et
-pagination disposent de cadres distincts qui se réorganisent selon la largeur.
-Les actions des fiches produit sont des boutons texte complets, regroupés par usage.
-Les quatre modes d’affichage utilisent des boutons à icônes vectorielles : cartes
-détaillées, image et nom, lignes sans image et lignes avec vignette. Les infobulles
-conservent les intitulés et le mode actif reste distingué par sa couleur et son contour.
-Leur hauteur suit exactement celle des boutons standard, en densité compacte comme
-en densité confort ; les pictogrammes sont réduits et centrés dans cette hauteur.
+Selected cards have a contrasting frame, tinted background and checkmark; selected rows are
+highlighted across their full width. Products and projects expose actions through right-click.
+Ctrl+click toggles a card; Shift+click selects a range in display order. Right-click preserves
+the selected group, with grouped favorites and size analysis; individual actions require a
+single selection. Favorites persist. One framed star button toggles the favorites filter
+before pagination. Catalog size analysis sits beside Refresh; filters, display modes and the
+star share the toolbar, with pagination aligned right. Engines and Projects group display modes
+and the star on one line in aligned frames, with a centered count beside them. Actions remain
+on a separate line and wrap when space is limited.
 
-Les vues Moteurs et Projets conservent leurs actions et leur sélection ;
-les profils se préparent dans Paramètres et les plugins se gèrent depuis les fiches
-des projets ou moteurs. La navigation Stockage et Activité est ancrée en bas.
-Les sources de bibliothèque sont sur une ligne, avec l’aide en bas ; les options
-d’affichage sont regroupées sous la recherche et s’adaptent à la largeur disponible.
-Les bibliothèques proposent quatre vues mémorisées : cartes détaillées, Image + nom,
-lignes sans image et lignes avec miniature. Les colonnes de données se trient au clic
-(ascendant/descendant). Le tri Fab/Megascans porte sur tous les résultats filtrés,
-avant pagination. Les facettes sans résultat sont masquées et réapparaissent
-automatiquement lorsque les autres filtres le permettent. La saisie clavier Windows
-laisse passer les caractères, les accents et AltGr vers les champs de texte ImGui.
-Les installations Unreal officielles sont distinguées en vert. Avec la connexion
-Epic/Fab, le hub vérifie les révisions de la même branche et indique les mises à jour
-disponibles, sans télécharger ni remplacer automatiquement le moteur.
-Les dossiers absents sont exclus après validation du catalogue ; un lecteur
-indisponible reste signalé comme tel. Ctrl/Maj + clic sélectionne plusieurs moteurs
-en cartes ou en liste. Le clic droit permet de vérifier les installations,
-rechercher leurs mises à jour officielles et les retirer du catalogue avec
-confirmation, sans supprimer leurs fichiers. Le lecteur de manifests accepte
-les catalogues binaires Unreal volumineux avec décompression bornée.
-Le téléchargement d’un moteur officiel ferme le formulaire et crée immédiatement
-une entrée de suivi dans Moteurs et Téléchargements. Le transfert continue pendant
-la navigation, respecte la concurrence des téléchargements et peut être annulé en
-attente ou en cours depuis les deux vues. Une destination active ne peut pas être
-ajoutée deux fois. La fin du transfert ajoute le moteur validé sans changer de page.
-Les variantes à télécharger affichent leurs libellés Unreal, plateformes et formats
-RAW/Megascans ; le texte et la case permettent de sélectionner une variante.
-Les moteurs et composants officiels téléchargent leurs chunks en parallèle :
-12 connexions par moteur par défaut, réglables de 1 à 32 dans Paramètres → Téléchargements.
-Le bouton Paramètres de téléchargement de la file ouvre directement ces réglages,
-avec le nombre de transferts simultanés distinct du nombre de connexions par moteur.
-Ce réglage est distinct du nombre de packs simultanés et s’applique aux prochains
-transferts. Les chunks sont écrits progressivement, les fichiers incomplets ne sont
-pas réutilisés, et les erreurs réseau temporaires font l’objet de nouvelles tentatives
-bornées. Le débit agrégé exclut les octets réutilisés du cache ; la progression réseau
-est rafraîchie au maximum quatre fois par seconde. Le débit effectif dépend aussi
-du CDN, de la connexion, du disque et du processeur.
-La reconstruction réutilise les chunks décompressés dans un cache mémoire LRU
-limité à 128 Mio par transfert et calcule le contrôle d’intégrité pendant l’écriture,
-sans relire les nouveaux fichiers. Sa progression est limitée à quatre mises à jour
-par seconde, en plus du début et de la fin de chaque phase. La sélection d’un dossier
-supprimé ou inaccessible affiche une erreur sans quitter l’application.
-Les chunks tronqués, les interruptions réseau et les timeouts sont retentés jusqu’à
-six fois avec attente progressive annulable. Après un échec ou une annulation,
-Reprendre est disponible dans Téléchargements, les cartes et les lignes Moteurs,
-ainsi que le menu contextuel. La reprise conserve la version et la destination
-d’origine et revalide les chunks du cache avant de télécharger les manquants.
-Pour une demande créée dans une ancienne version du hub, sélectionnez à nouveau
-la même version officielle et le même dossier cible : le cache adjacent est réutilisé.
+Engines, projects and packs have two size analyses: fill missing measurements or recheck
+everything on disk. Declared pack-manifest sizes are reused without a full disk scan;
+rechecking includes associated files. Each downloaded local version, whether from a provider
+or derived, has an Install action that prepares that exact version without a replacement
+download. In Activity, Actions groups installations, builds and analyses; Downloads is reserved
+for transfers. Each entry has an icon and two counters: running and queued. Completed tasks
+retain their original queue.
 
-Les téléchargements acceptent les chunks Epic dont l’en-tête passe de v2 à v3
-avec quatre octets supplémentaires, sans confondre cet écart avec un transfert
-tronqué. La taille HTTP, la charge utile de l’en-tête, le GUID, la décompression et
-les empreintes des fichiers reconstruits restent contrôlés lors de la reprise.
-Fab utilise le même pipeline de chunks parallèles, avec cache validé et nouvelles
-tentatives. Dans Paramètres → Téléchargements, un réglage indépendant de 1 à 32
-connexions par téléchargement Fab/Megascans est disponible (12 par défaut).
-Megascans télécharge plusieurs fichiers signés en parallèle et segmente les gros
-fichiers lorsque le serveur propose des plages d’octets avec un validateur fort ;
-sinon, il utilise une connexion par fichier. Les fichiers incomplets ne sont pas
-publiés dans la bibliothèque. Ces réglages ne changent pas les transferts actifs.
-Le journal affiche les événements importants par défaut : débuts, fins,
-annulations, avertissements et erreurs. L’option Journal complet révèle les
-progressions et détails techniques, conservés dans le fichier journal.
+Dear ImGui is now CyEngineHub's official default interface. The software remains on the alpha
+channel. The interface uses a medium-gray/orange palette inspired by CyDAW, compact lists with
+resizable columns, a side inspector, search and tabbed forms. Density is adjustable and saved.
+Downloads, profiles, installation scripts, connections and MCP tools use the existing services.
 
-Les moteurs et projets disposent de modes Cartes/Liste mémorisés séparément. Les
-cartes d’assets gardent une taille fixe ; un clic sélectionne la carte entière,
-un double-clic ouvre sa fiche et les boutons d’action restent indépendants. Les
-panneaux Sources et Paramètres occupent toute la hauteur, avec l’onglet actif
-surligné. Les fiches produit Fab, Megascans et des connecteurs proposent un retour
-explicite au catalogue, sans afficher les options de présentation de la liste.
-Cliquez aussi sur la source active pour revenir de sa fiche à son catalogue.
-Les variantes déjà téléchargées sont présentées dans des cadres séparés :
-compatibilités et tailles en haut, actions propres à chaque variante en dessous.
-Les extensions et plugins Unreal ont une liste avec inspecteur. Les miniatures
-sont chargées et décodées en arrière-plan ; les transferts vers le GPU sont limités
-par image rendue pour préserver la navigation. Le catalogue Megascans déjà en cache
-reste consultable hors ligne, sans remplacer une configuration de recherche autorisée.
+The main Tools tab groups Unreal utilities, the toolchain inventory and detailed compatibility
+diagnostics. Select an engine to find its prerequisite installer, Unreal Version Selector,
+Unreal Insights and Swarm Agent when present. Lists are searchable and sortable; the executable
+and its purpose are shown before an explicitly confirmed launch. An Unreal installer being
+present does not mean its prerequisites are installed. Official .NET, Visual Studio/C++,
+Windows SDK and Unreal resources open in the browser without automatic installation.
+Scans remain manual. Missing or unverified prerequisites offer contextual help in Tools,
+including the required version and official downloads. Repair a Gradle wrapper through its
+engine, rather than an arbitrary global version. .NET runtimes and Unreal wrappers are tied
+to their own installation; standard Linux toolchains and environment variables are considered.
+Launch/build actions are green, removal actions red and primary actions blue; orange is
+reserved for selection and warnings.
 
-Avalonia assure les fenêtres natives, le rendu GPU, les sélecteurs de fichiers et
-l’hébergement de WebView2. Les pages web restent affichées par WebView2 ; les
-barres de contrôle du hub sont dessinées avec ImGui. En cas de problème graphique,
-l’argument `--classic` permet de démarrer temporairement l’ancienne interface.
+New project and Add engine buttons are green. Project-specific options are in its detail page
+under Project settings; Projects retains creation, profiles and project import. Engines and
+Projects use the full width without a side inspector and offer the same four presentations as
+marketplaces: detailed cards, image and name, rows without images and rows with thumbnails.
+Engine, project and marketplace preferences are saved separately. Double-click always opens
+the detail page without launching the editor. Columns remain sortable in both row modes.
+Catalog filters are buttons with a selected state; filters, display options and pagination
+have separate frames that adapt to the width. Product-detail actions use full text buttons
+grouped by purpose. The four display modes use vector-icon buttons with tooltips, and the
+active mode has a distinct color and outline. Their height exactly matches standard buttons
+in both compact and comfortable density, with scaled, centered icons.
 
-## Télécharger
+Engines and Projects retain their actions and selection. Profiles are prepared in Settings;
+plugins are managed from project or engine detail pages. Storage and Activity navigation is
+anchored at the bottom. Library sources share one row, with help below; display options sit
+under search and adapt to available width. Libraries retain four views: detailed cards,
+Image + name, rows without images and rows with thumbnails. Click data columns to toggle
+ascending/descending sorting. Fab/Megascans sorting applies to all filtered results before
+pagination. Empty facets disappear and return automatically when other filters allow matches.
+Windows keyboard input passes characters, accents and AltGr to ImGui text fields.
 
-[Releases officielles](https://github.com/MrMybal/CyEngineHub/releases)
+Official Unreal installations are marked green. With Epic/Fab connected, the hub checks
+revisions on the same branch and reports available updates without automatically downloading
+or replacing the engine. Missing folders are excluded after catalog validation; unavailable
+drives remain marked as unavailable. Ctrl/Shift+click selects multiple engines in cards or
+lists. Right-click verifies installations, checks official updates or removes catalog entries
+with confirmation, without deleting their files. The manifest reader accepts large Unreal
+binary catalogs with bounded decompression.
 
-- `CyEngineHub-…-Setup-win-x64.exe` : installateur par utilisateur, sans droits administrateur.
-- `CyEngineHub-…-win-x64.zip` : version autonome à extraire entièrement avant de lancer `CyEngineHub.Desktop.exe`.
-- `SHA256SUMS.txt` : empreintes des deux téléchargements.
+An official engine download closes its form and immediately creates tracking entries in
+Engines and Downloads. Transfers continue during navigation, respect download concurrency,
+and can be canceled while queued or running from either view. An active destination cannot
+be added twice. Completion adds the validated engine without changing pages. Download variants
+show Unreal labels, platforms and RAW/Megascans formats; either the text or checkbox selects one.
 
-Windows 10/11 x64. Le runtime .NET est inclus dans les paquets ; aucun SDK n'est
-nécessaire pour utiliser l'application. Cette première Alpha n'est pas signée avec
-un certificat Authenticode et Windows peut afficher un avertissement.
+Official engines and components download chunks in parallel: 12 connections per engine by
+default, configurable from 1 to 32 in Settings → Downloads. The queue's Download settings
+button opens these settings directly, distinguishing simultaneous transfers from connections
+per engine. This setting is separate from simultaneous packs and applies to future transfers.
+Chunks are written progressively, incomplete files are not reused, and temporary network errors
+receive bounded retries. Aggregate throughput excludes bytes reused from cache; network progress
+updates at most four times per second. Actual throughput also depends on the CDN, connection,
+disk and CPU.
 
-## Fonctionnalités de cette Alpha
+Reconstruction reuses decompressed chunks in a per-transfer LRU memory cache limited to
+128 MiB and calculates integrity while writing, without rereading new files. Progress updates
+at most four times per second, plus the start and end of each phase. Selecting a deleted or
+inaccessible folder shows an error without exiting. Truncated chunks, network interruptions
+and timeouts are retried up to six times with cancellable progressive delays. After failure
+or cancellation, Resume is available in Downloads, engine cards/rows and the context menu.
+It preserves the original version and destination and revalidates cached chunks before fetching
+missing ones. For requests created by an older hub version, select the same official version
+and target folder again to reuse the adjacent cache.
 
-- Découverte et lancement des moteurs/projets installés, outils Unreal de build et packaging.
-- Bibliothèque Fab et Megascans historique Quixel : connexion utilisateur, catalogue
-  mis en cache, miniatures asynchrones, recherche, filtres et affichage virtualisé.
-- Onglet Collections Megascans : sélections officielles Quixel, recherche, couvertures
-  en cache et accès à leurs assets présents dans votre catalogue personnel.
-- Téléchargements Unreal et RAW selon les formats réellement disponibles dans le compte.
-- Compression ZIP configurable par marketplace, métadonnées JSON accessibles séparément,
-  dossiers de cache/téléchargement et bibliothèques multiples avec quotas et ordre de priorité.
-- Collections, packages locaux et scripts d'installation configurables par cible.
-- Ateliers de dérivés Fab/Unreal : projet temporaire avec la version moteur choisie,
-  correction dans l’éditeur, `Package Data`, versions locales installables et suppression contrôlée.
-- Création de projets Unreal Blueprint/C++, profils éditables, packs de fonctionnalités,
-  sélection des plugins du moteur et aperçu/édition des overrides INI.
-- Éditeur de profils indépendant dans les paramètres, accessible aussi depuis Projets.
-- Extensions intégrées Asset Bridge, installation Unreal avec déplacement dans un projet
-  temporaire et conversion expérimentale entre versions Unreal.
-- Logs, téléchargements en arrière-plan, zone de notification Windows et démarrage automatique optionnel.
-- Mises à jour via les releases GitHub officielles avec notes de version et contrôle SHA-256.
+Downloads accept Epic chunks whose header moves from v2 to v3 with four additional bytes,
+without mistaking that difference for truncation. HTTP size, header payload, GUID, decompression
+and reconstructed file hashes remain checked on resume. Fab uses the same parallel chunk
+pipeline, validated cache and retries. Settings → Downloads has an independent 1–32 connections
+setting per Fab/Megascans download (default: 12). Megascans downloads multiple signed files
+in parallel and segments large files when the server supports byte ranges with a strong
+validator; otherwise it uses one connection per file. Incomplete files are not published in
+the library. These settings do not change active transfers. The log shows significant events
+by default: starts, completions, cancellations, warnings and errors. Full log reveals progress
+and technical details, which remain in the log file.
 
-## Limites importantes
+Engines and projects retain separate Cards/List modes. Asset cards keep a fixed size;
+one click selects the whole card, double-click opens details, and action buttons remain
+independent. Sources and Settings panels use the full height and highlight the active tab.
+Fab, Megascans and connector product pages offer an explicit return to the catalog and omit
+list-presentation options. Clicking the active source also returns from a product to its catalog.
+Downloaded variants have separate frames, with compatibility/sizes above and variant actions
+below. Unreal extensions/plugins use a list with inspector. Thumbnails load and decode in the
+background; GPU uploads per rendered frame are bounded to preserve navigation. The cached
+Megascans catalog remains browsable offline without replacing authorized search configuration.
 
-Les connecteurs Fab/Quixel utilisent des interfaces de compatibilité communautaires
-susceptibles de changer ; l'accès nécessite votre compte et vos droits sur les assets.
-Les connecteurs ne contournent ni les licences ni les autorisations des marketplaces.
-Unity Asset Store ne dispose pas encore d'un parcours distant complet équivalent.
+Avalonia provides native windows, GPU rendering, file pickers and WebView2 hosting.
+Web pages remain in WebView2; hub controls are drawn with ImGui. For graphics problems,
+`--classic` temporarily starts the previous interface.
 
-Une conversion vers une ancienne version Unreal n'est **pas** un simple resave universel :
-les extensions expérimentales procèdent à des exports/réimports pour les types pris en
-charge et utilisent les moteurs installés. Blueprints, code, matériaux ou fonctionnalités
-non pris en charge peuvent nécessiter une intervention manuelle.
+<a id="télécharger"></a>
 
-Les scripts d'installation/post-création doivent provenir de sources de confiance.
-CyEngineHub est indépendant d'Epic Games, Quixel, Unity et des autres éditeurs cités.
+## Download
 
-## Données et mises à jour
+[Official releases](https://github.com/MrMybal/CyEngineHub/releases)
 
-La connexion Fab propose une fenêtre Epic intégrée via WebView2 sur Windows,
-avec récupération automatique du code JSON. Le **mode manuel** dans le navigateur
-externe reste disponible, y compris si WebView2 est absent ou refusé par le
-fournisseur de connexion. Voir [Connexion Epic / Fab](docs/fab-login.md).
+- `CyEngineHub-…-Setup-win-x64.exe`: per-user installer without administrator rights.
+- `CyEngineHub-…-win-x64.zip`: self-contained version; extract everything before running `CyEngineHub.Desktop.exe`.
+- `SHA256SUMS.txt`: hashes for both downloads.
 
-Par défaut, les réglages, catalogues et logs sont dans `%LOCALAPPDATA%\CyEngineHub`.
-Les paquets et caches peuvent être placés dans les dossiers définis dans les paramètres.
-Créer un fichier vide `portable.flag` à côté de l'exécutable active un dossier local `Data`.
-L'installateur et sa désinstallation ne suppriment pas vos bibliothèques ou projets.
-En mode portable, privilégiez la mise à jour manuelle par ZIP en conservant `Data` et
-`portable.flag` : l'installateur cible une installation Windows par utilisateur.
+Windows 10/11 x64. Packages include the .NET runtime; using the application requires no SDK.
+This initial Alpha has no Authenticode signature, so Windows may display a warning.
 
-Le dépôt `MrMybal/CyEngineHub` est configuré par défaut. Dans **Paramètres → Avancé →
-Mises à jour**, vous pouvez désactiver la vérification au lancement ou les préversions.
-Le canal Alpha/Bêta est activé par défaut pour cette Alpha. Les téléchargements sont
-vérifiés avant la fermeture de l'application et le lancement externe de l'installateur.
+<a id="fonctionnalités-de-cette-alpha"></a>
 
-## Compiler et tester
+## Features in this Alpha
 
-- .NET SDK 9.0.306 (ou une révision compatible avec `global.json`).
-- Cible runtime .NET 8 ; interface Dear ImGui, hébergée par Avalonia.
+- Discover and launch installed engines/projects; Unreal build and packaging tools.
+- Fab and legacy Quixel Megascans libraries: user login, cached catalog, asynchronous thumbnails,
+  search, filters and virtualized display.
+- Megascans Collections tab: official Quixel selections, search, cached covers and access to
+  their assets present in your personal catalog.
+- Unreal and RAW downloads according to formats actually available to the account.
+- Configurable ZIP compression per marketplace, separately accessible JSON metadata,
+  cache/download folders and multiple libraries with quotas and priority order.
+- Collections, local packages and installation scripts configurable per target.
+- Fab/Unreal derived-package workshops: temporary project with a selected engine version,
+  fixes in the editor, `Package Data`, installable local versions and controlled removal.
+- Unreal Blueprint/C++ project creation, editable profiles, feature packs, engine plugin
+  selection and INI override preview/editing.
+- Independent profile editor in Settings, also accessible from Projects.
+- Built-in Asset Bridge extensions, Unreal installation through relocation into a temporary
+  project, and experimental conversion between Unreal versions.
+- Logs, background downloads, Windows notification area and optional automatic startup.
+- Updates through official GitHub releases with release notes and SHA-256 verification.
+
+<a id="limites-importantes"></a>
+
+## Important limitations
+
+Fab/Quixel connectors use community compatibility interfaces that may change. Access requires
+your account and asset rights. They bypass neither marketplace licenses nor permissions.
+Unity Asset Store does not yet have an equivalent complete remote workflow.
+
+Converting to an older Unreal version is **not** a universal resave: experimental extensions
+export/reimport supported types using installed engines. Blueprints, code, materials and
+unsupported features may require manual intervention.
+
+Installation/post-creation scripts must come from trusted sources. CyEngineHub is independent
+of Epic Games, Quixel, Unity and the other publishers mentioned.
+
+<a id="données-et-mises-à-jour"></a>
+
+## Data and updates
+
+Fab login offers an embedded Epic window through WebView2 on Windows with automatic JSON-code
+retrieval. **Manual mode** in an external browser remains available, including when WebView2
+is absent or rejected by the login provider. See [Epic / Fab login](docs/fab-login.md).
+
+Settings, catalogs and logs default to `%LOCALAPPDATA%\CyEngineHub`. Packages and caches can
+use folders configured in Settings. An empty `portable.flag` beside the executable enables
+a local `Data` folder. Installing or uninstalling does not delete libraries or projects.
+In portable mode, prefer manual ZIP updates while preserving `Data` and `portable.flag`:
+the installer targets a per-user Windows installation.
+
+The default repository is `MrMybal/CyEngineHub`. Under **Settings → Advanced → Updates**,
+disable startup checks or prereleases if desired. The Alpha/Beta channel is enabled by default
+for this Alpha. Downloads are verified before the application closes and launches the installer externally.
+
+<a id="compiler-et-tester"></a>
+
+## Build and test
+
+- .NET SDK 9.0.306, or a revision compatible with `global.json`.
+- .NET 8 runtime target; Dear ImGui interface hosted by Avalonia.
 
 ```powershell
 dotnet restore .\CyEngineHub.sln
@@ -241,38 +218,37 @@ dotnet test .\CyEngineHub.sln -c Release
 dotnet run --project .\src\CyEngineHub.Desktop\CyEngineHub.Desktop.csproj
 ```
 
-Créer les paquets Windows avec Inno Setup 7 installé :
+Create Windows packages with Inno Setup 7 installed:
 
 ```powershell
-.\tools\release\build-windows.ps1 -InnoCompiler 'C:\chemin\Inno Setup 7\ISCC.exe'
+.\tools\release\build-windows.ps1 -InnoCompiler 'C:\path\Inno Setup 7\ISCC.exe'
 ```
 
-Le script crée un nouveau dossier sous `artifacts`, exécute les tests, publie les
-exécutables autonomes (application, updater et outils), embarque les extensions,
-compile l'installateur et génère le ZIP ainsi que les empreintes. Il ne publie rien
-sur GitHub et ne contient aucun identifiant.
+The script creates a new folder under `artifacts`, runs tests, publishes self-contained
+executables (application, updater and tools), bundles extensions, compiles the installer
+and generates the ZIP and hashes. It publishes nothing to GitHub and contains no credentials.
 
-Les sources ne comprennent aucun cache utilisateur, téléchargement de marketplace,
-jeton, export d'annotation ou fichier de projet personnel. Les dépendances restent
-soumises à leurs licences respectives : voir [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
-et les notices embarquées dans les binaires.
+Sources include no user caches, marketplace downloads, tokens, annotation exports or personal
+project files. Dependencies retain their respective licenses: see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and notices bundled in binaries.
 
 ## Documentation
 
-- [Connexion Epic / Fab : automatique et manuelle](docs/fab-login.md)
-- [Collections officielles Megascans](docs/megascan-collections.md)
-- [Dérivés de packages Unreal](docs/derived-packages.md)
-- [Profils et création de projets](docs/project-creation-profiles.md)
-- [Mises à jour et publication](docs/application-updates.md)
+- [Epic / Fab login: automatic and manual](docs/fab-login.md)
+- [Official Megascans collections](docs/megascan-collections.md)
+- [Derived Unreal packages](docs/derived-packages.md)
+- [Profiles and project creation](docs/project-creation-profiles.md)
+- [Updates and publishing](docs/application-updates.md)
 - [Extensions](docs/extensions.md)
-- [Sécurité des packages](docs/package-install-safety.md)
-- [Sécurité des plugins](docs/plugin-safety.md)
-- [Stockage](docs/storage-safety.md)
+- [Package safety](docs/package-install-safety.md)
+- [Plugin safety](docs/plugin-safety.md)
+- [Storage](docs/storage-safety.md)
 - [Architecture](docs/architecture.md)
 
-Certaines notes de conception historiques décrivent des étapes antérieures de l'Alpha.
-Les limites de la release courante sont précisées dans ses notes de version.
+Some historical design notes describe earlier Alpha stages. Current release limitations
+are specified in its release notes.
 
 ## Optional Megascans catalog access
 
-See [local catalog configuration](docs/quixel-local-configuration.md). Catalog search is disabled until an authorized key is configured locally.
+See [local catalog configuration](docs/quixel-local-configuration.md).
+Catalog search is disabled until an authorized key is configured locally.
