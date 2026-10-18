@@ -42,8 +42,10 @@ Son dernier échec est écrit dans `%TEMP%\CyEngineHub\Updater\last-error.log`.
 ## Préparer une publication
 
 1. Mettre à jour `Version`, `AssemblyVersion` et `FileVersion` dans `Directory.Build.props`.
-2. Ajouter les notes sous `docs/releases`, puis exécuter `tools/release/build-windows.ps1`
-   avec le chemin d'Inno Setup `ISCC.exe`. Le script teste et fabrique les trois assets
+2. Ajouter les notes sous `docs/releases`. Construire les quatre adaptateurs avec
+   `tools/release/build-native-adapters.ps1` dans un nouveau dossier sous `artifacts`,
+   puis exécuter `tools/release/build-windows.ps1` avec `-NativeAdapterRoot` pointant
+   vers ce dossier et le chemin d'Inno Setup `ISCC.exe`. Le script teste et fabrique les trois assets
    (installateur, ZIP, SHA256SUMS.txt) dans un nouveau dossier ignoré par Git.
 3. Vérifier l'application empaquetée, committer les sources et créer le tag correspondant.
 4. Créer une release GitHub sur ce tag, joindre les trois assets et publier.
