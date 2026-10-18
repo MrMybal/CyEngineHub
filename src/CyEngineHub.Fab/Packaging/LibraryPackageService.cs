@@ -239,7 +239,12 @@ public sealed class LibraryPackageService
         var hasRawModel = files.Any(file => file.Extension.Equals(".fbx", StringComparison.OrdinalIgnoreCase) ||
                                            file.Extension.Equals(".obj", StringComparison.OrdinalIgnoreCase) ||
                                            file.Extension.Equals(".gltf", StringComparison.OrdinalIgnoreCase) ||
-                                           file.Extension.Equals(".glb", StringComparison.OrdinalIgnoreCase));
+                                           file.Extension.Equals(".glb", StringComparison.OrdinalIgnoreCase) ||
+                                           file.Extension.Equals(".png", StringComparison.OrdinalIgnoreCase) ||
+                                           file.Extension.Equals(".tga", StringComparison.OrdinalIgnoreCase) ||
+                                           file.Extension.Equals(".jpg", StringComparison.OrdinalIgnoreCase) ||
+                                           file.Extension.Equals(".exr", StringComparison.OrdinalIgnoreCase) ||
+                                           file.Extension.Equals(".wav", StringComparison.OrdinalIgnoreCase));
         var hasNativeUnreal = files.Any(file => file.Extension.Equals(".uasset", StringComparison.OrdinalIgnoreCase) ||
                                                file.Extension.Equals(".umap", StringComparison.OrdinalIgnoreCase));
         if (hasRawModel && !hasNativeUnreal) return LibraryPackageContentKind.RawAsset;
@@ -404,6 +409,9 @@ public sealed class LibraryPackageService
         string.IsNullOrWhiteSpace(value) ? "[sans extension]" : value.ToLowerInvariant();
 
     private static string NormalizeSource(RemoteFabAsset asset) =>
+        asset.Source.StartsWith("cyenginehub.marketplace-", StringComparison.Ordinal)
+            ? asset.Source
+            :
         asset.Source.Contains("quixel", StringComparison.OrdinalIgnoreCase) ||
         asset.Namespace.Contains("megascans", StringComparison.OrdinalIgnoreCase)
             ? "Quixel"

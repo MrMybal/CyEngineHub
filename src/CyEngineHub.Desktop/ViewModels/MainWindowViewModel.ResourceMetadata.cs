@@ -136,7 +136,7 @@ public sealed partial class MainWindowViewModel
         var metadata = await Task.Run(() => downloads.Where(stored => Directory.Exists(stored.Path))
             .Select(stored => (Stored: stored, Sizes: ResolveStoredDownloadSizes(stored))).ToArray()).ConfigureAwait(true);
         var connectors = _connectorFootprints;
-        try { connectors = await Task.Run(async () => (await ConnectorDownloadCatalog.LoadAsync().ConfigureAwait(false)).Where(pack => File.Exists(pack.FilePath)).ToArray()).ConfigureAwait(true); }
+        try { connectors = await Task.Run(async () => (await ConnectorDownloadCatalog.LoadAsync().ConfigureAwait(false)).Where(pack => File.Exists(pack.FilePath) || Directory.Exists(pack.FilePath)).ToArray()).ConfigureAwait(true); }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException)
         { AppendRawLog("WARN", "Storage/Metadata", "Catalogue des téléchargements externes illisible ; inventaire précédent conservé."); }
         if (generation != _packMetadataGeneration) return;

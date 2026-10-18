@@ -95,20 +95,13 @@ internal sealed partial class ImGuiWorkspace
         Gui.BeginChild(settings ? "settings-content" : "library-content", new(0, 0), ImGuiChildFlags.None);
         if (settings)
         {
-            if (vm.IsSettingsAdvancedSelected)
-            {
-                Gui.TextUnformatted("AFFICHAGE");
-                var density = vm.UseCompactInterface ? 0 : 1;
-                Gui.SetNextItemWidth(210 * UiScale);
-                if (Gui.Combo("Densité de l’interface", ref density, "Compact\0Confort\0")) Set(vm, "{Binding UseCompactInterface}", density == 0);
-                Record("interface-density");
-                Gui.Separator();
-            }
             var body = page.Children.Single(node => node["Grid.Row"] == "1");
-            DrawChildren(body.Children.Single(node => node["Grid.Column"] == "1"), vm);
+            if (!DrawOrganizedSettings(vm, page)) DrawChildren(body.Children.Single(node => node["Grid.Column"] == "1"), vm);
         }
         else
         {
+            if (Gui.Button("Groupes de packs · Alpha")) OpenPackGroups(vm);
+            Record("pack-groups/open");
             var product = vm.IsRemoteFabProductVisible || vm.IsConnectorLibrarySelected && vm.SelectedConnectorLibrary?.IsProductVisible == true;
             if (!product && !(vm.IsRemoteMarketplaceContentVisible && vm.IsSelectedRemoteConnectionReady && vm.IsRemoteFabCatalogVisible))
             { DrawSizeAnalysisMenu(vm, "packs"); DrawLibraryViewModes(vm); }

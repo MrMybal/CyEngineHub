@@ -18,7 +18,41 @@ using CyEngineHub.Projects.Models;
 using CyEngineHub.Unreal.Models;
 
 // Explicitly opt in. Only fresh QA projects are used; engines are never downloaded or installed.
-if (args.Length != 3 || args[0] is not ("--live" or "--complex" or "--native-textures")) { Console.WriteLine("Usage: --live|--complex|--native-textures <source-engine-root> <target-engine-root>"); return 2; }
+if(args.Length==3&&args[0]=="--native-pack-shaders")
+{
+    var shaderProject=Path.GetFullPath(args[1]);var artifactsRoot=Path.GetFullPath("artifacts")+Path.DirectorySeparatorChar;
+    if(!shaderProject.StartsWith(artifactsRoot,StringComparison.OrdinalIgnoreCase))throw new InvalidOperationException("Shader QA is limited to artifact projects");
+    var shaderRoot=Path.GetDirectoryName(Path.GetDirectoryName(shaderProject))!;var shaderEngine=Engine(args[2]);
+    return await NativePackReplay.ShadersAsync(shaderRoot,shaderProject,shaderEngine,new IsolatedRunner(shaderRoot,[shaderEngine.EditorPath],render:true));
+}
+if(args.Length==3&&args[0]=="--native-pack-replay")
+{
+    var replayRoot=Path.GetFullPath(Path.Combine("artifacts","native-pack-replay-"+Guid.NewGuid().ToString("N")));Directory.CreateDirectory(replayRoot);var replayEngine=Engine(args[2]);
+    return await NativePackReplay.RunAsync(replayRoot,Path.GetFullPath(args[1]),replayEngine,new IsolatedRunner(replayRoot,[replayEngine.EditorPath]));
+}
+if (args.Length == 4 && args[0] == "--native-pack")
+{
+    var packRoot=Path.GetFullPath(Path.Combine("artifacts","native-full-pack-"+Guid.NewGuid().ToString("N")));Directory.CreateDirectory(packRoot);
+    var src=Engine(args[2]);var dst=Engine(args[3]);
+    return await NativePackSmoke.RunAsync(packRoot,Path.GetFullPath(args[1]),src,dst,new IsolatedRunner(packRoot,[src.EditorPath,dst.EditorPath]));
+}
+if (args.Length == 5 && args[0] == "--native-owned-textures")
+{
+    var ownedRoot = Path.GetFullPath(Path.Combine("artifacts", "native-owned-textures-" + Guid.NewGuid().ToString("N")));
+    Directory.CreateDirectory(ownedRoot);
+    var source = Engine(args[3]); var target = Engine(args[4]);
+    return await NativeTextureSmoke.RunAsync(ownedRoot, source, target, new IsolatedRunner(ownedRoot, [source.EditorPath, target.EditorPath]),
+        ownedProject: Path.GetFullPath(args[2]), ownedInventory: Path.GetFullPath(args[1]));
+}
+if (args.Length == 5 && args[0] == "--owned")
+{
+    var ownedRoot = Path.GetFullPath(Path.Combine("artifacts", "owned-pack-" + Guid.NewGuid().ToString("N")));
+    Directory.CreateDirectory(ownedRoot);
+    var engines = args.Skip(2).Select(Engine).ToArray();
+    return await OwnedPackSmoke.RunAsync(ownedRoot, Path.GetFullPath(args[1]), engines,
+        new IsolatedRunner(ownedRoot, engines.Select(engine => engine.EditorPath).ToArray()));
+}
+if (args.Length != 3 || args[0] is not ("--live" or "--complex" or "--native-textures" or "--native-graph" or "--relocation-only" or "--cosmos-raw")) { Console.WriteLine("Usage: --live|--complex|--native-textures|--native-graph|--relocation-only|--cosmos-raw <source-engine-root> <target-engine-root>"); return 2; }
 var root = Path.GetFullPath(Path.Combine("artifacts", "unreal-capabilities-" + Guid.NewGuid().ToString("N")));
 Directory.CreateDirectory(root);
 var passes = new List<string>();
@@ -28,6 +62,7 @@ var targetEngine = Engine(args[2]);
 var runner = new IsolatedRunner(root, [sourceEngine.EditorPath, targetEngine.EditorPath]);
 if (args[0] == "--complex") return await ComplexDowngrade.RunAsync(root, sourceEngine, targetEngine, runner);
 if (args[0] == "--native-textures") return await NativeTextureSmoke.RunAsync(root, sourceEngine, targetEngine, runner);
+if (args[0] == "--native-graph") return await NativeTextureSmoke.RunAsync(root, sourceEngine, targetEngine, runner, graph: true);
 var creator = new ProjectCreationService();
 var importer = new FabProjectContentImportService();
 var asset = new RemoteFabAsset("qa-owned", "ue", "QA generated asset", "", "Fab", "ASSET_PACK", null, null, [], []);
@@ -35,6 +70,22 @@ var version = new RemoteFabProjectVersion("qa-source", [], [$"{sourceEngine.Vers
 Console.WriteLine("QA_ROOT " + root);
 try
 {
+    if (args[0] == "--cosmos-raw")
+    {
+        var rawTarget = await Create("QaCosmosRaw", targetEngine);
+        var rawSource = Directory.CreateDirectory(Path.Combine(root, "CosmosRawSource")).FullName;
+        var rawTga = Path.Combine(rawSource, "T_QA.tga");
+        var rawBytes = new byte[18 + 4 * 4 * 3]; rawBytes[2] = 2; rawBytes[12] = 4; rawBytes[14] = 4; rawBytes[16] = 24;
+        Array.Fill<byte>(rawBytes, 120, 18, rawBytes.Length - 18); await File.WriteAllBytesAsync(rawTga, rawBytes);
+        var registry = new FabInstallationScriptRegistry([
+            new UnrealMegascansInstallationScript(runner, importer, Path.Combine(root, "RawVariants")),
+            new UnrealRelocatedContentInstallationScript(runner, importer, Path.Combine(root, "RelocationWork"))], runner);
+        await new FabInstallationPipeline(registry).ExecuteAsync(Context(rawSource, rawTarget, targetEngine) with { ContentKind = LibraryPackageContentKind.RawAsset },
+            [new(UnrealMegascansInstallationScript.ScriptId, new Dictionary<string, string> { ["importMode"] = "raw" }),
+             new(UnrealRelocatedContentInstallationScript.ScriptId, new Dictionary<string, string> { ["destinationFolder"] = "CosmosQA" })]);
+        await Verify(rawTarget, targetEngine, "cosmos-raw", rawTga);
+        return 0;
+    }
     var source = await Create("QaSource", sourceEngine);
     var normal = await Create("QaNormal", sourceEngine);
     var relocated = await Create("QaRelocated", sourceEngine);
@@ -63,6 +114,7 @@ try
         .InstallAsync(Context(derived.DestinationDirectory, relocated, sourceEngine) with
         { Configuration = new Dictionary<string, string> { ["destinationFolder"] = "QA", ["keepStaging"] = "true" } });
     await Verify(relocated, sourceEngine, "relocated", tga);
+    if (args[0] == "--relocation-only") return 0;
     var pluginSource = Path.Combine(root, "PluginSource", "QaPlugin"); Directory.CreateDirectory(Path.Combine(pluginSource, "Content"));
     await File.WriteAllTextAsync(Path.Combine(pluginSource, "QaPlugin.uplugin"), "{\"FileVersion\":3,\"Version\":1,\"FriendlyName\":\"QA Plugin\",\"CanContainContent\":true,\"EnabledByDefault\":true}");
     File.Copy(Path.Combine(source.ProjectRoot, "Content", "OriginalPack", "M_Parent.uasset"), Path.Combine(pluginSource, "Content", "M_Parent.uasset"));
@@ -151,7 +203,7 @@ static UnrealEngineInstallation Engine(string root)
     return new(root, $"{version.Major}.{version.Minor}", "QA engine", root, editor, version, EngineInstallationType.EpicBinary, null, null, null, "QA explicit", EngineHealth.Healthy, [], DateTimeOffset.UtcNow);
 }
 
-sealed class IsolatedRunner(string root, string[] allowedEditors) : IProcessRunner
+sealed class IsolatedRunner(string root, string[] allowedEditors, bool render = false) : IProcessRunner
 {
     public long PeakBytes { get; private set; }
     public long Measure() => Directory.EnumerateFiles(root, "*", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint, IgnoreInaccessible = true }).Sum(p => { try { return new FileInfo(p).Length; } catch (IOException) { return 0L; } });
@@ -162,11 +214,11 @@ sealed class IsolatedRunner(string root, string[] allowedEditors) : IProcessRunn
         if (!project.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) || Path.GetExtension(project) != ".uproject") throw new InvalidOperationException("QA refused non-fixture project");
         var config = Path.Combine(Path.GetDirectoryName(project)!, "Config"); Directory.CreateDirectory(config);
         var cache = Path.Combine(root, "DDC").Replace('\\', '/');
-        await File.AppendAllTextAsync(Path.Combine(config, "DefaultEngine.ini"), $"\n[QaIsolated]\nRoot=(Type=FileSystem,ReadOnly=false,Clean=false,Flush=false,DeleteUnused=false,Path=\"{cache}\")\n", cancellationToken);
+        await File.AppendAllTextAsync(Path.Combine(config, "DefaultEngine.ini"), $"\n[QaIsolated]\nRoot=(Type=FileSystem,ReadOnly=false,Clean=false,Flush=false,DeleteUnused=false,Path=\"{cache}\")\n\n[/Script/Engine.RendererSettings]\nr.Nanite.ProjectEnabled=True\n\n[/Script/WindowsTargetPlatform.WindowsTargetSettings]\n+D3D12TargetedShaderFormats=PCD3D_SM6\n", cancellationToken);
         var temp = Path.Combine(root, "Temp"); Directory.CreateDirectory(temp);
         var env = new Dictionary<string, string?>(request.EnvironmentVariables) { ["TEMP"] = temp, ["TMP"] = temp, ["UE-SharedDataCachePath"] = "None", ["UE-LocalDataCachePath"] = cache };
-        using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken); stop.CancelAfter(TimeSpan.FromMinutes(4));
-        var task = new SystemProcessRunner().RunAsync(request with { Arguments = request.Arguments.Concat(["-ddc=QaIsolated", "-NoSplash", "-NoShaderCompile"]).ToArray(), EnvironmentVariables = env }, output, stop.Token);
+        using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken); stop.CancelAfter(TimeSpan.FromMinutes(render ? 20 : 4));
+        var task = new SystemProcessRunner().RunAsync(request with { Arguments = request.Arguments.Concat(render ? ["-ddc=QaIsolated", "-NoSplash"] : new[] {"-ddc=QaIsolated", "-NoSplash", "-NoShaderCompile"}).ToArray(), EnvironmentVariables = env }, output, stop.Token);
         while (!task.IsCompleted)
         {
             await Task.WhenAny(task, Task.Delay(2000, CancellationToken.None)); PeakBytes = Math.Max(PeakBytes, Measure());

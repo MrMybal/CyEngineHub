@@ -90,14 +90,20 @@ internal sealed partial class ImGuiWorkspace
         }
         Gui.TextUnformatted(Value(_root, "HeaderTitle"));
         var available = Gui.GetContentRegionAvail().X;
-        if (available > 650) Gui.SameLine(Math.Max(Gui.GetCursorPosX(), available - 440));
-        else Gui.SameLine();
-        foreach (var provider in new[] { "Epic", "Fab", "Unity" })
+        var badges = ConnectionSettingsProviders.Where(provider => Flag(_root, "Is" + provider + "ConnectionEnabled")).Select(provider =>
         {
-            if (!Flag(_root, "Is" + provider + "ConnectionEnabled")) continue;
-            var connected = provider != "Unity" && Flag(_root, "IsDirectFabConnected");
+            var connected = provider is "Epic" or "Fab" ? Flag(_root, "IsDirectFabConnected") : provider == "Quixel" && Flag(_root, "IsQuixelConnected");
+            var label = (provider == "Quixel" ? "MEGASCANS" : provider.ToUpperInvariant()) + (connected ? " · Connecté" : provider == "Git" ? " · Non vérifié" : " · À connecter");
+            return (Provider: provider, Connected: connected, Label: label);
+        }).ToArray();
+        var badgeWidth = badges.Sum(badge => Gui.CalcTextSize(badge.Label).X + Gui.GetStyle().FramePadding.X * 2 + Gui.GetStyle().ItemSpacing.X);
+        if (available > badgeWidth + Gui.CalcTextSize(Value(_root, "HeaderTitle")).X + 24) Gui.SameLine(Math.Max(Gui.GetCursorPosX(), available - badgeWidth));
+        else Gui.NewLine();
+        foreach (var (provider, connected, label) in badges)
+        {
+            if (Gui.GetContentRegionAvail().X < Gui.CalcTextSize(label).X + Gui.GetStyle().FramePadding.X * 2) Gui.NewLine();
             Gui.PushStyleColor(ImGuiCol.Text, connected ? ImGuiTheme.Success : ImGuiTheme.Warning);
-            ActionButton(_root, provider.ToUpperInvariant() + (connected ? " · Connecté" : " · À connecter"), "Show" + provider + "ConnectionSettingsCommand");
+            ActionButton(_root, label, "Show" + provider + "ConnectionSettingsCommand");
             Record("connection/" + provider + (connected ? "/connected" : "/disconnected"));
             Gui.PopStyleColor();
             if (Gui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) Gui.SetTooltip(Value(_root, provider == "Unity" ? "UnityStoreConnectionStatus" : provider + "ConnectionStatus"));
@@ -113,7 +119,7 @@ internal sealed partial class ImGuiWorkspace
         }
         Gui.EndChild(); Gui.EndChild(); Gui.EndChild();
         DrawEngineSelectionMenus();
-        if (_root is MainWindowViewModel itemActions) DrawItemContextMenus(itemActions);
+        if (_root is MainWindowViewModel itemActions) { DrawItemContextMenus(itemActions); DrawPackGroups(itemActions); }
         Gui.Separator();
         Gui.TextColored(_error is null ? ImGuiTheme.Muted : ImGuiTheme.Rgb(0xE58C83),
             Elide(_error ?? Value(_root, "StatusMessage"), Math.Max(20, size.X - 35)));

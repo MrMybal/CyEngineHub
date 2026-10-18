@@ -80,6 +80,12 @@ public sealed class UnrealRelocatedContentInstallationScript(
                 cancellationToken)
             .ConfigureAwait(false);
 
+        if (context.Configuration.GetValueOrDefault("prepareOnly") == "true")
+            return new(Descriptor.Id, "Déplacement préparé et références validées ; projet cible inchangé.", new Dictionary<string, string>
+            {
+                ["variant"] = relocated.VariantDirectory, ["manifest"] = relocated.ManifestPath,
+                ["report"] = relocated.ReportPath,
+            });
         progress?.Report(new(0.88, "Installation transactionnelle dans le projet cible…"));
         var plan = await contentImport.PrepareAsync(
                 relocated.VariantDirectory,

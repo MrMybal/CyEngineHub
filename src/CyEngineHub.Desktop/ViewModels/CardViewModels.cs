@@ -902,7 +902,7 @@ public sealed class HubExtensionCardViewModel
         : "UTILISATEUR";
 
     public string Health => Snapshot.Health == HubExtensionHealth.Ready
-        ? "PRÊTE"
+        ? "ALPHA"
         : "INVALIDE";
 
     public string Kind => Snapshot.Manifest.Kind switch
@@ -984,6 +984,8 @@ public sealed class HubUiContributionButtonViewModel
 
 public sealed class EngineCardViewModel : ObservableObject
 {
+    public CyEngineHub.Git.Analysis.EngineGitStatus? EngineGitStatus { get; set; }
+    public string EngineGitMessage { get; set; } = "Branche Git non vérifiée (la branche de compilation peut être différente).";
     private bool _isUnregisterConfirmationVisible;
     private string _effectiveSizeLabel;
 
@@ -1038,9 +1040,17 @@ public sealed class EngineCardViewModel : ObservableObject
         OpenDetailsCommand = new RelayCommand(() => openDetails(this));
     }
 
-    public UnrealEngineInstallation Engine { get; }
+    public UnrealEngineInstallation Engine { get; private set; }
 
-    public UnrealEngineRegistration? Registration { get; }
+    public UnrealEngineRegistration? Registration { get; private set; }
+
+    public void UpdateRegistration(UnrealEngineRegistration registration)
+    {
+        Registration = registration;
+        Engine = Engine with { AssociationId = registration.Identifier };
+        OnPropertyChanged(nameof(Registration)); OnPropertyChanged(nameof(RegistrationLabel));
+        OnPropertyChanged(nameof(IsRegistered)); OnPropertyChanged(nameof(CanRegister));
+    }
 
     public LibraryItemOrganizationViewModel Organization { get; }
 

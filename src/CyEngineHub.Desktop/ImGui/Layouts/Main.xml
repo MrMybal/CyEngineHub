@@ -765,6 +765,14 @@
                 </WrapPanel>
               </Grid>
               <StackPanel IsVisible="{Binding IsUnrealProjectDetailsSelected}">
+                <Border Classes="card" IsVisible="{Binding IsCosmosProjectSettingsVisible}">
+                  <StackPanel>
+                    <TextBlock Text="COSMOS · ALPHA · DOSSIER DES ASSETS DU PROJET" Foreground="#70A8FA" />
+                    <TextBlock Text="Sous /Game. Les références et dépendances sont reconstruites par Unreal avant installation. Ne déplace pas les imports déjà présents." TextWrapping="Wrap" />
+                    <TextBox Text="{Binding CosmosProjectDestination}" PlaceholderText="Assets/Cosmos" />
+                    <Button Content="Enregistrer le dossier Cosmos" Command="{Binding SaveCosmosProjectSettingsCommand}" />
+                  </StackPanel>
+                </Border>
                 <Border Classes="card">
                   <Grid ColumnDefinitions="180,*,Auto">
                     <Border Width="180" Height="110">
@@ -3542,7 +3550,24 @@
                                   <TextBlock Text="{Binding InventoryUrl}" TextWrapping="Wrap" FontSize="10" />
                                   <TextBlock Text="DOSSIER DE TÉLÉCHARGEMENT" FontSize="10" />
                                   <TextBox Text="{Binding DownloadDirectory, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Chemin absolu du dossier de téléchargement" />
-                                  <TextBlock Text="Chemin enregistré automatiquement. Les fichiers déjà téléchargés ne sont pas déplacés." TextWrapping="Wrap" FontSize="10" Foreground="#8294A8" />
+                                  <StackPanel IsVisible="{Binding HasPackageStorage}">
+                                  <TextBlock Text="COSMOS : JSON, COMPRESSION ET BIBLIOTHÈQUES ORDONNÉES" FontSize="10" />
+                                  <ComboBox ItemsSource="{Binding CompressionModes}" SelectedItem="{Binding Compression}" />
+                                  <Button Content="Ajouter une bibliothèque" Command="{Binding AddLibraryCommand}" />
+                                  <ItemsControl ItemsSource="{Binding LibraryLocations}">
+                                    <ItemsControl.ItemTemplate><DataTemplate>
+                                      <Grid ColumnDefinitions="Auto,*,120,Auto,Auto,Auto">
+                                        <CheckBox IsChecked="{Binding IsEnabled}" />
+                                        <TextBox Grid.Column="1" Text="{Binding Path}" PlaceholderText="Chemin absolu de bibliothèque" />
+                                        <TextBox Grid.Column="2" Text="{Binding MaximumGigabytes}" PlaceholderText="Quota Gio · illimité" />
+                                        <Button Grid.Column="3" Content="↑" Command="{Binding MoveUpCommand}" />
+                                        <Button Grid.Column="4" Content="↓" Command="{Binding MoveDownCommand}" />
+                                        <Button Grid.Column="5" Classes="danger" Content="×" Command="{Binding RemoveCommand}" />
+                                      </Grid>
+                                    </DataTemplate></ItemsControl.ItemTemplate>
+                                  </ItemsControl>
+                                  </StackPanel>
+                                  <TextBlock Text="Enregistrement automatique. Cosmos copie les nouveaux fichiers en packages ; les originaux et les anciens téléchargements ne sont pas déplacés." TextWrapping="Wrap" FontSize="10" Foreground="#8294A8" />
                                   <TextBlock Text="{Binding SaveStatus}" TextWrapping="Wrap" FontSize="11" />
                                   <Button Content="Enregistrer ce connecteur" Command="{Binding SaveCommand}" />
                                   <Button Content="Ouvrir dans CyEngineHub" Command="{Binding OpenInventoryCommand}" />
@@ -4587,15 +4612,13 @@
             <Button Grid.Column="1" Classes="history" Content="✕" Command="{Binding CloseFabInstallationScriptConfigurationCommand}" ToolTip.Tip="Fermer" />
           </Grid>
           <Border Grid.Row="1">
-            <Grid ColumnDefinitions="*,Auto">
+            <StackPanel>
+              <TextBlock Text="{Binding SelectedFabInstallationScriptTarget.InstallationScriptEngineVersionLabel}" FontSize="10" Foreground="#8CC2FF" TextWrapping="Wrap" />
               <StackPanel>
                 <TextBlock Text="{Binding SelectedFabInstallationScriptTarget.Name}" />
                 <TextBlock Text="{Binding SelectedFabInstallationScriptTarget.Path}" FontSize="9" Foreground="#718398" TextTrimming="CharacterEllipsis" />
               </StackPanel>
-              <Border Grid.Column="1">
-                <TextBlock Text="{Binding SelectedFabInstallationScriptTarget.InstallationScriptEngineVersionLabel}" FontSize="10" Foreground="#8CC2FF" />
-              </Border>
-            </Grid>
+            </StackPanel>
           </Border>
           <ScrollViewer Grid.Row="2">
             <StackPanel>
@@ -4604,13 +4627,15 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <Border>
-                      <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto">
-                        <TextBlock Text="{Binding DisplayName}" />
+                      <StackPanel>
+                      <Grid ColumnDefinitions="250,*">
+                        <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap" />
                         <CheckBox Grid.Column="1" IsVisible="{Binding IsBoolean}" IsChecked="{Binding BooleanValue}" />
                         <TextBox Grid.Column="1" IsVisible="{Binding IsText}" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" />
                         <ComboBox Grid.Column="1" IsVisible="{Binding IsChoice}" ItemsSource="{Binding Choices}" SelectedItem="{Binding Value}" />
-                        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Description}" FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
                       </Grid>
+                      <TextBlock Text="{Binding Description}" FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
+                      </StackPanel>
                     </Border>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>

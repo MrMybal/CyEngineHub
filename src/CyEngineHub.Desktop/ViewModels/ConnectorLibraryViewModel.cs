@@ -72,7 +72,7 @@ public sealed class ConnectorLibraryViewModel : ObservableObject
             var entries = await Task.Run(async () => (await _catalog.LoadAsync().ConfigureAwait(false))
                 .Where(item => item.MarketplaceId.Equals(_id, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(item => item.DownloadedAt)
-                .Select(item => (Asset: item, Available: File.Exists(item.FilePath))).ToArray());
+                .Select(item => (Asset: item, Available: File.Exists(item.FilePath) || Directory.Exists(item.FilePath))).ToArray());
             if (generation != _generation) return;
             _all = entries.Select(item => new ConnectorAssetViewModel(item.Asset, item.Available, Select)).ToArray();
             Filter();
@@ -108,7 +108,7 @@ public sealed class ConnectorLibraryViewModel : ObservableObject
     private async Task OpenSelectedFolderAsync()
     {
         var path = _selected?.Asset.FilePath;
-        if (path is not null) await _openFolder(Path.GetDirectoryName(path)!);
+        if (path is not null) await _openFolder(Directory.Exists(path) ? path : Path.GetDirectoryName(path)!);
     }
 
     private async Task SaveAsync()

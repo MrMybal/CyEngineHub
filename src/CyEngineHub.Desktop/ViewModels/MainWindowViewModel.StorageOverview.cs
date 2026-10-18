@@ -43,6 +43,9 @@ public sealed partial class MainWindowViewModel
             new AdditionalStorageRoot(StorageCategory.MarketplaceLibrary, source.StoreLabel, source.Path)));
         roots.AddRange(MarketplaceConnectors.Select(connector =>
             new AdditionalStorageRoot(StorageCategory.MarketplaceLibrary, connector.Name, connector.DownloadDirectory)));
+        roots.AddRange(MarketplaceConnectors.Where(connector => connector.HasPackageStorage).SelectMany(connector => connector.LibraryLocations
+            .Where(location => location.IsEnabled && Path.IsPathFullyQualified(location.Path)).Select(location =>
+                new AdditionalStorageRoot(StorageCategory.MarketplaceLibrary, connector.Name + " · bibliothèque", location.Path))));
         return roots.ToArray();
 
         void AddMarket(string name, string cache, string download, IEnumerable<MarketplaceLibraryLocationViewModel> libraries)

@@ -29,6 +29,18 @@ public static class GitCommandFactory
         return builder.ToString();
     }
 
+    public static ProcessRequest CreateStatusFetch(string repositoryRoot, string remoteName)
+    {
+        ValidateRemoteName(remoteName);
+        return Create(repositoryRoot, ["fetch", "--no-tags", "--no-recurse-submodules", "--", remoteName], 500) with
+        {
+            EnvironmentVariables = new Dictionary<string, string?>
+            {
+                ["GIT_OPTIONAL_LOCKS"] = "0", ["GIT_TERMINAL_PROMPT"] = "0", ["GCM_INTERACTIVE"] = "Never", ["LC_ALL"] = "C",
+            },
+        };
+    }
+
     private static ProcessRequest Create(
         string repositoryPath,
         IReadOnlyList<string> arguments,

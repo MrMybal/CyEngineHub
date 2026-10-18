@@ -1,6 +1,7 @@
 using System.Windows.Input;
 using CyEngineHub.Extensions;
 using CyEngineHub.Core.Settings;
+using System.Collections.ObjectModel;
 
 namespace CyEngineHub.Desktop.ViewModels;
 
@@ -13,10 +14,15 @@ public sealed class MarketplaceConnectorViewModel : ObservableObject
     private readonly Func<MarketplaceConnectorSettings, Task> _save;
     private Task _pendingWrite = Task.CompletedTask;
     private int _revision;
+    private string _compression = "ZipFastest";
+    public IReadOnlyList<string> CompressionModes { get; } = ["Uncompressed", "ZipStore", "ZipFastest", "ZipBalanced", "ZipHigh", "ZipUltra"];
+    public string Compression { get => _compression; set { if (SetProperty(ref _compression, value)) QueueSave(); } }
+    public ObservableCollection<ConnectorLibraryLocationViewModel> LibraryLocations { get; } = [];
+    public ICommand AddLibraryCommand { get; }
 
     public MarketplaceConnectorViewModel(HubExtensionSnapshot extension, bool enabled, string downloadDirectory,
         Func<Uri, Task> openInventory, Func<Task> openLibrary, Action<Exception> onError,
-        Func<MarketplaceConnectorSettings, Task> save)
+        Func<MarketplaceConnectorSettings, Task> save, MarketplaceConnectorSettings? storage = null)
     {
         Id = extension.Manifest.Id;
         Name = extension.Manifest.DisplayName;
@@ -25,6 +31,10 @@ public sealed class MarketplaceConnectorViewModel : ObservableObject
         _isEnabled = enabled;
         _downloadDirectory = downloadDirectory;
         _save = save;
+        _compression = storage?.Compression ?? "ZipFastest";
+        foreach (var location in storage?.Libraries ?? [new ConnectorLibraryDirectory(System.IO.Path.Combine(downloadDirectory, "Library"))])
+            AddLocation(location.Path, location.MaximumBytes, location.Enabled);
+        AddLibraryCommand = new RelayCommand(() => { AddLocation("", 0, true); });
         _openInventoryCommand = new AsyncRelayCommand(async () =>
         {
             await SaveAsync();
@@ -35,6 +45,7 @@ public sealed class MarketplaceConnectorViewModel : ObservableObject
     }
 
     public string Id { get; }
+    public bool HasPackageStorage => Id == "cyenginehub.marketplace-cosmos";
     public string Name { get; }
     public string LibrarySubtitle => Id == "cyenginehub.marketplace-megascans-fab" ? "Fiches natives · Fab / MCP" : "Mes assets téléchargés";
     public string Description { get; }
@@ -63,6 +74,22 @@ public sealed class MarketplaceConnectorViewModel : ObservableObject
 
     public Task PendingWrite => _pendingWrite;
 
+    private void AddLocation(string path, long bytes, bool enabled)
+    {
+        var row = new ConnectorLibraryLocationViewModel(path, bytes == 0 ? "" : (bytes / 1073741824d).ToString(System.Globalization.CultureInfo.InvariantCulture), enabled,
+            item => Move(item, -1), item => Move(item, 1), item => { LibraryLocations.Remove(item); Reindex(); QueueSave(); });
+        LibraryLocations.Add(row); Reindex();
+        row.PropertyChanged += (_, _) => QueueSave();
+    }
+    private void Reindex() { for (var index = 0; index < LibraryLocations.Count; index++) LibraryLocations[index].SetPriority(index + 1); }
+    private void Move(ConnectorLibraryLocationViewModel item, int delta)
+    { var index = LibraryLocations.IndexOf(item); if (index + delta >= 0 && index + delta < LibraryLocations.Count) { LibraryLocations.Move(index, index + delta); Reindex(); QueueSave(); } }
+    public MarketplaceConnectorSettings Snapshot() => new(IsEnabled, DownloadDirectory, Compression,
+        LibraryLocations.Select(item => new ConnectorLibraryDirectory(item.Path,
+            string.IsNullOrWhiteSpace(item.MaximumGigabytes) ? 0 : double.TryParse(item.MaximumGigabytes.Replace(',', '.'), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var amount) && double.IsFinite(amount) && amount >= 0 && amount < long.MaxValue / 1073741824d
+                ? checked((long)(amount * 1073741824)) : throw new ArgumentException("Quota de bibliothèque invalide."), item.IsEnabled)).ToArray());
+
     private void QueueSave() => _ = ObserveSaveAsync(SaveAsync());
     private static async Task ObserveSaveAsync(Task write)
     {
@@ -73,13 +100,13 @@ public sealed class MarketplaceConnectorViewModel : ObservableObject
     public async Task SaveAsync()
     {
         var revision = ++_revision;
-        var snapshot = new MarketplaceConnectorSettings(IsEnabled, DownloadDirectory);
         SaveStatus = "Enregistrement…";
-        // Preserve edit order even if the store is slow or a previous draft was invalid.
-        var previous = _pendingWrite;
-        _pendingWrite = Task.Run(() => PersistAfterAsync(previous, snapshot));
         try
         {
+            var snapshot = Snapshot();
+            // Preserve edit order even if the store is slow or a previous draft was invalid.
+            var previous = _pendingWrite;
+            _pendingWrite = Task.Run(() => PersistAfterAsync(previous, snapshot));
             await _pendingWrite;
             if (revision == _revision) SaveStatus = "Enregistré automatiquement";
         }
@@ -95,4 +122,21 @@ public sealed class MarketplaceConnectorViewModel : ObservableObject
         try { await previous.ConfigureAwait(false); } catch (Exception) { }
         await _save(snapshot).ConfigureAwait(false);
     }
+}
+
+public sealed class ConnectorLibraryLocationViewModel : ObservableObject
+{
+    private string _path, _quota;
+    private bool _enabled;
+    public ConnectorLibraryLocationViewModel(string path, string quota, bool enabled,
+        Action<ConnectorLibraryLocationViewModel> up, Action<ConnectorLibraryLocationViewModel> down, Action<ConnectorLibraryLocationViewModel> remove)
+    { _path = path; _quota = quota; _enabled = enabled; MoveUpCommand = new RelayCommand(() => up(this)); MoveDownCommand = new RelayCommand(() => down(this)); RemoveCommand = new RelayCommand(() => remove(this)); }
+    public string Path { get => _path; set => SetProperty(ref _path, value); }
+    public string MaximumGigabytes { get => _quota; set => SetProperty(ref _quota, value); }
+    public bool IsEnabled { get => _enabled; set => SetProperty(ref _enabled, value); }
+    public int Priority { get; private set; }
+    public void SetPriority(int priority) => Priority = priority;
+    public ICommand MoveUpCommand { get; }
+    public ICommand MoveDownCommand { get; }
+    public ICommand RemoveCommand { get; }
 }

@@ -10,9 +10,9 @@ internal static class ImGuiTheme
     public static readonly Vector4 Accent = Rgb(0xF28A2E);
     public static readonly Vector4 Muted = Rgb(0xB4B4B4);
     public static readonly Vector4 Primary = Rgb(0x7D4A1D);
-    public static readonly Vector4 Selected = Rgb(0x76512D);
-    public static readonly Vector4 Panel = Rgb(0x373737);
-    public static readonly Vector4 Input = Rgb(0x2E2E2E);
+    public static Vector4 Selected { get; private set; } = Rgb(0x76512D);
+    public static Vector4 Panel { get; private set; } = Rgb(0x373737);
+    public static Vector4 Input { get; private set; } = Rgb(0x2E2E2E);
     public static readonly Vector4 Success = Rgb(0x5CD26E);
     public static readonly Vector4 OfficialRow = Rgb(0x334C3A);
     public static readonly Vector4 Warning = Rgb(0xF5A623);
@@ -34,15 +34,25 @@ internal static class ImGuiTheme
         return 3;
     }
     internal static Vector4 Rgb(uint hex) => new(((hex >> 16) & 255) / 255f, ((hex >> 8) & 255) / 255f, (hex & 255) / 255f, 1);
+    internal static Vector4 Rgb(int hex) => Rgb((uint)hex);
     public static void Apply()
     {
-        Gui.StyleColorsDark();
         var s = Gui.GetStyle();
         s.WindowPadding = new(10, 8); s.FramePadding = new(7, 4);
         s.ItemSpacing = new(7, 5); s.ItemInnerSpacing = new(5, 4); s.CellPadding = new(8, 6);
         s.WindowRounding = 3; s.ChildRounding = 3; s.FrameRounding = 3;
         s.PopupRounding = 4; s.ScrollbarRounding = 3; s.GrabRounding = 2;
         s.ScrollbarSize = 11; s.WindowBorderSize = 1; s.ChildBorderSize = 1; s.FrameBorderSize = 0;
+        s.ScaleAllSizes(UiCardGrid.InterfaceScale);
+        ApplyPalette("Gris");
+    }
+    public static void ApplyPalette(string theme)
+    {
+        Gui.StyleColorsDark();
+        var s = Gui.GetStyle();
+        Panel = Rgb(theme == "Sombre" ? 0x22262B : theme == "Contraste" ? 0x151515 : 0x373737);
+        Input = Rgb(theme == "Sombre" ? 0x181B20 : theme == "Contraste" ? 0x080808 : 0x2E2E2E);
+        Selected = Rgb(theme == "Contraste" ? 0x7C4A10 : 0x76512D);
         s.Colors[(int)ImGuiCol.WindowBg] = Rgb(0x2E2E2E);
         s.Colors[(int)ImGuiCol.ChildBg] = Panel;
         s.Colors[(int)ImGuiCol.PopupBg] = Rgb(0x414141);
@@ -65,6 +75,17 @@ internal static class ImGuiTheme
         s.Colors[(int)ImGuiCol.TableHeaderBg] = Rgb(0x4B4B4B);
         s.Colors[(int)ImGuiCol.TableRowBgAlt] = new(.7f, .7f, .7f, .045f);
         s.Colors[(int)ImGuiCol.ModalWindowDimBg] = new(.025f, .03f, .04f, .82f);
-        s.ScaleAllSizes(UiCardGrid.InterfaceScale);
+        if (theme != "Gris")
+        {
+            var surface = Rgb(theme == "Contraste" ? 0x292929 : 0x303740);
+            var hover = Rgb(theme == "Contraste" ? 0x484848 : 0x414D5B);
+            s.Colors[(int)ImGuiCol.WindowBg] = Input;
+            s.Colors[(int)ImGuiCol.Text] = Rgb(0xF5F5F5);
+            foreach (var color in new[] { ImGuiCol.PopupBg, ImGuiCol.Button, ImGuiCol.Header, ImGuiCol.Tab, ImGuiCol.TableHeaderBg }) s.Colors[(int)color] = surface;
+            foreach (var color in new[] { ImGuiCol.FrameBgHovered, ImGuiCol.FrameBgActive, ImGuiCol.ButtonHovered, ImGuiCol.HeaderHovered, ImGuiCol.HeaderActive }) s.Colors[(int)color] = hover;
+            s.Colors[(int)ImGuiCol.Border] = Rgb(theme == "Contraste" ? 0x9A9A9A : 0x566474);
+            s.Colors[(int)ImGuiCol.Separator] = s.Colors[(int)ImGuiCol.Border];
+            if (theme == "Contraste") s.Colors[(int)ImGuiCol.TextDisabled] = Rgb(0xD5D5D5);
+        }
     }
 }

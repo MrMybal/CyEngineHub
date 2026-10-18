@@ -12,7 +12,7 @@ static partial class Program
             if (engines) vm.ShowEnginesCommand.Execute(null); else vm.ShowProjectsCommand.Execute(null);
             vm.SetResourcePresentation(engines, 0);
             var scope = engines ? "engines" : "projects";
-            foreach (var width in new[] { 1280, 1050, 900 })
+            foreach (var width in new[] { 1920, 1280, 1050, 900 })
             foreach (var compact in new[] { true, false })
             {
                 window.Width = width; vm.UseCompactInterface = compact;
@@ -25,6 +25,7 @@ static partial class Program
                 var counter = ImGuiDiagnostics.ElementBounds(window, "resource-counter");
                 var search = ImGuiDiagnostics.ElementBounds(window, "resource-search");
                 var analyze = ImGuiDiagnostics.ElementBounds(window, "size-analysis/" + scope);
+                Check(ImGuiDiagnostics.Elements(window).Contains("resource-toolbar-row/" + scope), scope + " display modes, favorite filter and counter belong to one explicit toolbar row");
                 Check(Math.Abs(first.Y - star.Y) < 1 && Math.Abs(first.W - star.W) < 1 && last.Z < star.X,
                     scope + " display modes and favorite icon share one aligned compact row at " + width + "/" + compact);
                 Check(Math.Abs(viewFrame.Y - starFrame.Y) < 1 && Math.Abs(viewFrame.W - starFrame.W) < 1,
@@ -36,7 +37,7 @@ static partial class Program
                 var card = ImGuiDiagnostics.Elements(window).FirstOrDefault(key => key.StartsWith("card/body/resource/", StringComparison.Ordinal));
                 if (card is not null) Check(ImGuiDiagnostics.ElementBounds(window, card).Y >= viewFrame.W,
                     scope + " cards start below the complete display toolbar");
-                if (compact && width is 1280 or 900)
+                if (compact && width is 1920 or 1280 or 900)
                     await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-resource-toolbar-" + scope + "-" + width + ".png"));
             }
             window.Width = 1280; vm.UseCompactInterface = true; vm.SetResourcePresentation(engines, 2);

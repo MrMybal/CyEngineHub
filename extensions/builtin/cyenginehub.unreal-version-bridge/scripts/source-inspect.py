@@ -16,22 +16,25 @@ try:
     options.include_searchable_names = False
     options.include_soft_management_references = False
     options.include_hard_management_references = False
-    for asset_path in sorted(library.list_assets("/Game", recursive=True, include_folder=False)):
-        asset = library.load_asset(asset_path)
-        if not asset:
-            errors.append("Chargement impossible : " + asset_path)
-            continue
-        kind = asset.get_class().get_name()
+    # Registry data names top-level assets, unlike list_assets which can include map subobjects.
+    for data in registry.get_assets_by_path("/Game", recursive=True):
+        asset_path = str(data.package_name) + "." + str(data.asset_name)
+        kind = str(data.asset_class_path.asset_name)
         features, inspection_errors = [], []
         dependencies = []
         try:
             dependencies = sorted(str(p) for p in registry.get_dependencies(asset_path.split(".")[0], options))
+            # Unsupported types (including World) remain explicit plan entries. Do not try to
+            # load levels through EditorAssetLibrary, whose API excludes level assets.
+            asset = library.load_asset(asset_path) if kind in ("StaticMesh", "Texture2D", "TextureCube", "SoundWave") else None
+            if kind in ("StaticMesh", "Texture2D", "TextureCube", "SoundWave") and not asset:
+                raise RuntimeError("Chargement impossible : " + asset_path)
             if kind == "StaticMesh":
                 if asset.get_num_lods() > 1:
                     features.append("multiple-lods")
                 if asset.get_editor_property("nanite_settings").enabled:
                     features.append("nanite")
-            elif kind == "Texture2D":
+            elif kind in ("Texture2D", "TextureCube"):
                 features.append("native-texture-candidate")
                 if asset.get_editor_property("virtual_texture_streaming"):
                     features.append("virtual-texture")

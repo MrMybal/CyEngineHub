@@ -1,8 +1,8 @@
 {
   "FileVersion": 3,
-  "Version": 1,
-  "VersionName": "0.1.0",
-  "FriendlyName": "CyHub Native Texture Bridge",
+  "Version": 2,
+  "VersionName": "0.2.0-alpha",
+  "FriendlyName": "CyHub Native Asset Bridge (Alpha)",
   "CanContainContent": false,
   "Modules": [
     {

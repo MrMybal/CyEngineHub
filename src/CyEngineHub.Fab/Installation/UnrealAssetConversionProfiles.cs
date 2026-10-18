@@ -84,7 +84,26 @@ public static class UnrealAssetConversionProfiles
                 return Result("unsupported", "", "Aucun profil pour ce type et ce couple de versions.");
             if (mode == "native")
             {
-                if (asset.AssetType != "Texture2D" || profile.NativeAdapter != "native-texture-v1" || sourceVersion != "5.6" || targetVersion != "5.5")
+                var supportedPair = (sourceVersion, targetVersion) is ("5.6", "5.5") or ("5.7", "5.5") or ("5.7", "5.3");
+                var nativeAdapter = asset.AssetType switch
+                {
+                    "Material" or "MaterialInstanceConstant" or "MaterialFunction" => "native-material-v1",
+                    "StaticMesh" => "native-mesh-v1",
+                    "World" or "BlueprintGeneratedClass" => "native-world-v1",
+                    _ => "",
+                };
+                if (supportedPair && sourceVersion == "5.7" && nativeAdapter.Length > 0 && profile.NativeAdapter == nativeAdapter)
+                {
+                    if (asset.AssetType == "BlueprintGeneratedClass" && !inventory.Any(a => a.AssetType == "World" &&
+                        a.Path + "_C" == asset.Path))
+                        return Result("unsupported", "", "Seules les classes générées des scripts de niveau du pack sont adaptées ; pas les Blueprints arbitraires.");
+                    var packages = inventory.Select(a => a.Path.Split('.')[0]).ToHashSet(StringComparer.Ordinal);
+                    if (asset.Dependencies.Any(p => p.StartsWith("/Game/", StringComparison.Ordinal) ? !packages.Contains(p) :
+                        !p.StartsWith("/Script/", StringComparison.Ordinal) && !p.StartsWith("/Engine/", StringComparison.Ordinal)))
+                        return Result("blocked", "", "Dépendance absente du pack ou d’un plugin non adapté.");
+                    return Result("adaptation-required", nativeAdapter, "Transfert natif contrôlé : données, propriétés et références reconstruites puis comparées après réouverture dans la cible.");
+                }
+                if (asset.AssetType is not ("Texture2D" or "TextureCube") || profile.NativeAdapter != "native-texture-v1" || !supportedPair || (asset.AssetType == "TextureCube" && sourceVersion != "5.7"))
                     return Result("unsupported", "", "Adaptateur natif non implémenté pour ce profil. " + profile.Notes);
                 if (!asset.Features.Contains("native-texture-candidate", StringComparer.Ordinal) || asset.Features.Contains("virtual-texture", StringComparer.Ordinal) ||
                     asset.Dependencies.Any(p => !p.StartsWith("/Script/", StringComparison.Ordinal)))

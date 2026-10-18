@@ -4,7 +4,7 @@
   "displayName": "Unreal Fab Pack Relocator",
   "version": "0.1.0",
   "publisher": "CyEngineHub",
-  "description": "Conserve les chemins natifs d’un pack Fab dans un projet Unreal temporaire, déplace les assets vers un dossier configurable, vérifie les références puis publie une variante installable.",
+  "description": "Alpha : déplace les assets dans un projet Unreal isolé, corrige les redirectors et vérifie les références avant installation. Les packs contenant des niveaux (.umap) sont refusés intégralement ; aucune variante partielle publiée.",
   "kind": "EngineIntegration",
   "executionKind": "WebLink",
   "capabilities": "AssetImport, ProjectTool, DependencyValidation",

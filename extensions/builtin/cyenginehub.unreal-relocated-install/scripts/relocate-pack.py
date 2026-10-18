@@ -12,6 +12,16 @@ errors = []
 original_assets = list(
     unreal.EditorAssetLibrary.list_assets("/Game", recursive=True, include_folder=False)
 )
+registry = unreal.AssetRegistryHelpers.get_asset_registry()
+registry.scan_paths_synchronous(["/Game"], True)
+levels = [str(data.package_name) for data in registry.get_assets_by_path("/Game", recursive=True)
+          if str(data.asset_class_path.asset_name) in ("World", "WorldPartition")]
+if levels:
+    # EditorAssetLibrary cannot safely move levels. Refuse the whole pack, never publish a partial result.
+    with open(config["reportPath"], "w", encoding="utf-8") as handle:
+        json.dump(dict(originalAssetCount=len(original_assets), movedAssetCount=0,
+                       errors=["Déplacement de niveaux non pris en charge en Alpha : " + ", ".join(levels)]), handle, indent=2)
+    raise RuntimeError("Pack avec niveaux : déplacement Alpha refusé, source et cible conservées")
 
 # Le premier chargement se fait impérativement aux chemins d’origine du pack.
 for asset_path in original_assets:
@@ -105,6 +115,15 @@ except Exception as exception:
 
 try:
     unreal.EditorAssetLibrary.save_directory(destination, only_if_is_dirty=False, recursive=True)
+    dependency_options = unreal.AssetRegistryDependencyOptions()
+    dependency_options.include_soft_package_references = True
+    dependency_options.include_hard_package_references = True
+    registry.scan_paths_synchronous(["/Game"], True)
+    for asset_path in moved_assets:
+        for dependency in registry.get_dependencies(asset_path.split(".")[0], dependency_options):
+            path = str(dependency)
+            if path.startswith("/Game/") and not path.startswith(destination + "/"):
+                errors.append(asset_path + " : référence hors destination après déplacement : " + path)
 except Exception as exception:
     errors.append("Sauvegarde finale impossible : " + str(exception))
 

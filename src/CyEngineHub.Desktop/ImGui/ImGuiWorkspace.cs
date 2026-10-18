@@ -58,7 +58,13 @@ internal sealed partial class ImGuiWorkspace : IDisposable
     {
         _root = model;
         RenderedFontSize = Gui.GetFontSize();
-        if (model is MainWindowViewModel preferences) _compact = preferences.UseCompactInterface;
+        if (model is MainWindowViewModel preferences)
+        {
+            _compact = preferences.UseCompactInterface;
+            // Other ImGui hosts have their own context; keep shared palette helpers
+            // consistent with this host even after opening a sign-in/tool window.
+            ImGuiTheme.ApplyPalette(preferences.InterfaceTheme);
+        }
         VisibleRows.Clear();
         Elements.Clear();
         if (_previousSize != size || _previousCompact != _compact) _lists.Clear();
@@ -194,6 +200,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
                 var value = UiBinding.Boolean(context, node["IsChecked"], false);
                 if (Gui.Checkbox(Text(context, node["Content"]) + "###value", ref value)) Set(context, node["IsChecked"], value);
                 Record("check/" + (UiBinding.Path(node["IsChecked"]) ?? node.Id));
+                if (context is FabInstallationConfigurationOptionViewModel option) Record("script-option/" + option.Id);
                 if (node.Children.Length > 0)
                 {
                     Gui.SameLine(); Gui.BeginGroup();

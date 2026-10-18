@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "profiles": [
+    {
+      "id": "ue57-55-texture2d-native", "revision": 1, "assetType": "Texture2D", "sourceVersion": "5.7", "targetVersion": "5.5",
+      "nativeAdapter": "native-texture-v1", "portableAdapter": "", "checks": ["Pixels source", "Propriétés", "Réouverture cible"], "losses": [],
+      "notes": "Expérimental : reconstruction native par le moteur cible, BGRA8/G8. Aucun changement d’en-tête de package. Les propriétés non prises en charge provoquent un refus."
+    },
+    {
+      "id": "ue57-53-texture2d-native", "revision": 1, "assetType": "Texture2D", "sourceVersion": "5.7", "targetVersion": "5.3",
+      "nativeAdapter": "native-texture-v1", "portableAdapter": "", "checks": ["Pixels source", "Propriétés", "Réouverture cible"], "losses": [],
+      "notes": "Expérimental : reconstruction native par le moteur cible, BGRA8/G8. Aucun changement d’en-tête de package. Les propriétés non prises en charge provoquent un refus."
+    },
+    {
+      "id": "ue57-55-material-native", "revision": 1, "assetType": "Material", "sourceVersion": "5.7", "targetVersion": "5.5",
+      "nativeAdapter": "native-material-v1", "portableAdapter": "", "checks": ["Nœuds", "Propriétés", "Références", "Réouverture"], "losses": [], "notes": "Graphe natif contrôlé ; nœuds non implémentés refusés avant publication."
+    },
+    {
+      "id": "ue57-53-material-native", "revision": 1, "assetType": "Material", "sourceVersion": "5.7", "targetVersion": "5.3",
+      "nativeAdapter": "native-material-v1", "portableAdapter": "", "checks": ["Nœuds", "Propriétés", "Références", "Réouverture"], "losses": [], "notes": "Graphe natif contrôlé ; nœuds non implémentés refusés avant publication."
+    },
+    {
+      "id": "ue57-55-mic-native", "revision": 1, "assetType": "MaterialInstanceConstant", "sourceVersion": "5.7", "targetVersion": "5.5",
+      "nativeAdapter": "native-material-v1", "portableAdapter": "", "checks": ["Parent", "Paramètres", "Références", "Réouverture"], "losses": [], "notes": "Parent et paramètres natifs ; aucune suppression silencieuse d’une propriété non par défaut."
+    },
+    {
+      "id": "ue57-53-mic-native", "revision": 1, "assetType": "MaterialInstanceConstant", "sourceVersion": "5.7", "targetVersion": "5.3",
+      "nativeAdapter": "native-material-v1", "portableAdapter": "", "checks": ["Parent", "Paramètres", "Références", "Réouverture"], "losses": [], "notes": "Parent et paramètres natifs ; aucune suppression silencieuse d’une propriété non par défaut."
+    }
+    ,{"id":"ue57-55-function-native","revision":1,"assetType":"MaterialFunction","sourceVersion":"5.7","targetVersion":"5.5","nativeAdapter":"native-material-v1","portableAdapter":"","checks":["Nœuds et commentaires","Entrées/sorties","Références","Réouverture"],"losses":[],"notes":"Fonctions natives et graphes contrôlés ; comparaison des propriétés et connexions."}
+    ,{"id":"ue57-53-function-native","revision":1,"assetType":"MaterialFunction","sourceVersion":"5.7","targetVersion":"5.3","nativeAdapter":"native-material-v1","portableAdapter":"","checks":["Nœuds et commentaires","Entrées/sorties","Références","Réouverture"],"losses":[],"notes":"Fonctions natives et graphes contrôlés ; comparaison des propriétés et connexions."}
+    ,{"id":"ue57-55-mesh-native","revision":1,"assetType":"StaticMesh","sourceVersion":"5.7","targetVersion":"5.5","nativeAdapter":"native-mesh-v1","portableAdapter":"","checks":["Géométrie multi-LOD","UV/normales/tangentes/couleurs","Matériaux","Collision","Réouverture"],"losses":[],"notes":"MeshDescription reconstruit avec le moteur cible ; propriétés non représentables refusées."}
+    ,{"id":"ue57-53-mesh-native","revision":1,"assetType":"StaticMesh","sourceVersion":"5.7","targetVersion":"5.3","nativeAdapter":"native-mesh-v1","portableAdapter":"","checks":["Géométrie multi-LOD","UV/normales/tangentes/couleurs","Matériaux","Collision","Réouverture"],"losses":[],"notes":"MeshDescription reconstruit avec le moteur cible ; propriétés non représentables refusées."}
+    ,{"id":"ue57-55-cube-native","revision":1,"assetType":"TextureCube","sourceVersion":"5.7","targetVersion":"5.5","nativeAdapter":"native-texture-v1","portableAdapter":"","checks":["Pixels HDR","Faces/long-lat","Mips source","Réouverture"],"losses":[],"notes":"Source HDR native, aucun export d’image intermédiaire."}
+    ,{"id":"ue57-53-cube-native","revision":1,"assetType":"TextureCube","sourceVersion":"5.7","targetVersion":"5.3","nativeAdapter":"native-texture-v1","portableAdapter":"","checks":["Pixels HDR","Faces/long-lat","Mips source","Réouverture"],"losses":[],"notes":"Source HDR native, aucun export d’image intermédiaire."}
+    ,{"id":"ue57-55-world-native","revision":1,"assetType":"World","sourceVersion":"5.7","targetVersion":"5.5","nativeAdapter":"native-world-v1","portableAdapter":"","checks":["Acteurs/composants","Foliage","Script de niveau","Réouverture"],"losses":[],"notes":"Niveaux non partitionnés : sérialisation textuelle native UE, données foliage et graphes de niveau reconstruits ; données d’éclairage cible à régénérer."}
+    ,{"id":"ue57-53-world-native","revision":1,"assetType":"World","sourceVersion":"5.7","targetVersion":"5.3","nativeAdapter":"native-world-v1","portableAdapter":"","checks":["Acteurs/composants","Foliage","Script de niveau","Réouverture"],"losses":[],"notes":"Niveaux non partitionnés : sérialisation textuelle native UE, données foliage et graphes de niveau reconstruits ; données d’éclairage cible à régénérer."}
+    ,{"id":"ue57-55-levelclass-native","revision":1,"assetType":"BlueprintGeneratedClass","sourceVersion":"5.7","targetVersion":"5.5","nativeAdapter":"native-world-v1","portableAdapter":"","checks":["Script de niveau","Compilation cible","Réouverture"],"losses":[],"notes":"Uniquement classe générée d’un World présent dans le même inventaire, pas de Blueprint arbitraire."}
+    ,{"id":"ue57-53-levelclass-native","revision":1,"assetType":"BlueprintGeneratedClass","sourceVersion":"5.7","targetVersion":"5.3","nativeAdapter":"native-world-v1","portableAdapter":"","checks":["Script de niveau","Compilation cible","Réouverture"],"losses":[],"notes":"Uniquement classe générée d’un World présent dans le même inventaire, pas de Blueprint arbitraire."}
+  ]
+}

@@ -34,9 +34,18 @@ sealed class FixtureApp : Application
 }
 sealed class FixtureRegistration : IUnrealEngineRegistrationService
 {
-    public UnrealEngineRegistration? FindByRoot(string path) => null;
-    public UnrealEngineRegistration Register(string path) => throw new NotSupportedException();
-    public bool Unregister(string path) => throw new NotSupportedException();
+    private readonly UnrealEngineRegistrationService _service = new(new FixtureRegistrationStore());
+    public UnrealEngineRegistration? FindByRoot(string path) => _service.FindByRoot(path);
+    public UnrealEngineRegistration Register(string path) => _service.Register(path);
+    public UnrealEngineRegistration SetAssociation(string path, string identifier) => _service.SetAssociation(path, identifier);
+    public bool Unregister(string path) => _service.Unregister(path);
+    private sealed class FixtureRegistrationStore : IUnrealEngineRegistrationStore
+    {
+        private readonly List<UnrealEngineRegistration> _values = [];
+        public IReadOnlyList<UnrealEngineRegistration> ReadAll() => _values.ToArray();
+        public void Write(UnrealEngineRegistration value) { _values.RemoveAll(item => item.Identifier.Equals(value.Identifier, StringComparison.OrdinalIgnoreCase)); _values.Add(value); }
+        public bool Delete(string identifier) => _values.RemoveAll(item => item.Identifier == identifier) > 0;
+    }
 }
 sealed class RecordingLauncher : IPlatformLauncher
 {
@@ -100,6 +109,9 @@ static partial class Program
     static bool AnnotationsOnly;
     static bool ResourcesOnly;
     static bool ResourceLayoutOnly;
+    static bool GroupsOnly;
+    static bool SettingsOnly;
+    static bool EngineIdentityOnly;
     static readonly FixtureEngineBackend EngineBackend = new();
     const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
     static readonly string Output = Path.GetFullPath("artifacts/usability-qa-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
@@ -114,6 +126,9 @@ static partial class Program
         AnnotationsOnly = args.Contains("--annotations-only");
         ResourcesOnly = args.Contains("--resources-only");
         ResourceLayoutOnly = args.Contains("--resource-layout-only");
+        GroupsOnly = args.Contains("--groups-only");
+        SettingsOnly = args.Contains("--settings-only");
+        EngineIdentityOnly = args.Contains("--engine-identity-only");
         Directory.CreateDirectory(Output);
         AppBuilder.Configure<FixtureApp>().UsePlatformDetect().SetupWithoutStarting();
         using var stop = new CancellationTokenSource(args.Contains("--interactive") ? TimeSpan.FromMinutes(20) : TimeSpan.FromSeconds(240));
@@ -138,7 +153,9 @@ static partial class Program
             "database" or "settings" or "engineCatalog" => (object)store,
             "engineModules" => new EngineModuleRegistry([new UnrealEngineModule()]),
             "engineRegistration" => new FixtureRegistration(), "taskScheduler" => scheduler,
+            "processRunner" when EngineIdentityOnly => new CyEngineHub.Infrastructure.Processes.SystemProcessRunner(),
             "appData" => paths, "platformLauncher" => launcher,
+            "fabProjectContentImport" => new CyEngineHub.Fab.Import.FabProjectContentImportService(),
             "storageSnapshotCache" => new StorageSnapshotCache(store),
             "directFabClient" => new FixtureFab(), "quixelClient" => new FixtureQuixel(), "epicBinaryEngineBackend" => EngineBackend, _ => null,
         }).ToArray());
@@ -187,7 +204,10 @@ static partial class Program
         window.Show();
         if (ImGuiDiagnostics.IsHosted(window))
         {
-            if (ResourceLayoutOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestResourceToolbarLayout(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            if (EngineIdentityOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestEngineIdentity(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (SettingsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestOrganizedSettings(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (GroupsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestPackGroups(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (ResourceLayoutOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestResourceToolbarLayout(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (VariantsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestVariantLabels(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (ToolsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestTools(window, vm, launcher); Console.WriteLine("OUTPUT " + Output); }
             else if (ActivityOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestEngineDetailsAndActivity(window, vm); Console.WriteLine("OUTPUT " + Output); }
@@ -690,24 +710,30 @@ static partial class Program
         Check(!vm.IsFabDownloadOptionsVisible, "Closing variant options releases the modal");
         await ImGuiDiagnostics.ClickAsync(window, "nav/Téléchargements");
         await ImGuiDiagnostics.ClickAsync(window, "action/ShowDownloadSettingsCommand");
-        Check(vm.IsSettingsDownloadsSelected && ImGuiDiagnostics.Elements(window).Contains("field/EngineChunkConcurrency") &&
-            ImGuiDiagnostics.Elements(window).Contains("field/DownloadConcurrency"), "Downloads page opens dedicated settings with independent transfer and chunk controls");
+        Check(vm.IsSettingsDownloadsSelected && !ImGuiDiagnostics.Elements(window).Contains("field/EngineChunkConcurrency") &&
+            ImGuiDiagnostics.Elements(window).Contains("field/DownloadConcurrency"), "Downloads page exposes global queue controls without Unreal-only settings");
+        await ImGuiDiagnostics.ClickAsync(window, "section-tab/settings/project-profiles");
+        await ImGuiDiagnostics.ClickAsync(window, "settings-subtab/unreal/downloads");
         await ImGuiDiagnostics.ClickAsync(window, "field/EngineChunkConcurrency", leadingEdge: true);
         await ImGuiDiagnostics.KeyAsync(window, Key.A, KeyModifiers.Control);
         await ImGuiDiagnostics.TextAsync(window, "24");
         await ImGuiDiagnostics.KeyAsync(window, Key.Enter);
         Check(vm.EngineChunkConcurrency == 24, "Keyboard configuration supports more than twelve engine connections");
-        await ImGuiDiagnostics.ClickAsync(window, "field/AssetDownloadConnections", leadingEdge: true);
+        await ImGuiDiagnostics.ClickAsync(window, "section-tab/settings/marketplaces");
+        await ImGuiDiagnostics.ClickAsync(window, "settings-subtab/marketplaces/Fab");
+        await ImGuiDiagnostics.ClickAsync(window, "field/FabDownloadConnections", leadingEdge: true);
         await ImGuiDiagnostics.KeyAsync(window, Key.A, KeyModifiers.Control);
         await ImGuiDiagnostics.TextAsync(window, "20");
         await ImGuiDiagnostics.KeyAsync(window, Key.Enter);
         Check(vm.AssetDownloadConnections == 20, "Fab and Megascans connections have their own editable setting");
+        vm.QuixelDownloadConnections = 20;
+        await ImGuiDiagnostics.ClickAsync(window, "section-tab/settings/downloads");
         await ImGuiDiagnostics.ClickAsync(window, "field/DownloadConcurrency", leadingEdge: true);
         await ImGuiDiagnostics.KeyAsync(window, Key.A, KeyModifiers.Control);
         await ImGuiDiagnostics.TextAsync(window, "6");
         await ImGuiDiagnostics.KeyAsync(window, Key.Enter);
         vm.ResumeDownloadsOnStartup = false; // Never resume a real user's queue from an isolated fixture.
-        await ImGuiDiagnostics.ClickAsync(window, "command/SaveDownloadQueueSettingsCommand");
+        await ImGuiDiagnostics.ClickAsync(window, "action/SaveDownloadQueueSettingsCommand");
         await ImGuiDiagnostics.FramesAsync(window, 5);
         Check(EngineBackend.ChunkConcurrency == 24 && vm.DownloadConcurrency == 6, "Saving independent download settings configures the engine backend");
         var fab = (FixtureFab)typeof(MainWindowViewModel).GetField("_directFabClient", Private)!.GetValue(vm)!;
@@ -997,7 +1023,7 @@ static partial class Program
         await ImGuiDiagnostics.ClickAsync(window, "plugin-row/FixturePlugin");
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-plugins-list.png"));
         await ImGuiDiagnostics.ClickAsync(window, "nav/Paramètres");
-        await ImGuiDiagnostics.ClickAsync(window, "section-tab/settings/advanced");
+        await ImGuiDiagnostics.ClickAsync(window, "section-tab/settings/appearance");
         Check(ImGuiDiagnostics.Elements(window).Contains("interface-density"), "Density is configured in settings, not the navigation sidebar");
     }
 

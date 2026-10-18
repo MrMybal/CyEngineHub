@@ -63,7 +63,7 @@
         DestinationFolder="$(OutDir)Extensions/cyenginehub.asset-bridge" />
     <ItemGroup>
       <UnrealVersionBridgeFiles Include="../../extensions/builtin/cyenginehub.unreal-version-bridge/**/*" />
-      <NativeTextureAdapterFiles Include="../../artifacts/native-texture-adapters/**/CyHubNativeBridge.uplugin;../../artifacts/native-texture-adapters/**/*.dll;../../artifacts/native-texture-adapters/**/*.modules" Exclude="../../artifacts/native-texture-adapters/**/HostProject/**;../../artifacts/native-texture-adapters/**/Intermediate/**" />
+      <NativeTextureAdapterFiles Include="$(NativeBridgeAdapterRoot)/**/CyHubNativeBridge.uplugin;$(NativeBridgeAdapterRoot)/**/*.dll;$(NativeBridgeAdapterRoot)/**/*.modules" Exclude="$(NativeBridgeAdapterRoot)/**/HostProject/**;$(NativeBridgeAdapterRoot)/**/Intermediate/**" />
       <UnrealRelocatedInstallFiles Include="../../extensions/builtin/cyenginehub.unreal-relocated-install/**/*" />
       <MarketplaceConnectorFiles Include="../../extensions/builtin/cyenginehub.marketplace-cosmos/**/*" />
       <MegascansFabConnectorFiles Include="../../extensions/builtin/cyenginehub.marketplace-megascans-fab/**/*" />

@@ -80,7 +80,8 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner, s
             if (hasNative)
             {
                 var profileFile = string.IsNullOrWhiteSpace(request.ProfileFile)
-                    ? Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(ResolveScript("source-inspect.py")))!, "profiles", "ue-5.6-to-5.5.json")
+                    ? Path.Combine(Path.GetDirectoryName(Path.GetDirectoryName(ResolveScript("source-inspect.py")))!, "profiles",
+                        request.SourceEngine.Version.Minor == 7 && request.TargetEngine.Version.Minor is 3 or 5 ? "ue-5.7-native.json" : "ue-5.6-to-5.5.json")
                     : Path.GetFullPath(request.ProfileFile);
                 var profiles = UnrealAssetConversionProfiles.Load(profileFile);
                 await WriteJsonAsync(Path.Combine(staging, "profiles-snapshot.json"), profiles, cancellationToken).ConfigureAwait(false);
@@ -185,7 +186,7 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner, s
                     Path.Combine(staging, "native-reopen-editor.log"), progress, cancellationToken).ConfigureAwait(false);
                 ValidateReportErrors(verifyReport);
                 if (ReadArrayCount(verifyReport, "imported") != importedCount || ReadArrayCount(sourceReport, "exported") != importedCount)
-                    throw new InvalidOperationException("Le nombre de textures natives ne correspond pas après réouverture.");
+                    throw new InvalidOperationException("Le nombre d’assets natifs ne correspond pas après réouverture.");
             }
 
             var unsupported = ReadStringArray(sourceReport, "unsupported");
@@ -250,7 +251,9 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner, s
         var destination = Path.Combine(Path.GetDirectoryName(projectFile)!, "Plugins", "CyHubNativeBridge");
         Directory.CreateDirectory(destination);
         await CopyFileAsync(descriptor, Path.Combine(destination, "CyHubNativeBridge.uplugin"), cancellationToken).ConfigureAwait(false);
-        await CopyTreeAsync(binaryRoot, Path.Combine(destination, "Binaries", "Win64"), cancellationToken).ConfigureAwait(false);
+        Directory.CreateDirectory(Path.Combine(destination, "Binaries", "Win64"));
+        foreach (var name in new[] { "UnrealEditor-CyHubNativeBridge.dll", "UnrealEditor.modules" })
+            await CopyFileAsync(Path.Combine(binaryRoot, name), Path.Combine(destination, "Binaries", "Win64", name), cancellationToken).ConfigureAwait(false);
         var project = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(projectFile, cancellationToken).ConfigureAwait(false))!;
         project["Plugins"]!.AsArray().Add(new System.Text.Json.Nodes.JsonObject { ["Name"] = "CyHubNativeBridge", ["Enabled"] = true });
         await File.WriteAllTextAsync(projectFile, project.ToJsonString(JsonOptions), cancellationToken).ConfigureAwait(false);
@@ -325,6 +328,12 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner, s
 
     private static async Task<string> WriteProjectAsync(string root, string name, CancellationToken cancellationToken)
     {
+        // Conversion must retain Nanite derived data even if the destination project's rendering profile disables it.
+        // This isolated conversion project is not the user's project configuration.
+        var configRoot = Path.Combine(root, "Config");
+        Directory.CreateDirectory(configRoot);
+        await File.WriteAllTextAsync(Path.Combine(configRoot, "DefaultEngine.ini"),
+            "[/Script/Engine.RendererSettings]\nr.Nanite.ProjectEnabled=True\n\n[/Script/WindowsTargetPlatform.WindowsTargetSettings]\n+D3D12TargetedShaderFormats=PCD3D_SM6\n", cancellationToken).ConfigureAwait(false);
         Directory.CreateDirectory(Path.Combine(root, "Content"));
         var path = Path.Combine(root, name + ".uproject");
         await File.WriteAllTextAsync(

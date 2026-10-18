@@ -1,5 +1,7 @@
 # Premier adaptateur natif Texture2D
 
+Évolution Alpha 30 du 18 octobre 2026 : le pack Foliage complet de **54 assets** passe en natif **5.7 → 5.5/5.3**, avec StaticMesh/LOD/Nanite, matériaux/fonctions, textures/HDR et deux niveaux. Voir [le compte rendu natif 5.7](native-57-bridge-validation.md) pour les preuves de réouverture/installation, les tests graphiques et les limites Alpha. La suite de cette page décrit uniquement le premier adaptateur 5.6 → 5.5.
+
 ## Fonctionnement
 
 Le hub copie le pack dans un projet temporaire UE 5.6, inspecte les types/dépendances puis charge le plugin C++ CyHubNativeBridge compilé pour ce moteur. Celui-ci lit directement `FTextureSource` et les propriétés prises en charge. L'échange contient du JSON et les octets source `.bin`, sans TGA/PNG/FBX et sans `AssetImportTask`.

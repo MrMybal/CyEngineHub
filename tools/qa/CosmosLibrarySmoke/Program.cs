@@ -84,7 +84,7 @@ static class Program
             await Task.Delay(250);
             Check(vm.IsConnectorLibrarySelected && vm.SelectedConnectorLibrary!.IsEmpty, "Empty native Cosmos library renders");
             var file = Path.Combine(Output, "FixturePack.zip");
-            using (var zip = ZipFile.Open(file, ZipArchiveMode.Create)) zip.CreateEntry("Content/Mesh.uasset");
+            using (var zip = ZipFile.Open(file, ZipArchiveMode.Create)) { using var writer = new StreamWriter(zip.CreateEntry("Content/Mesh.uasset").Open()); writer.Write("fixture"); }
             await Call(vm, "RegisterConnectorDownloadAsync", manifest.Id, file);
             await Call(vm, "ShowConnectorLibraryAsync", manifest.Id, file);
             await Task.Delay(250);
@@ -104,8 +104,8 @@ static class Program
                 await ImGuiDiagnostics.FramesAsync(window);
                 Check(ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("list/Assets/", StringComparison.Ordinal)), "Downloaded file rendered in ImGui list");
                 await ImGuiDiagnostics.ClickAsync(window, "library-view/images");
-                Check(ImGuiDiagnostics.Elements(window).Contains("minimal/card/Assets/0"), "Local connector catalogs support image and name cards");
-                await ImGuiDiagnostics.ClickAsync(window, "minimal/image/Assets/0", clicks: 2);
+                Check(ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("minimal/card/Assets/", StringComparison.Ordinal)), "Local connector catalogs support image and name cards");
+                await ImGuiDiagnostics.ClickAsync(window, ImGuiDiagnostics.Elements(window).First(key => key.StartsWith("minimal/image/Assets/", StringComparison.Ordinal)), clicks: 2);
                 Check(vm.SelectedConnectorLibrary.IsProductVisible, "Connector minimal card double-click opens its native product");
                 await ImGuiDiagnostics.ClickAsync(window, "section-tab/source/" + manifest.Id);
                 await ImGuiDiagnostics.ClickAsync(window, "library-view/rows");
@@ -184,7 +184,7 @@ static class Program
                 Check(detail.IsEnabled, "Completed download enables native detail button"); detail.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             }
             await Task.Delay(500);
-            Check(vm.SelectedConnectorLibrary.SelectedAsset?.Asset.FilePath == path, "Browser button opens downloaded asset detail");
+            Check(vm.SelectedConnectorLibrary.SelectedAsset is { } selected && Directory.Exists(selected.Asset.FilePath) && File.Exists(Path.Combine(selected.Asset.FilePath, "cyenginehub-package.json")), "Browser button opens the packaged Cosmos product with its JSON manifest");
             if (ImGuiDiagnostics.IsHosted(browserWindow)) await ImGuiDiagnostics.ClickAsync(browserWindow, "native/Mes assets téléchargés");
             else
             {

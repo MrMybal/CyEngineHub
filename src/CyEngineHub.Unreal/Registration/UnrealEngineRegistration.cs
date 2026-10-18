@@ -17,6 +17,9 @@ public interface IUnrealEngineRegistrationService
 
     UnrealEngineRegistration Register(string rootPath);
 
+    UnrealEngineRegistration SetAssociation(string rootPath, string identifier) =>
+        throw new NotSupportedException("La modification des associations n’est pas disponible.");
+
     bool Unregister(string rootPath);
 }
 

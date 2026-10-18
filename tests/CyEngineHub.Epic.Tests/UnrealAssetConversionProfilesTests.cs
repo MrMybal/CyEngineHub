@@ -7,6 +7,8 @@ public sealed class UnrealAssetConversionProfilesTests
     private static UnrealAssetConversionProfileSet Profiles() => UnrealAssetConversionProfiles.Load(Path.Combine(
         AppContext.BaseDirectory, "Extensions", "cyenginehub.unreal-version-bridge", "profiles", "ue-5.6-to-5.5.json"));
     private static UnrealAssetConversionInventoryItem Asset(string type = "Texture2D") => new("/Game/A.A", type, [], [], []);
+    private static UnrealAssetConversionProfileSet Native57Profiles() => UnrealAssetConversionProfiles.Load(Path.Combine(
+        AppContext.BaseDirectory, "Extensions", "cyenginehub.unreal-version-bridge", "profiles", "ue-5.7-native.json"));
     private static UnrealAssetConversionPlan Plan(UnrealAssetConversionInventoryItem asset, string mode = "portable", bool consent = true) =>
         UnrealAssetConversionProfiles.Analyze(Profiles(), [asset], "5.6", "5.5", mode, consent);
 
@@ -40,9 +42,54 @@ public sealed class UnrealAssetConversionProfilesTests
     [Fact]
     public void NativeTextureAdapterCannotBeEnabledForUnvalidatedVersionPair()
     {
-        var profile = Profiles().Profiles.Single(p => p.AssetType == "Texture2D") with { SourceVersion = "5.7" };
-        var plan = UnrealAssetConversionProfiles.Analyze(new(1, [profile]), [Asset() with { Features = ["native-texture-candidate"] }], "5.7", "5.5", "native", false);
+        var profile = Profiles().Profiles.Single(p => p.AssetType == "Texture2D") with { SourceVersion = "5.8" };
+        var plan = UnrealAssetConversionProfiles.Analyze(new(1, [profile]), [Asset() with { Features = ["native-texture-candidate"] }], "5.8", "5.5", "native", false);
         Assert.False(plan.CanConvert);
+    }
+    [Theory]
+    [InlineData("5.5")]
+    [InlineData("5.3")]
+    public void Native57GraphRequiresCompleteConvertibleDependencyClosure(string target)
+    {
+        var texture = Asset() with { Features = ["native-texture-candidate"] };
+        var material = Asset("Material") with { Path = "/Game/M.M", Dependencies = ["/Game/A", "/Script/Engine"] };
+        var instance = Asset("MaterialInstanceConstant") with { Path = "/Game/MI.MI", Dependencies = ["/Game/M"] };
+        UnrealAssetConversionPlan Analyze(params UnrealAssetConversionInventoryItem[] assets) =>
+            UnrealAssetConversionProfiles.Analyze(Native57Profiles(), assets, "5.7", target, "native", false);
+        var plan = Analyze(texture, material, instance);
+        Assert.True(plan.CanConvert);
+        Assert.Equal(["native-texture-v1", "native-material-v1", "native-material-v1"], plan.Assets.Select(a => a.Adapter));
+        Assert.False(Analyze(material, instance).CanConvert);
+        Assert.False(Analyze(texture, material with { Dependencies = ["/ThirdParty/M"] }, instance).CanConvert);
+        Assert.False(Analyze(texture with { Features = ["virtual-texture"] }, material, instance).CanConvert);
+        Assert.False(Analyze(texture, material, instance, Asset("Blueprint") with { Path = "/Game/B.B" }).CanConvert);
+        Assert.False(UnrealAssetConversionProfiles.Analyze(Native57Profiles(), [texture, material, instance], "5.7", target, "portable", true).CanConvert);
+    }
+
+    [Fact]
+    public void Native57CatalogCannotEnableArbitraryAdaptersOrOtherTargets()
+    {
+        var p = Native57Profiles().Profiles.Single(p => p.AssetType == "Material" && p.TargetVersion == "5.5");
+        Assert.False(UnrealAssetConversionProfiles.Analyze(new(1, [p with { NativeAdapter = "arbitrary-native" }]), [Asset("Material")], "5.7", "5.5", "native", true).CanConvert);
+        Assert.False(UnrealAssetConversionProfiles.Analyze(new(1, [p with { TargetVersion = "5.4" }]), [Asset("Material")], "5.7", "5.4", "native", true).CanConvert);
+    }
+    [Theory]
+    [InlineData("5.5")]
+    [InlineData("5.3")]
+    public void Native57WholePackRoutesAllKnownFamiliesButNotArbitraryGeneratedClasses(string target)
+    {
+        var texture=Asset() with {Features=["native-texture-candidate"]};
+        var cube=Asset("TextureCube") with {Path="/Game/C.C",Features=["native-texture-candidate"]};
+        var function=Asset("MaterialFunction") with {Path="/Game/F.F",Dependencies=["/Game/A"]};
+        var material=Asset("Material") with {Path="/Game/M.M",Dependencies=["/Game/F","/Game/C"]};
+        var mesh=Asset("StaticMesh") with {Path="/Game/S.S",Dependencies=["/Game/M"],Features=["nanite","multiple-lods"]};
+        var world=Asset("World") with {Path="/Game/W.W",Dependencies=["/Game/S"]};
+        var generated=Asset("BlueprintGeneratedClass") with {Path="/Game/W.W_C",Dependencies=["/Game/W"]};
+        UnrealAssetConversionPlan Analyze(params UnrealAssetConversionInventoryItem[] items)=>UnrealAssetConversionProfiles.Analyze(Native57Profiles(),items,"5.7",target,"native",false);
+        Assert.True(Analyze(texture,cube,function,material,mesh,world,generated).CanConvert);
+        Assert.False(Analyze(texture,cube,function,material,mesh,generated).CanConvert);
+        Assert.False(Analyze(texture,cube,function,material,mesh,world,generated with {Path="/Game/Arbitrary.Arbitrary_C"}).CanConvert);
+        Assert.False(Analyze(texture,cube,function,material,mesh with {Dependencies=["/ThirdParty/M"]},world,generated).CanConvert);
     }
     [Theory]
     [InlineData("StaticMesh")]

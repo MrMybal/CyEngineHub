@@ -45,6 +45,10 @@ try:
             sound = unreal.EditorAssetLibrary.load_asset('/Game/Audio/S_QA')
             assert sound and sound.get_class().get_name() == 'SoundWave', 'Converted sound not loadable'
             assert sound.get_editor_property('duration') > 0, 'Converted sound has no duration'
+        elif mode == 'cosmos-raw':
+            texture = unreal.EditorAssetLibrary.load_asset('/Game/CosmosQA/T_QA')
+            assert texture and texture.get_class().get_name() == 'Texture2D', 'RAW asset not reconstructed at Cosmos destination'
+            assert not unreal.EditorAssetLibrary.does_asset_exist('/Game/T_QA'), 'Original RAW import path still present'
         elif mode == 'plugin':
             unreal.AssetRegistryHelpers.get_asset_registry().scan_paths_synchronous(['/QaPlugin'], True)
             asset = unreal.EditorAssetLibrary.load_asset('/QaPlugin/M_Parent')

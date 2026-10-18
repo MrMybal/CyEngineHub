@@ -24,5 +24,16 @@ public sealed class GitCommandFactoryTests
     {
         Assert.Throws<ArgumentException>(() =>
             GitCommandFactory.CreateFetch(Path.GetTempPath(), remoteName));
+        Assert.Throws<ArgumentException>(() =>
+            GitCommandFactory.CreateStatusFetch(Path.GetTempPath(), remoteName));
+    }
+
+    [Fact]
+    public void UpdateCheckOnlyFetchesAndDoesNotPruneOrRecurseIntoSubmodules()
+    {
+        var request = GitCommandFactory.CreateStatusFetch(Path.GetTempPath(), "company");
+        Assert.Contains("fetch", request.Arguments); Assert.Contains("--no-recurse-submodules", request.Arguments);
+        Assert.DoesNotContain("--prune", request.Arguments); Assert.DoesNotContain("pull", request.Arguments);
+        Assert.Equal("company", request.Arguments[^1]); Assert.Equal("Never", request.EnvironmentVariables["GCM_INTERACTIVE"]);
     }
 }

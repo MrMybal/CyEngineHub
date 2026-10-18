@@ -5,6 +5,8 @@ using CyEngineHub.Desktop.Views;
 using CyEngineHub.Core.Marketplaces;
 using CyEngineHub.Core.Settings;
 using CyEngineHub.Fab.Remote;
+using CyEngineHub.Fab.Packaging;
+using CyEngineHub.Fab.Storage;
 
 namespace CyEngineHub.Desktop.ViewModels;
 
@@ -63,6 +65,7 @@ public sealed partial class MainWindowViewModel
 
     private async Task ShowConnectorLibraryAsync(string id, string? filePath = null, bool localOnly = false)
     {
+        if (filePath is not null && _connectorPackagePaths.TryGetValue(filePath, out var packaged)) filePath = packaged;
         if (id == MegascansFabConnectorId && filePath is null && !localOnly)
         {
             SelectLibrarySource(FabWebLibraryClient.Source);
@@ -71,6 +74,7 @@ public sealed partial class MainWindowViewModel
             return;
         }
         SelectedConnectorLibrary = GetConnectorLibrary(id);
+        if (id == "cyenginehub.marketplace-cosmos") await IndexCosmosPackagesAsync().ConfigureAwait(true);
         SelectLibrarySource("Connector:" + id);
         ShowSection(PageSection.Epic);
         MarketplaceLibraryActivated?.Invoke(this, EventArgs.Empty);
@@ -79,9 +83,41 @@ public sealed partial class MainWindowViewModel
 
     private async Task RegisterConnectorDownloadAsync(string id, string path)
     {
-        await ConnectorDownloadCatalog.RegisterAsync(id, path).ConfigureAwait(true);
+        await _connectorPackageGate.WaitAsync().ConfigureAwait(true);
+        try
+        {
+        if (_connectorPackagePaths.TryGetValue(path, out var existingPackage) && Directory.Exists(existingPackage)) return;
+        var connector = MarketplaceConnectors.FirstOrDefault(item => item.Id == id);
+        // Cosmos browser downloads and imports use the same JSON/compression/router as Fab.
+        if (id == "cyenginehub.marketplace-cosmos" && connector is not null)
+        {
+            await connector.SaveAsync().ConfigureAwait(true);
+            var snapshot = connector.Snapshot();
+            if (!Enum.TryParse<LibraryPackageStorageMode>(snapshot.Compression, out var mode)) throw new InvalidOperationException("Compression Cosmos inconnue.");
+            var profile = new MarketplaceStorageProfile(id, Path.Combine(DataDirectory, "Cache", id), snapshot.DownloadDirectory,
+                snapshot.Libraries!.Select(item => new MarketplaceLibraryLocation(item.Path, item.MaximumBytes, item.Enabled)).ToArray());
+            DirectFabDownloadResult? package = null;
+            var operation = _taskScheduler.Enqueue(new CyEngineHub.Core.Tasks.HubTaskDefinition("Bibliothèque · Cosmos", "Préparer le package " + Path.GetFileName(path),
+                async (task, token) =>
+                {
+                    task.Report(null, "Copie, compression et manifeste JSON ; le fichier original est conservé.");
+                    package = await ConnectorLibraryPackageService.ImportAsync(path, id, mode, profile, Path.Combine(DataDirectory, "ConnectorImports"), token).ConfigureAwait(false);
+                }));
+            var completed = await operation.Completion.ConfigureAwait(true);
+            if (completed.Status != CyEngineHub.Core.Tasks.HubTaskStatus.Completed || package is null)
+                throw new IOException("Préparation du package Cosmos interrompue. Original conservé. " + completed.Error);
+            // Keep the completed browser file as well; packing never silently removes originals.
+            await ConnectorDownloadCatalog.RegisterAsync(id, package.DestinationDirectory).ConfigureAwait(true);
+            _connectorPackagePaths[path] = package.DestinationDirectory;
+            await RefreshPackFootprintsAsync().ConfigureAwait(true);
+        }
+        else await ConnectorDownloadCatalog.RegisterAsync(id, path).ConfigureAwait(true);
         if (_connectorLibraries.TryGetValue(id, out var library)) await library.LoadAsync().ConfigureAwait(true);
+        }
+        finally { _connectorPackageGate.Release(); }
     }
+    private readonly Dictionary<string, string> _connectorPackagePaths = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SemaphoreSlim _connectorPackageGate = new(1, 1);
 
     private async Task ImportConnectorFilesAsync(string id)
     {
@@ -110,10 +146,27 @@ public sealed partial class MainWindowViewModel
             connectors.Add(new MarketplaceConnectorViewModel(extension, saved.Enabled, saved.DownloadDirectory,
                 uri => OpenMarketplaceBrowserAsync(extension.Manifest.Id, extension.Manifest.DisplayName, uri),
                 () => ShowConnectorLibraryAsync(extension.Manifest.Id), ShowError,
-                snapshot => store.SaveAsync(extension.Manifest.Id, snapshot)));
+                snapshot => store.SaveAsync(extension.Manifest.Id, snapshot), saved));
         }
         MarketplaceConnectors.Clear();
         foreach (var connector in connectors) MarketplaceConnectors.Add(connector);
+        await IndexCosmosPackagesAsync().ConfigureAwait(true);
+    }
+
+    private async Task IndexCosmosPackagesAsync()
+    {
+        var connector = MarketplaceConnectors.FirstOrDefault(item => item.HasPackageStorage);
+        if (connector is null) return;
+        try
+        {
+            var libraries = connector.LibraryLocations.Where(item => item.IsEnabled && Path.IsPathFullyQualified(item.Path)).Select(item => item.Path).ToArray();
+            var indexed = (await ConnectorDownloadCatalog.LoadAsync().ConfigureAwait(true)).Select(item => item.FilePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var paths = await Task.Run(() => ConnectorLibraryPackageService.DiscoverPackages(connector.Id, libraries)).ConfigureAwait(true);
+            foreach (var directory in paths.Where(path => !indexed.Contains(path)))
+                await ConnectorDownloadCatalog.RegisterAsync(connector.Id, directory).ConfigureAwait(true);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        { AppendRawLog("WARN", "Library/Cosmos", "Indexation des packages locaux : " + error.Message); }
     }
 
     private string GetConnectorDownloadDirectory(string id)

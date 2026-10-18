@@ -34,3 +34,4 @@ __pycache__/
 *.dmp
 *.etl
 *.log
+tools/clean-generated-*.ps1

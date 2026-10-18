@@ -7,6 +7,31 @@ namespace CyEngineHub.Desktop.ImGui;
 
 internal sealed partial class ImGuiWorkspace
 {
+    private void DrawEngineGit(MainWindowViewModel vm, EngineCardViewModel card)
+    {
+        Gui.Spacing(); Gui.Separator(); Gui.TextUnformatted("DÉPÔT GIT DU MOTEUR");
+        DetailActions((vm, "Lire la branche locale", "InspectEngineGitCommand", false),
+            (vm, "Vérifier les mises à jour Git", "CheckEngineGitUpdatesCommand", false));
+        Gui.TextDisabled("La vérification distante fait un fetch, jamais un pull. Aucune source n’est modifiée.");
+        if (card.EngineGitStatus is { } git)
+        {
+            var status = git.Status;
+            Gui.TextWrapped("Branche actuelle : " + status.Branch + " · commit " + status.HeadCommit[..Math.Min(status.HeadCommit.Length, 12)]);
+            Gui.TextWrapped("Suivi : " + (status.Upstream ?? "aucun — configurez une branche de suivi dans Git"));
+            if (status.Upstream is not null)
+            {
+                var verified = git.RemoteChecked && string.IsNullOrEmpty(card.EngineGitMessage);
+                var color = verified && status.Behind == 0 && status.Ahead == 0 ? ImGuiTheme.Success : ImGuiTheme.Warning;
+                Gui.TextColored(color, $"{status.Behind} commit(s) à récupérer · {status.Ahead} commit(s) locaux" +
+                    (verified ? " · suivi distant vérifié" : " · références locales, état distant non vérifié"));
+                if (status.Behind > 0 && status.Ahead > 0) Gui.TextColored(ImGuiTheme.Warning, "Branches divergentes — intégration manuelle nécessaire.");
+            }
+            Gui.TextWrapped(status.WorkingTree.IsDirty ? "Modifications locales suivies détectées (non écrasées)." : "Aucune modification de fichier suivi ; fichiers non suivis non analysés.");
+            Gui.TextDisabled("Dernier contrôle : " + git.CheckedAt.ToString("g", System.Globalization.CultureInfo.CurrentCulture));
+        }
+        if (!string.IsNullOrEmpty(card.EngineGitMessage)) Gui.TextWrapped(card.EngineGitMessage);
+        Record("engine-details/git");
+    }
     private void DetailActions(params (object Model, string Label, string Command, bool Primary)[] actions)
     {
         var right = Gui.GetCursorScreenPos().X + Gui.GetContentRegionAvail().X;
@@ -50,7 +75,16 @@ internal sealed partial class ImGuiWorkspace
         if (vm.EngineDetailsTab == 0)
         {
             DetailActions((engine, unreal is null ? "Lancer" : "Lancer · accueil Unreal", "LaunchCommand", true),
-                (engine, "Ouvrir le dossier", "OpenFolderCommand", false), (vm, "Analyser la taille", "AnalyzeSelectedEngineSizeCommand", false));
+                (engine, "Ouvrir le dossier", "OpenFolderCommand", false), (vm, "Analyser la taille", "AnalyzeSelectedEngineSizeCommand", false),
+                (vm, "Renommer…", "StartEngineRenameCommand", false));
+            if (vm.IsEngineNameEditing)
+            {
+                Gui.TextWrapped("Nom dans CyEngineHub uniquement — laissez vide pour rétablir le nom d’origine.");
+                var name = vm.EngineNameDraft; Gui.SetNextItemWidth(Math.Min(480 * UiScale, Gui.GetContentRegionAvail().X));
+                if (Gui.InputTextWithHint("###engine-name", "Nom personnalisé", ref name, 512)) vm.EngineNameDraft = name;
+                Record("field/EngineNameDraft");
+                DetailActions((vm, "Enregistrer le nom", "SaveEngineNameCommand", false), (vm, "Annuler", "CancelEngineRenameCommand", false));
+            }
             Gui.Spacing(); Gui.Separator();
             if (Gui.BeginTable("engine-general-info", 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp))
             {
@@ -59,11 +93,33 @@ internal sealed partial class ImGuiWorkspace
                 void Info(string label, string text)
                 { Gui.TableNextRow(); Gui.TableNextColumn(); Gui.TextDisabled(label); Gui.TableNextColumn(); Gui.TextWrapped(text); }
                 Info("Type", unreal?.TypeLabel ?? Value(engine, "Family"));
-                Info("Branche / source", unreal?.BranchLabel ?? Value(engine, "Source"));
+                Info("Branche de compilation", unreal?.BranchLabel ?? Value(engine, "Source"));
                 Info("Taille", Value(engine, "EffectiveSizeLabel"));
                 if (unreal is not null) Info("Association", unreal.RegistrationLabel);
                 Gui.EndTable();
             }
+            if (unreal is { IsOfficialEpic: false })
+            {
+                ActionButton(vm, "Modifier l’association Unreal…", "StartEngineAssociationCommand");
+                if (vm.IsEngineAssociationEditing)
+                {
+                    Gui.TextWrapped("Valeur du registre utilisateur : HKCU\\SOFTWARE\\Epic Games\\Unreal Engine\\Builds");
+                    Gui.TextWrapped("Dossier associé : " + unreal.Path);
+                    var association = vm.EngineAssociationDraft; Gui.SetNextItemWidth(Math.Min(480 * UiScale, Gui.GetContentRegionAvail().X));
+                    if (Gui.InputTextWithHint("###engine-association", "Identifiant personnalisé ou GUID", ref association, 512)) vm.EngineAssociationDraft = association;
+                    Record("field/EngineAssociationDraft");
+                    Gui.TextColored(ImGuiTheme.Warning, "Les anciens identifiants de ce moteur seront remplacés.");
+                    Gui.TextWrapped("Les .uproject ne seront pas modifiés : ceux qui utilisent l’ancienne association devront être réassociés. Aucun identifiant d’un autre moteur ne sera écrasé.");
+                    if (!vm.EngineAssociationConfirm)
+                        DetailActions((vm, "Préparer la modification", "PrepareEngineAssociationCommand", false), (vm, "Fermer", "CloseEngineAssociationCommand", false));
+                    else
+                    {
+                        Gui.TextWrapped("Confirmer l’association « " + vm.EngineAssociationDraft.Trim() + " » vers « " + unreal.Path + " » ?");
+                        DetailActions((vm, "Confirmer l’écriture au registre", "ApplyEngineAssociationCommand", false), (vm, "Annuler", "CancelEngineAssociationCommand", false));
+                    }
+                }
+            }
+            if (!string.IsNullOrEmpty(vm.EngineIdentityStatus)) Gui.TextWrapped(vm.EngineIdentityStatus);
             if (unreal is not null)
             {
                 Gui.Spacing();
@@ -77,6 +133,13 @@ internal sealed partial class ImGuiWorkspace
                     (vm, "Outils / prérequis", "ShowToolchainsCommand", false));
                 if (unreal.CanRegister) ActionButton(unreal, "Enregistrer le moteur", "RegisterCommand");
                 if (unreal.IsRegistered) ActionButton(unreal, "Désenregistrer…", "RequestUnregisterCommand");
+                if (unreal.IsUnregisterConfirmationVisible)
+                {
+                    Gui.TextWrapped("Supprimer les associations utilisateur de ce moteur ? Les fichiers et projets seront conservés.");
+                    DetailActions((unreal, "Confirmer le désenregistrement", "ConfirmUnregisterCommand", false),
+                        (unreal, "Annuler", "CancelUnregisterCommand", false));
+                }
+                if (!unreal.IsOfficialEpic) DrawEngineGit(vm, unreal);
             }
             Gui.Spacing();
             if (unreal is null)

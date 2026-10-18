@@ -775,8 +775,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             "Providers et emplacements"));
         SettingsCategories.Add(new SettingsCategoryOptionViewModel(
             "project-profiles",
-            "Profils de projet",
-            "Plugins et configuration Unreal"));
+            "Unreal Engine",
+            "Profils, configuration et téléchargements"));
         SettingsCategories.Add(new SettingsCategoryOptionViewModel(
             "library",
             "Bibliothèque",
@@ -789,10 +789,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             "marketplaces",
             "Marketplaces",
             "Fab, Megascans et Unity"));
-        SettingsCategories.Add(new SettingsCategoryOptionViewModel(
-            "storage",
-            "Stockage",
-            "Données locales"));
+        SettingsCategories.Add(new SettingsCategoryOptionViewModel("appearance", "Apparence", "Thèmes et densité de l’interface"));
         SettingsCategories.Add(new SettingsCategoryOptionViewModel(
             "advanced",
             "Avancé",
@@ -2315,6 +2312,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (SetProperty(ref _selectedSettingsCategory, value))
             {
                 OnPropertyChanged(nameof(IsSettingsConnectionsSelected));
+                OnPropertyChanged(nameof(IsSettingsAppearanceSelected));
                 OnPropertyChanged(nameof(IsSettingsEnginesSelected));
                 OnPropertyChanged(nameof(IsSettingsProjectProfilesSelected));
                 OnPropertyChanged(nameof(IsSettingsLibrarySelected));
@@ -2707,9 +2705,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _ => "FAB · × NON CONNECTÉ",
     };
 
-    public string GitConnectionStatus => GitRepositories.Count > 0
-        ? "GIT · ✓ LOCAL"
-        : "GIT · × À CONFIGURER";
+    public string GitConnectionStatus => IsGitConnectionEnabled ? "GIT · AUTHENTIFICATION DISTANTE NON VÉRIFIÉE" : "GIT · SERVICE DÉSACTIVÉ";
 
     public string UnityStoreConnectionStatus => IsProviderEnabled("unity")
         ? "UNITY STORE · × À CONFIGURER"
@@ -2734,8 +2730,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         EpicVaultItemCount > 0 ||
         FabPluginPackageCount > 0;
 
-    public IBrush GitConnectionIndicator => GitRepositories.Count > 0
-        ? Brushes.LimeGreen
+    public IBrush GitConnectionIndicator => IsGitConnectionEnabled
+        ? Brushes.Orange
         : Brushes.IndianRed;
 
     public IBrush UnityConnectionIndicator => IsProviderEnabled("unity")
@@ -4683,11 +4679,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             try
             {
-                var file = string.IsNullOrWhiteSpace(UnrealVersionBridgeAssetProfileFile)
-                    ? Path.Combine(AppContext.BaseDirectory, "Extensions", "cyenginehub.unreal-version-bridge", "profiles", "ue-5.6-to-5.5.json")
-                    : UnrealVersionBridgeAssetProfileFile;
-                var profiles = UnrealAssetConversionProfiles.Load(file);
-                return string.Join(Environment.NewLine + Environment.NewLine, profiles.Profiles.Select(p =>
+                var folder = Path.Combine(AppContext.BaseDirectory, "Extensions", "cyenginehub.unreal-version-bridge", "profiles");
+                var files = string.IsNullOrWhiteSpace(UnrealVersionBridgeAssetProfileFile)
+                    ? new[] { Path.Combine(folder, "ue-5.6-to-5.5.json"), Path.Combine(folder, "ue-5.7-native.json") }
+                    : new[] { UnrealVersionBridgeAssetProfileFile };
+                var profiles = files.SelectMany(file => UnrealAssetConversionProfiles.Load(file).Profiles);
+                return string.Join(Environment.NewLine + Environment.NewLine, profiles.Select(p =>
                     $"{p.AssetType} · UE {p.SourceVersion} → {p.TargetVersion} · révision {p.Revision}\n{p.Notes}\nContrôles prévus : {string.Join(", ", p.Checks)}"));
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidOperationException or ArgumentException)
@@ -9385,14 +9382,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 progress,
                 cancellationToken)
             .ConfigureAwait(false);
-        if (result.Outputs.TryGetValue("variant", out var variantDirectory) &&
+        if (result.Outputs.GetValueOrDefault("registerDerivedVariant") != "false" && result.Outputs.TryGetValue("variant", out var variantDirectory) &&
             !string.IsNullOrWhiteSpace(variantDirectory) &&
             Directory.Exists(variantDirectory))
         {
             var registration = Dispatcher.UIThread.InvokeAsync(() => RegisterDerivedVariantAsync(
                 asset,
                 version,
-                target,
+                target.EngineVersion,
+                target.ContentKind,
                 variantDirectory,
                 result.Outputs.GetValueOrDefault("manifest", string.Empty)));
             await registration;
@@ -9403,11 +9401,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private async Task RegisterDerivedVariantAsync(
         RemoteFabAsset asset,
         RemoteFabProjectVersion sourceVersion,
-        FabInstallTargetOptionViewModel target,
+        string engineVersion,
+        LibraryPackageContentKind contentKind,
         string variantDirectory,
         string manifestPath)
     {
-        var artifactId = $"{sourceVersion.ArtifactId}:converted:{target.EngineVersion}";
+        var artifactId = $"{sourceVersion.ArtifactId}:converted:{engineVersion}";
         var bytes = Directory.EnumerateFiles(variantDirectory, "*", SearchOption.AllDirectories)
             .Select(path => new FileInfo(path).Length)
             .Aggregate(0L, (total, length) => checked(total + length));
@@ -9416,29 +9415,29 @@ public sealed partial class MainWindowViewModel : ObservableObject
             string.Equals(item.ArtifactId, artifactId, StringComparison.OrdinalIgnoreCase));
         _fabStoredDownloads.Add(new FabStoredDownloadRecord(
             asset.AssetId,
-            $"Unreal Engine {target.EngineVersion} · convertie",
+            $"Unreal Engine {engineVersion} · convertie",
             artifactId,
             variantDirectory,
             bytes,
             DateTimeOffset.UtcNow,
             NormalizeAssetSource(asset),
-            target.ContentKind.ToString(),
+            contentKind.ToString(),
             "DerivedVariant",
             string.IsNullOrWhiteSpace(manifestPath) ? null : manifestPath,
             bytes,
             bytes,
             asset.Title,
-            $"{asset.Title} · UE {target.EngineVersion}",
+            $"{asset.Title} · UE {engineVersion}",
             "Conversion créée automatiquement par le script d’installation.",
             sourceVersion.ArtifactId,
-            [target.EngineVersion]));
+            [engineVersion]));
         await PersistStoredFabDownloadsAsync().ConfigureAwait(true);
         UpdateStoredFabAssetState(asset.AssetId);
         RebuildSelectedFabStoredDownloads(asset.AssetId);
         AppendRawLog(
             "INFO",
             "Library/VersionBridge",
-            $"Variante locale enregistrée : {asset.Title} · UE {target.EngineVersion} · {variantDirectory}");
+            $"Variante locale enregistrée : {asset.Title} · UE {engineVersion} · {variantDirectory}");
     }
 
     private async Task InstallDownloadedFabPackageAsync(
@@ -14882,6 +14881,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         SelectedLocalEngineDetails = null;
         SelectedEngineDetails = engine;
+        ResetEngineIdentityEditor();
+        _ = InspectSelectedEngineGitAsync(false);
         EngineDetailsTab = 0;
         SetEngineInstallationEditing(false);
         EngineComponentUpdateStatus = engine.IsOfficialEpic
@@ -15001,6 +15002,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         SelectedEngineDetails = null;
         SelectedLocalEngineDetails = engine;
+        ResetEngineIdentityEditor();
         EngineDetailsTab = 0;
         RefreshSelectedEngineToolchains();
         ShowSection(PageSection.EngineDetails);
@@ -15044,6 +15046,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         SelectedLocalProjectDetails = null;
         SelectedProjectDetails = project;
+        _ = LoadCosmosProjectSettingsAsync(project);
         ShowSection(PageSection.ProjectDetails);
     }
 

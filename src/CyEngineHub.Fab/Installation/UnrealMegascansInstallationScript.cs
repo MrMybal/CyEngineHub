@@ -60,6 +60,8 @@ public sealed class UnrealMegascansInstallationScript(
 
         if (!rawVariant)
         {
+            if (context.Configuration.GetValueOrDefault("prepareOnly") == "true")
+                return new(Descriptor.Id, "Variante UAsset prête ; projet inchangé.", new Dictionary<string, string> { ["variant"] = context.SourceDirectory });
             progress?.Report(new(0, "Installation de la variante Megascans UAsset…"));
             var installed = await InstallContentAsync(
                     context.SourceDirectory,
@@ -99,10 +101,15 @@ public sealed class UnrealMegascansInstallationScript(
                     defaultVariantStorageRoot,
                     "safe",
                     KeepStaging: false,
-                    ValidateOutput: validateOutput),
+                    ValidateOutput: validateOutput,
+                    Mode: "portable",
+                    AllowLossyConversion: true),
                 progress,
                 cancellationToken)
             .ConfigureAwait(false);
+        if (context.Configuration.GetValueOrDefault("prepareOnly") == "true")
+            return new(Descriptor.Id, "Sources RAW importées en UAsset ; projet inchangé.", new Dictionary<string, string>
+            { ["variant"] = converted.VariantDirectory, ["manifest"] = converted.ManifestPath, ["contentKind"] = "ContentPack" });
         var installedRaw = await InstallContentAsync(
                 converted.VariantDirectory,
                 project.FilePath,

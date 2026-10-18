@@ -4,7 +4,7 @@
   "displayName": "Cosmos · mes assets",
   "version": "0.3.1",
   "publisher": "CyEngineHub · connecteur non officiel",
-  "description": "Bibliothèque native des fichiers téléchargés sur Cosmos, avec fiches locales. Téléchargement depuis l’inventaire officiel dans le navigateur intégré, session conservée et dossier configurable. Ajout de fichiers existants. Aucun inventaire ni image du site extrait automatiquement.",
+  "description": "Alpha : inventaire web officiel et bibliothèque locale. Packages JSON, compression et bibliothèques ordonnées avec quotas ; dossier d’assets configurable par projet Unreal. Les fichiers originaux sont conservés. Aucun inventaire ni image du site extrait automatiquement.",
   "kind": "Marketplace",
   "executionKind": "WebLink",
   "capabilities": "OwnedInventory",

@@ -43,14 +43,15 @@ public sealed class UnrealVersionBridgeInstallationScript(
     public FabInstallationScriptDescriptor Descriptor { get; } = new(
         ScriptId,
         "Unreal · Convertir puis installer",
-        "Analyse par type/version. Bridge natif Texture2D BGRA8/G8 expérimental, sauvegarde et comparaison après réouverture cible. Autres types natifs non implémentés ; portable sur accord explicite.",
+        "Alpha · Natif C++ Texture2D et graphes Material/MaterialInstanceConstant contrôlés : 5.7 vers 5.5/5.3. Sauvegarde native et comparaison après réouverture cible. Types et nœuds non adaptés bloquants.",
         "CyEngineHub",
         [LibraryPackageContentKind.ContentPack, LibraryPackageContentKind.RawAsset, LibraryPackageContentKind.Unknown],
         [FabInstallationTargetKind.Project],
         [
-            new("conversionMode", "Méthode", "Natif : Texture2D BGRA8/G8 et propriétés prises en charge, contrôle C++ obligatoire. Portable : export/import expérimental, pas un resave natif.", FabInstallationOptionKind.Choice, "native", ["native", "portable"]),
-            new("assetProfileFile", "Profils par type (JSON)", "Vide : profils intégrés UE 5.6 vers 5.5. Un fichier personnalisé remplace le catalogue sans activer de code non implémenté.", FabInstallationOptionKind.Text, string.Empty, []),
+            new("conversionMode", "Méthode", "Natif : pixels source, graphes de matériaux et références pris en charge, contrôle C++ obligatoire. Portable : export/import expérimental sur accord explicite.", FabInstallationOptionKind.Choice, "native", ["native", "portable"]),
+            new("assetProfileFile", "Profils par type (JSON)", "Vide : catalogue intégré adapté au couple (5.7 vers 5.5/5.3 ou 5.6 vers 5.5). Un fichier personnalisé n'active aucun code non implémenté.", FabInstallationOptionKind.Text, string.Empty, []),
             new("analyzeOnly", "Analyser seulement", "Produit un rapport par asset sans convertir, publier ni installer. Les diagnostics sont conservés.", FabInstallationOptionKind.Boolean, "false", []),
+            new("registerDerivedVariant", "Ajouter le downgrade aux dérivés du pack", "Ajoute la conversion validée dans la fiche du pack pour la réinstaller sans reconvertir. Les originaux restent intacts. Désactivé : la sortie technique reste dans le dossier de variantes mais n’est pas ajoutée à la fiche.", FabInstallationOptionKind.Boolean, "true", []),
             new("allowLossyConversion", "Accepter les pertes du mode portable", "Consentement explicite à l'export/import : propriétés et données dérivées non garanties. Les assets non pris en charge restent bloquants.", FabInstallationOptionKind.Boolean, "false", []),
             new("sourceVersion", "Version Unreal source", "Auto choisit la version la plus récente déclarée par le pack.", FabInstallationOptionKind.Text, "auto", []),
             new("profile", "Ancien préréglage d'export", "Les profils par type gardent la priorité. Les exports squelettiques et animations non validés restent bloqués.", FabInstallationOptionKind.Choice, "safe", ["safe", "extended"]),
@@ -70,6 +71,8 @@ public sealed class UnrealVersionBridgeInstallationScript(
             ?? throw new InvalidOperationException("La conversion exige un projet Unreal cible.");
         var targetEngine = context.Target.Engine
             ?? throw new InvalidOperationException("La version Unreal du projet cible n’est pas installée.");
+        if (!bool.TryParse(context.Configuration.GetValueOrDefault("registerDerivedVariant", "true"), out var register))
+            throw new InvalidOperationException("Option de dérivé invalide.");
         var engines = await engineCatalog.GetAllAsync(cancellationToken).ConfigureAwait(false);
         var sourceVersion = ResolveSourceVersion(
             context.Configuration.GetValueOrDefault("sourceVersion", "auto"),
@@ -82,6 +85,9 @@ public sealed class UnrealVersionBridgeInstallationScript(
         {
             if (analyzeOnly)
                 throw new InvalidOperationException("L'analyse par profils concerne les conversions vers une version antérieure. Aucune installation effectuée.");
+            if (context.Configuration.GetValueOrDefault("prepareOnly") == "true")
+                return new(Descriptor.Id, "Aucune conversion requise ; projet cible inchangé.",
+                    new Dictionary<string, string> { ["variant"] = context.SourceDirectory });
             progress?.Report(new(0, "Le pack n’est pas plus récent : installation standard."));
             return await InstallContentAsync(context.SourceDirectory, project.FilePath, context.Configuration, progress, cancellationToken)
                 .ConfigureAwait(false);
@@ -126,6 +132,13 @@ public sealed class UnrealVersionBridgeInstallationScript(
             return new(Descriptor.Id,
                 $"Analyse préliminaire : {converted.UnsupportedAssetCount:N0} asset(s) bloquant(s). Contrôles C++ supplémentaires requis en natif. Aucune conversion ni installation. Rapport : {converted.ReportPath}",
                 new Dictionary<string, string> { ["report"] = converted.ReportPath });
+        if (context.Configuration.GetValueOrDefault("prepareOnly") == "true")
+            return new(Descriptor.Id, "Conversion préparée ; projet cible inchangé.", new Dictionary<string, string>
+            {
+                ["variant"] = converted.VariantDirectory, ["manifest"] = converted.ManifestPath,
+                ["report"] = converted.ReportPath, ["sourceVersion"] = FormatVersion(targetEngine.Version),
+                ["registerDerivedVariant"] = register ? "true" : "false",
+            });
         var installed = await InstallContentAsync(converted.VariantDirectory, project.FilePath, context.Configuration, progress, cancellationToken)
             .ConfigureAwait(false);
         return new(
@@ -136,6 +149,7 @@ public sealed class UnrealVersionBridgeInstallationScript(
                 ["variant"] = converted.VariantDirectory,
                 ["manifest"] = converted.ManifestPath,
                 ["report"] = converted.ReportPath,
+                ["registerDerivedVariant"] = register ? "true" : "false",
                 ["receipt"] = installed.Outputs.GetValueOrDefault("receipt", string.Empty),
                 ["backup"] = installed.Outputs.GetValueOrDefault("backup", string.Empty),
             });

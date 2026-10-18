@@ -70,6 +70,8 @@ internal sealed partial class ImGuiWorkspace
             ItemMenuCommand("folder", "Ouvrir le dossier", item, "OpenFolderCommand");
             Gui.EndDisabled();
             Gui.Separator();
+            if (item is not ProjectCardViewModel and not LocalEngineProjectCardViewModel)
+            { if (Gui.MenuItem("Groupes de packs…")) OpenPackGroups(vm, selected); Record("item-context/pack-groups"); }
             var addFavorite = !selected.All(vm.IsResourceFavorite);
             if (Gui.MenuItem(addFavorite ? "Ajouter aux favoris" : "Retirer des favoris"))
                 _actions.Enqueue(() => vm.SetResourceFavorites(selected, addFavorite));

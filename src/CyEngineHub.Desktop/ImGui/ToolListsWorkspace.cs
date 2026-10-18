@@ -12,6 +12,7 @@ internal sealed partial class ImGuiWorkspace
 
     private void DrawExtensions(MainWindowViewModel vm, UiNode page)
     {
+        Gui.TextColored(ImGuiTheme.Warning, "ALPHA · Extensions expérimentales · testez sur une copie de projet");
         Gui.SetNextItemWidth(Math.Max(180, Gui.GetContentRegionAvail().X - 160 * UiScale));
         Gui.InputTextWithHint("###extensions-search", "Rechercher une extension, un éditeur ou un type…", ref _extensionQuery, 1024);
         Record("extensions-search"); Gui.SameLine(); ActionButton(vm, "Actualiser", "RefreshHubExtensionsCommand");

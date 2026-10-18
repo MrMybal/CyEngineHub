@@ -2,6 +2,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$InnoCompiler,
     [string]$OutputRoot,
+    [Parameter(Mandatory = $true)][string]$NativeAdapterRoot,
     [switch]$SkipTests
 )
 
@@ -65,6 +66,16 @@ try {
         Copy-Item -LiteralPath $file.FullName -Destination $destination
     }
     Copy-Item -LiteralPath (Join-Path $repoRoot 'README.md'), (Join-Path $repoRoot 'THIRD_PARTY_NOTICES.md') -Destination $appStage
+    # Only audited runtime files, never native build projects, intermediates or symbols.
+    foreach ($nativeVersion in @('5.3', '5.5', '5.6', '5.7')) {
+        foreach ($relative in @('CyHubNativeBridge.uplugin', 'Binaries/Win64/UnrealEditor-CyHubNativeBridge.dll', 'Binaries/Win64/UnrealEditor.modules')) {
+            $source = Join-Path (Join-Path $NativeAdapterRoot "UE_$nativeVersion") $relative
+            if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Missing native adapter runtime file for UE $nativeVersion" }
+            $destination = Join-Path (Join-Path $appStage "Extensions/cyenginehub.unreal-version-bridge/native-binaries/UE_$nativeVersion") $relative
+            New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+            Copy-Item -LiteralPath $source -Destination $destination
+        }
+    }
 
     # Keep the notices supplied by NuGet authors alongside the bundled runtime.
     $licenseRoot = Join-Path $appStage 'Licenses'

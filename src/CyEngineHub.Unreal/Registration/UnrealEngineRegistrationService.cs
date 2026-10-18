@@ -37,6 +37,37 @@ public sealed class UnrealEngineRegistrationService : IUnrealEngineRegistrationS
         return registration;
     }
 
+    public UnrealEngineRegistration SetAssociation(string rootPath, string identifier)
+    {
+        var normalizedRoot = NormalizeRoot(rootPath, requireValidEngine: true);
+        ArgumentNullException.ThrowIfNull(identifier);
+        identifier = identifier.Trim();
+        if (identifier.Length is 0 or > 128 || identifier.Any(c => char.IsControl(c) || c is '\\' or '/' or '"') ||
+            Version.TryParse(identifier, out _))
+            throw new UnrealEngineRegistrationException("Utilisez un identifiant personnalisé ou un GUID (128 caractères maximum), pas un numéro de version Epic.");
+        var all = _store.ReadAll();
+        if (all.Any(item => item.Identifier.Equals(identifier, StringComparison.OrdinalIgnoreCase) && !PathsEqual(item.RootPath, normalizedRoot)))
+            throw new UnrealEngineRegistrationException("Cet identifiant est déjà associé à un autre moteur ; il ne sera pas écrasé.");
+        var previous = all.Where(item => PathsEqual(item.RootPath, normalizedRoot)).ToArray();
+        var updated = new UnrealEngineRegistration(identifier, normalizedRoot);
+        // Write and verify before removing any previous value. Unrelated engines are never changed.
+        try
+        {
+            _store.Write(updated);
+            if (!_store.ReadAll().Any(item => item.Identifier.Equals(identifier, StringComparison.OrdinalIgnoreCase) && PathsEqual(item.RootPath, normalizedRoot)))
+                throw new UnrealEngineRegistrationException("La nouvelle association n’a pas pu être relue ; anciennes valeurs conservées.");
+            foreach (var item in previous.Where(item => !item.Identifier.Equals(identifier, StringComparison.OrdinalIgnoreCase)))
+                _store.Delete(item.Identifier);
+        }
+        catch
+        {
+            foreach (var item in previous) _store.Write(item);
+            if (!previous.Any(item => item.Identifier.Equals(identifier, StringComparison.OrdinalIgnoreCase))) _store.Delete(identifier);
+            throw;
+        }
+        return updated;
+    }
+
     public bool Unregister(string rootPath)
     {
         var normalizedRoot = NormalizeRoot(rootPath, requireValidEngine: false);

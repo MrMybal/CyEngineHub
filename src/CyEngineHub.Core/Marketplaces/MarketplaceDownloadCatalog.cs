@@ -34,7 +34,7 @@ public sealed class MarketplaceDownloadCatalog(string catalogPath)
             var asset = existing >= 0
                 ? entries[existing] with { SizeBytes = metadata.Size, AssetKind = metadata.Kind }
                 : new MarketplaceLocalAsset(Guid.NewGuid().ToString("N"), marketplaceId, fullPath,
-                    Path.GetFileNameWithoutExtension(fullPath).Replace('_', ' '), Path.GetExtension(fullPath).ToUpperInvariant(),
+                    metadata.Name, Directory.Exists(fullPath) ? "CYHUB" : Path.GetExtension(fullPath).ToUpperInvariant(),
                     metadata.Kind, metadata.Size, DateTimeOffset.UtcNow, "");
             if (existing >= 0) entries[existing] = asset;
             else entries.Add(asset);
@@ -83,8 +83,19 @@ public sealed class MarketplaceDownloadCatalog(string catalogPath)
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
-    private static (long Size, string Kind) DescribeFile(string path)
+    private static (long Size, string Kind, string Name) DescribeFile(string path)
     {
+        if (Directory.Exists(path))
+        {
+            var manifestPath = Path.Combine(path, "cyenginehub-package.json");
+            if (!File.Exists(manifestPath) || new FileInfo(manifestPath).Length > 1024 * 1024) throw new InvalidDataException("Manifeste de package absent ou trop volumineux.");
+            using var manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            var bytes = manifest.RootElement.GetProperty("storedBytes").GetInt64();
+            if (bytes < 0) throw new InvalidDataException("Taille du package invalide.");
+            var packageKind = manifest.RootElement.GetProperty("contentKind").GetString();
+            return (bytes, packageKind == "codePlugin" ? "Plugin Unreal" : packageKind == "completeProject" ? "Projet Unreal" : packageKind == "rawAsset" ? "Assets RAW" : "Pack Unreal",
+                manifest.RootElement.GetProperty("title").GetString() ?? Path.GetFileName(path));
+        }
         var file = new FileInfo(path);
         if (!file.Exists || file.Length == 0) throw new InvalidDataException("Le fichier est absent ou vide.");
         var kind = "Fichier local · type non déterminé";
@@ -103,6 +114,6 @@ public sealed class MarketplaceDownloadCatalog(string catalogPath)
             catch (InvalidDataException) { kind = "ZIP illisible · à vérifier"; }
         }
         else if (file.Extension.Equals(".unitypackage", StringComparison.OrdinalIgnoreCase)) kind = "Package Unity";
-        return (file.Length, kind);
+        return (file.Length, kind, Path.GetFileNameWithoutExtension(path).Replace('_', ' '));
     }
 }

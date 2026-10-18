@@ -12,7 +12,7 @@ internal static class ActionColorPolicy
             (command.StartsWith("RequestRemove", StringComparison.Ordinal) || command.StartsWith("ConfirmRemove", StringComparison.Ordinal) ||
              command.StartsWith("RequestUninstall", StringComparison.Ordinal) || command.StartsWith("ConfirmUninstall", StringComparison.Ordinal) ||
              command.StartsWith("RequestDelete", StringComparison.Ordinal) || command.StartsWith("ConfirmDelete", StringComparison.Ordinal) ||
-             command is "RemoveCommand" or "DeleteCommand" or "DeleteProjectProfileCommand" or "RequestUnregisterCommand" or "ConfirmUnregisterCommand"))
+             command is "RemoveCommand" or "DeleteCommand" or "DeleteProjectProfileCommand" or "RequestUnregisterCommand" or "ConfirmUnregisterCommand" or "ApplyEngineAssociationCommand"))
             return ActionTone.Danger;
         if (command is "ToggleProjectCreatorCommand" or "ToggleEngineImporterCommand" or "PrepareUnrealUtilityCommand" or "ConfirmUtilityLaunchCommand" or
             "BuildEditorCommand" or "BuildPluginCommand" or "RunCommand" or "RunCrossCompileCommand" or "SetupCommand" ||

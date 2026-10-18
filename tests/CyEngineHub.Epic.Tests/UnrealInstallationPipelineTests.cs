@@ -110,6 +110,24 @@ public sealed class UnrealInstallationPipelineTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(context.Target.RootPath, "Content")));
     }
 
+    [Theory]
+    [InlineData("true")]
+    [InlineData("false")]
+    public async Task DowngradeExposesAndReturnsExplicitLibraryDerivativeChoice(string register)
+    {
+        var original = Context();
+        var config = new Dictionary<string, string>(original.Configuration) { ["registerDerivedVariant"] = register };
+        var runner = new FixtureRunner();
+        var script = new UnrealVersionBridgeInstallationScript(new EngineStore([original.Target.Engine!, Engine(6)]), new Settings(), runner,
+            new FabProjectContentImportService(), Path.Combine(_root, "Converted"));
+        Assert.Contains(script.Descriptor.Options, option => option.Id == "registerDerivedVariant" && option.Kind == FabInstallationOptionKind.Boolean);
+        var result = await script.InstallAsync(original with { Configuration = config });
+        Assert.Equal(register, result.Outputs["registerDerivedVariant"]);
+        Assert.True(File.Exists(result.Outputs["manifest"]));
+        Assert.True(File.Exists(Path.Combine(original.Target.RootPath, "Content", "Converted.uasset")));
+        Assert.Equal("fixture", await File.ReadAllTextAsync(Path.Combine(original.SourceDirectory, "Content", "Original", "Mesh.uasset")));
+    }
+
     [Fact]
     public async Task AnalyzeOnlyRetainsPlanWithoutExportPublicationOrInstallation()
     {
@@ -155,7 +173,7 @@ public sealed class UnrealInstallationPipelineTests : IDisposable
     [InlineData("verify-count")]
     public async Task NativeTexturesMustReopenAndMatchBeforeInstallation(string failure)
     {
-        var context = Context() with { Configuration = new Dictionary<string, string> { ["conversionMode"] = "native", ["validateOutput"] = "false" } };
+        var context = Context() with { Configuration = new Dictionary<string, string> { ["conversionMode"] = "native", ["validateOutput"] = "false", ["keepStaging"] = "true" } };
         var nativeRoot = Path.Combine(_root, "NativeAdapters");
         foreach (var version in new[] { "5.6", "5.5" })
         {
@@ -164,6 +182,7 @@ public sealed class UnrealInstallationPipelineTests : IDisposable
             await File.WriteAllTextAsync(Path.Combine(plugin, "CyHubNativeBridge.uplugin"), "{}");
             await File.WriteAllTextAsync(Path.Combine(binaries, "UnrealEditor-CyHubNativeBridge.dll"), "not executed");
             await File.WriteAllTextAsync(Path.Combine(binaries, "UnrealEditor.modules"), "{}");
+            await File.WriteAllTextAsync(Path.Combine(binaries, "private.pdb"), "must not be staged");
         }
         var runner = new FixtureRunner { Native = true, Failure = failure };
         var script = new UnrealVersionBridgeInstallationScript(new EngineStore([context.Target.Engine!, Engine(6)]), new Settings(), runner,
@@ -186,6 +205,16 @@ public sealed class UnrealInstallationPipelineTests : IDisposable
             Assert.False(Directory.Exists(Path.Combine(context.Target.RootPath, "Plugins")));
         }
         Assert.Equal(4, runner.Calls);
+        foreach (var request in runner.Requests.Where(r => r.Arguments.Any(a => a.Contains("native-textures.py", StringComparison.Ordinal))))
+        {
+            var conversionIni = await File.ReadAllTextAsync(Path.Combine(Path.GetDirectoryName(request.Arguments[0])!, "Config", "DefaultEngine.ini"));
+            Assert.Contains("r.Nanite.ProjectEnabled=True", conversionIni, StringComparison.Ordinal);
+            Assert.Contains("D3D12TargetedShaderFormats=PCD3D_SM6", conversionIni, StringComparison.Ordinal);
+            var pluginFiles = Directory.GetFiles(Path.Combine(Path.GetDirectoryName(request.Arguments[0])!, "Plugins", "CyHubNativeBridge"), "*", SearchOption.AllDirectories);
+            Assert.Equal(3, pluginFiles.Length);
+            Assert.DoesNotContain(pluginFiles, f => f.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase));
+        }
+        Assert.False(File.Exists(Path.Combine(context.Target.RootPath, "Config", "DefaultEngine.ini")));
         Assert.DoesNotContain(runner.Requests, r => r.Arguments.Any(a => a.Contains("source-export.py", StringComparison.Ordinal) || a.Contains("target-import.py", StringComparison.Ordinal)));
     }
 

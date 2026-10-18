@@ -11,11 +11,13 @@ Dans **Configurer** du script **Unreal · Convertir puis installer** :
 - `analyzeOnly` : produit un diagnostic sans exporter, publier ou installer ;
 - `allowLossyConversion` : consentement explicite aux pertes du chemin portable, désactivé par défaut.
 
-Le mode natif dispose désormais d'un premier adaptateur C++ expérimental **Texture2D 5.6 → 5.5**, décrit dans [native-texture-bridge.md](native-texture-bridge.md). Il transfère les pixels source BGRA8/G8 et des propriétés contrôlées, sans export/import de fichier image. Les autres types natifs restent non implémentés. Le chemin portable reste explicitement séparé.
+Le mode natif dispose d'adaptateurs C++ expérimentaux **Texture2D 5.6 → 5.5** et **Texture2D, Material, MaterialInstanceConstant 5.7 → 5.5/5.3**. Il transfère les pixels source BGRA8/G8 et des graphes contrôlés, sans export/import de fichier image. Les classes et nœuds non adaptés restent bloquants. Voir [le compte rendu 5.7](native-57-bridge-validation.md). Le chemin portable reste explicitement séparé.
 
 ## Catalogue v1
 
 Fichier intégré : `extensions/builtin/cyenginehub.unreal-version-bridge/profiles/ue-5.6-to-5.5.json`.
+
+Pour le natif 5.7 → 5.5/5.3, le service choisit automatiquement `ue-5.7-native.json` (six profils). Le champ personnalisé, s'il est renseigné, remplace cette sélection. L'aperçu dans Extensions affiche les deux catalogues intégrés.
 
 Onze types : StaticMesh, Texture2D, SoundWave, SkeletalMesh, Skeleton, AnimSequence, Material, MaterialInstanceConstant, Blueprint, World, DataTable. Une règle correspond exactement à un type et un couple majeur/mineur. Les patches ne sont pas discriminés par ce schéma ; les essais réels actuels utilisent 5.6.1 et 5.5.4 et ne valident pas toutes les révisions.
 
@@ -30,7 +32,7 @@ Chaque entrée contient : `id`, `revision`, `assetType`, `sourceVersion`, `targe
 
 Une copie isolée est ouverte avec le moteur source. `source-inspect.py` inventorie classes, dépendances de packages directes (hard/soft) et indicateurs Nanite, LOD multiples, virtual texturing. Toute erreur d'inspection bloque l'asset. Ce n'est pas encore une analyse exhaustive des structures binaires ni des dépendances transitives.
 
-Le plan distingue `unsupported`, `blocked`, `loss-confirmation-required`, `lossy-confirmed` et `adaptation-required`. Ce dernier indique un candidat natif, pas une conversion déjà validée : le contrôle C++ des pixels et propriétés peut encore le refuser. **Un seul asset bloquant arrête le pack entier avant export.** Les dépendances `/Game` et de plugins non prises en charge, Nanite, LOD multiples et virtual texturing sont actuellement bloquants même avec accord sur les pertes.
+Le plan distingue `unsupported`, `blocked`, `loss-confirmation-required`, `lossy-confirmed` et `adaptation-required`. Ce dernier indique un candidat natif, pas une conversion déjà validée : le contrôle C++ peut encore le refuser. **Un seul asset bloquant arrête le pack entier avant export.** Les graphes natifs 5.7 autorisent les dépendances `/Game` présentes dans le même inventaire ; une dépendance non convertible bloque toujours l'ensemble. Les dépendances de plugins non adaptées, Nanite, LOD multiples et virtual texturing restent bloquants même avec accord sur les pertes.
 
 Les adaptateurs portables autorisés sont limités à StaticMesh/FBX, Texture2D/TGA et SoundWave/WAV. Ils restent expérimentaux : les dépendances moteur, propriétés, rendu et données dérivées ne sont pas intégralement comparés. Le consentement ne garantit pas la fidélité. Les anciens préréglages `safe`/`extended` ne contournent pas les règles par type ; l'export squelettique qui plantait reste bloqué.
 
