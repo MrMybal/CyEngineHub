@@ -5,11 +5,17 @@
 Hub de développement multi-moteur, local-first, pour Windows. Unreal Engine est
 le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers locaux.
 
-**Version publiée : `2.0.0-alpha.30`.** Sauvegardez vos projets avant d'essayer les
+**Version publiée : `2.0.0-alpha.32`.** Sauvegardez vos projets avant d'essayer les
 opérations d'installation, de déplacement ou de conversion d'assets.
 
-Les changements depuis l’alpha.25 sont récapitulés dans les
-[notes de version](docs/releases/v2.0.0-alpha.30.md).
+Les changements récents sont récapitulés dans les
+[notes de version](docs/releases/v2.0.0-alpha.32.md).
+
+L’alpha.32 unifie les paramètres Cosmos et ajoute un recours IA / MCP optionnel
+via CyToolsCore pour réparer les conversions de packs/plugins Unreal bloquées.
+L’exécution de code exige un consentement distinct ; la validation cible reste
+obligatoire avant installation. Voir le
+[guide MCP et ses limites](extensions/builtin/cyenginehub.unreal-version-bridge/mcp/README.md).
 
 Cette préversion ajoute les groupes de packs, chaînes de scripts, destinations
 Cosmos par projet, paramètres réorganisés et contrôles d’identité/Git des moteurs.

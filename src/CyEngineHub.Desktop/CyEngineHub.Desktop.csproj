@@ -12,6 +12,7 @@
     <ProjectReference Include="../CyEngineHub.Engines/CyEngineHub.Engines.csproj" />
     <ProjectReference Include="../CyEngineHub.Extensions/CyEngineHub.Extensions.csproj" />
     <ProjectReference Include="../CyEngineHub.AssetBridge.Tool/CyEngineHub.AssetBridge.Tool.csproj" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../CyEngineHub.VersionBridge.Tool/CyEngineHub.VersionBridge.Tool.csproj" ReferenceOutputAssembly="false" />
     <ProjectReference Include="../CyEngineHub.Unity/CyEngineHub.Unity.csproj" />
     <ProjectReference Include="../CyEngineHub.Godot/CyEngineHub.Godot.csproj" />
     <ProjectReference Include="../CyEngineHub.CryEngine/CyEngineHub.CryEngine.csproj" />
@@ -62,16 +63,28 @@
         SourceFiles="../../extensions/builtin/cyenginehub.asset-bridge/extension.json"
         DestinationFolder="$(OutDir)Extensions/cyenginehub.asset-bridge" />
     <ItemGroup>
-      <UnrealVersionBridgeFiles Include="../../extensions/builtin/cyenginehub.unreal-version-bridge/**/*" />
+      <UnrealVersionBridgeFiles Include="../../extensions/builtin/cyenginehub.unreal-version-bridge/**/*" Exclude="../../extensions/builtin/cyenginehub.unreal-version-bridge/**/__pycache__/**;../../extensions/builtin/cyenginehub.unreal-version-bridge/**/*.pyc" />
+      <SdkLicenseFiles Include="../../LICENCES/**/*" />
       <NativeTextureAdapterFiles Include="$(NativeBridgeAdapterRoot)/**/CyHubNativeBridge.uplugin;$(NativeBridgeAdapterRoot)/**/*.dll;$(NativeBridgeAdapterRoot)/**/*.modules" Exclude="$(NativeBridgeAdapterRoot)/**/HostProject/**;$(NativeBridgeAdapterRoot)/**/Intermediate/**" />
       <UnrealRelocatedInstallFiles Include="../../extensions/builtin/cyenginehub.unreal-relocated-install/**/*" />
       <MarketplaceConnectorFiles Include="../../extensions/builtin/cyenginehub.marketplace-cosmos/**/*" />
       <MegascansFabConnectorFiles Include="../../extensions/builtin/cyenginehub.marketplace-megascans-fab/**/*" />
       <UpdaterFiles Include="../CyEngineHub.Updater/bin/$(Configuration)/net8.0/**/*" />
     </ItemGroup>
+    <PropertyGroup>
+      <VersionBridgeWorkerOutputRoot>../CyEngineHub.VersionBridge.Tool/bin/$(Configuration)/net8.0/</VersionBridgeWorkerOutputRoot>
+      <!-- A global -o builds references into OutDir; never package stale default-bin workers. -->
+      <VersionBridgeWorkerOutputRoot Condition="Exists('$(OutDir)CyEngineHub.VersionBridge.Tool.dll')">$(OutDir)</VersionBridgeWorkerOutputRoot>
+    </PropertyGroup>
+    <ItemGroup>
+      <VersionBridgeWorkerFiles Include="$(VersionBridgeWorkerOutputRoot)CyEngineHub.VersionBridge.Tool.*;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Fab.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Core.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Unreal.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Projects.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Plugins.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Engines.dll" Exclude="$(VersionBridgeWorkerOutputRoot)*.pdb" />
+    </ItemGroup>
     <Copy
         SourceFiles="@(UnrealVersionBridgeFiles)"
         DestinationFiles="@(UnrealVersionBridgeFiles->'$(OutDir)Extensions/cyenginehub.unreal-version-bridge/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="@(VersionBridgeWorkerFiles)" DestinationFolder="$(OutDir)Extensions/cyenginehub.unreal-version-bridge/mcp/tools" />
+    <Copy SourceFiles="../../extensions/builtin/cyenginehub.unreal-version-bridge/scripts/agent-validate.py" DestinationFolder="$(OutDir)Extensions/cyenginehub.unreal-version-bridge/mcp/tools/Extensions/cyenginehub.unreal-version-bridge/scripts" />
+    <Copy SourceFiles="@(SdkLicenseFiles)" DestinationFiles="@(SdkLicenseFiles->'$(OutDir)LICENCES/%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(NativeTextureAdapterFiles)" DestinationFiles="@(NativeTextureAdapterFiles->'$(OutDir)Extensions/cyenginehub.unreal-version-bridge/native-binaries/%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy
         SourceFiles="@(UnrealRelocatedInstallFiles)"

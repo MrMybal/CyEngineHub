@@ -34,7 +34,7 @@ UninstallDisplayIcon={app}\CyEngineHub.Desktop.exe
 Uninstallable=not IsAuditExtraction
 CreateUninstallRegKey=not IsAuditExtraction
 CloseApplications=yes
-CloseApplicationsFilter=CyEngineHub.Desktop.exe,CyEngineHub.AssetBridge.Tool.exe
+CloseApplicationsFilter=CyEngineHub.Desktop.exe,CyEngineHub.AssetBridge.Tool.exe,CyEngineHub.VersionBridge.Tool.exe,CyEngineHub.Mcp.exe
 RestartApplications=no
 
 [Languages]

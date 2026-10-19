@@ -15,8 +15,23 @@ public sealed class MarketplaceConnectorViewModel : ObservableObject
     private Task _pendingWrite = Task.CompletedTask;
     private int _revision;
     private string _compression = "ZipFastest";
-    public IReadOnlyList<string> CompressionModes { get; } = ["Uncompressed", "ZipStore", "ZipFastest", "ZipBalanced", "ZipHigh", "ZipUltra"];
-    public string Compression { get => _compression; set { if (SetProperty(ref _compression, value)) QueueSave(); } }
+    public IReadOnlyList<MarketplaceCompressionChoice> CompressionOptions { get; } = MarketplaceCompressionChoice.AllOptions;
+    public string Compression
+    {
+        get => _compression;
+        set
+        {
+            if (!SetProperty(ref _compression, value)) return;
+            OnPropertyChanged(nameof(SelectedCompressionOption));
+            QueueSave();
+        }
+    }
+    public MarketplaceCompressionChoice SelectedCompressionOption
+    {
+        get => CompressionOptions.FirstOrDefault(option => option.StorageMode == Compression)
+            ?? CompressionOptions.Single(option => option.StorageMode == "ZipFastest");
+        set { if (value is not null) Compression = value.StorageMode; }
+    }
     public ObservableCollection<ConnectorLibraryLocationViewModel> LibraryLocations { get; } = [];
     public ICommand AddLibraryCommand { get; }
 
@@ -47,6 +62,9 @@ public sealed class MarketplaceConnectorViewModel : ObservableObject
     public string Id { get; }
     public bool HasPackageStorage => Id == "cyenginehub.marketplace-cosmos";
     public string Name { get; }
+    public string SettingsHeading => HasPackageStorage ? "COSMOS" : Name.ToUpperInvariant();
+    public string SettingsSubtitle => HasPackageStorage ? "Mes assets · inventaire web et bibliothèque locale" : "Connecteur · inventaire web";
+    public string SettingsSaveLabel => HasPackageStorage ? "Enregistrer Cosmos" : "Enregistrer " + Name;
     public string LibrarySubtitle => Id == "cyenginehub.marketplace-megascans-fab" ? "Fiches natives · Fab / MCP" : "Mes assets téléchargés";
     public string Description { get; }
     public string InventoryUrl { get; }
@@ -134,8 +152,14 @@ public sealed class ConnectorLibraryLocationViewModel : ObservableObject
     public string Path { get => _path; set => SetProperty(ref _path, value); }
     public string MaximumGigabytes { get => _quota; set => SetProperty(ref _quota, value); }
     public bool IsEnabled { get => _enabled; set => SetProperty(ref _enabled, value); }
-    public int Priority { get; private set; }
-    public void SetPriority(int priority) => Priority = priority;
+    private int _priority;
+    public int Priority => _priority;
+    public string PriorityLabel => $"#{Priority}";
+    public void SetPriority(int priority)
+    {
+        if (!SetProperty(ref _priority, priority, nameof(Priority))) return;
+        OnPropertyChanged(nameof(PriorityLabel));
+    }
     public ICommand MoveUpCommand { get; }
     public ICommand MoveDownCommand { get; }
     public ICommand RemoveCommand { get; }

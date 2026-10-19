@@ -72,6 +72,7 @@ public sealed partial class MainWindowViewModel
         if (IsPackGroupBusy) return;
         IsPackGroupBusy = true;
         var completedPacks = 0;
+        string? pendingAgentWorkspace = null;
         try
         {
             var engine = ResolveEngine(project.Project.EngineAssociation) ?? throw new InvalidOperationException("Moteur du projet non installé.");
@@ -117,6 +118,13 @@ public sealed partial class MainWindowViewModel
                             }
                             var packContext = Context(item, scratch);
                             var results = await pipeline.ExecuteAsync(packContext, steps, progress, token);
+                            var pending = results.FirstOrDefault(r => r.Outputs.GetValueOrDefault("agentPending") == "true");
+                            if (pending is not null)
+                            {
+                                pendingAgentWorkspace = pending.Outputs["agentWorkspace"];
+                                task.Report(null, "Groupe suspendu : réparation IA à reprendre dans " + pendingAgentWorkspace);
+                                break;
+                            }
                             foreach (var converted in results.Where(r => r.Outputs.GetValueOrDefault("registerDerivedVariant") == "true" && r.Outputs.ContainsKey("variant")))
                             {
                                 var registration = Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => RegisterDerivedVariantAsync(
@@ -132,6 +140,7 @@ public sealed partial class MainWindowViewModel
             var result = await handle.Completion;
             PackGroupStatus = $"{completedPacks}/{plan.Items.Count} packs installés · {result.Status}. " +
                 (result.Status == HubTaskStatus.Completed ? "" : "Les packs déjà installés sont conservés. " + result.Error);
+            if (pendingAgentWorkspace is not null) PackGroupStatus = $"{completedPacks}/{plan.Items.Count} packs installés · Groupe suspendu pour réparation IA : {pendingAgentWorkspace}";
             StatusMessage = PackGroupStatus;
         }
         catch (Exception ex) { PackGroupStatus = $"{completedPacks} pack(s) terminé(s). " + ex.Message; ShowError(ex); }

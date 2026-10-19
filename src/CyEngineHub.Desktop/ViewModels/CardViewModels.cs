@@ -29,7 +29,12 @@ namespace CyEngineHub.Desktop.ViewModels;
 public sealed record MarketplaceCompressionOptionViewModel(
     LibraryPackageStorageMode StorageMode,
     string Label,
-    string Description);
+    string Description)
+{
+    public static IReadOnlyList<MarketplaceCompressionOptionViewModel> ZipOptions { get; } =
+        MarketplaceCompressionChoice.ZipOptions.Select(option => new MarketplaceCompressionOptionViewModel(
+            Enum.Parse<LibraryPackageStorageMode>(option.StorageMode), option.Label, option.Description)).ToArray();
+}
 
 public enum MarketplaceNativeStoreKind
 {
@@ -1535,6 +1540,7 @@ public sealed class FabInstallationConfigurationOptionViewModel : ObservableObje
     public bool IsBoolean => Definition.Kind == FabInstallationOptionKind.Boolean;
     public bool IsText => Definition.Kind == FabInstallationOptionKind.Text;
     public bool IsChoice => Definition.Kind == FabInstallationOptionKind.Choice;
+    public bool IsAgentOption => Id is "enableAgentFallback" or "allowAgentCodeExecution" or "agentWorkspace";
 
     public string Value
     {
@@ -1673,6 +1679,12 @@ public sealed class FabInstallTargetOptionViewModel : ObservableObject
             option => option.Id,
             option => option.Value,
             StringComparer.OrdinalIgnoreCase);
+
+    public IReadOnlyList<FabInstallationConfigurationOptionViewModel> StandardInstallationConfiguration =>
+        InstallationConfiguration.Where(option => !option.IsAgentOption).ToArray();
+    public IReadOnlyList<FabInstallationConfigurationOptionViewModel> AgentInstallationConfiguration =>
+        InstallationConfiguration.Where(option => option.IsAgentOption).ToArray();
+    public bool HasAgentInstallationConfiguration => InstallationConfiguration.Any(option => option.IsAgentOption);
 
     public bool IsSelected
     {

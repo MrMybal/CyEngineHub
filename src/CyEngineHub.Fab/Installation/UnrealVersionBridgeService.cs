@@ -17,7 +17,11 @@ internal sealed record UnrealVersionBridgeRequest(
     string Mode = "native",
     string? ProfileFile = null,
     bool AllowLossyConversion = false,
-    bool AnalyzeOnly = false);
+    bool AnalyzeOnly = false,
+    bool EnableAgentFallback = false,
+    bool AllowAgentCodeExecution = false,
+    string? AgentWorkspace = null,
+    string? AgentPython = null);
 
 internal sealed record UnrealVersionBridgeResult(
     string VariantDirectory,
@@ -25,7 +29,9 @@ internal sealed record UnrealVersionBridgeResult(
     string ReportPath,
     int ImportedAssetCount,
     int UnsupportedAssetCount,
-    bool AnalysisOnly = false);
+    bool AnalysisOnly = false,
+    string? AgentWorkspace = null,
+    bool ContainsPlugins = false);
 
 internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner, string? nativePluginRoot = null)
 {
@@ -47,6 +53,21 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner, s
         var sourceRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(request.SourceDirectory));
         var storageRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(request.StorageRoot));
         ValidateRoots(sourceRoot, storageRoot);
+        if (request.AnalyzeOnly && !string.IsNullOrWhiteSpace(request.AgentWorkspace))
+            throw new InvalidOperationException("L’analyse seule ne peut pas publier ou installer une réparation IA. Désactivez-la pour une reprise explicite.");
+        if (!string.IsNullOrWhiteSpace(request.AgentWorkspace))
+            return await new UnrealVersionBridgeAgentWorkspace(processRunner).ResumeAsync(request, progress, cancellationToken).ConfigureAwait(false);
+        var plugins = UnrealVersionBridgeAgentWorkspace.FindPlugins(sourceRoot);
+        if (plugins.Length > 0)
+        {
+            if (!request.EnableAgentFallback)
+                throw new InvalidOperationException("La conversion des plugins exige l’assistance IA optionnelle et les sources pour les modules C++.");
+            if (request.AnalyzeOnly)
+                throw new InvalidOperationException("Analyse de plugin : activez la préparation IA pour obtenir un diagnostic MCP sans installation.");
+            var workspace = await UnrealVersionBridgeAgentWorkspace.CreateAsync(request, null,
+                "Plugin : adaptez les API et les assets dans la copie cible, puis compilez les modules pour le moteur cible. Aucun changement des originaux.", cancellationToken).ConfigureAwait(false);
+            return new(string.Empty, string.Empty, Path.Combine(workspace, "agent-diagnostic.txt"), 0, 0, AgentWorkspace: workspace, ContainsPlugins: true);
+        }
         Directory.CreateDirectory(storageRoot);
         var jobId = Guid.NewGuid().ToString("N");
         var staging = CombineContained(storageRoot, Path.Combine(".staging", jobId));
@@ -230,6 +251,14 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner, s
                 Path.Combine(variantDirectory, "conversion-report.json"),
                 importedCount,
                 unsupported.Length);
+        }
+        catch (Exception exception) when (request.EnableAgentFallback && !request.AnalyzeOnly &&
+            exception is InvalidOperationException or InvalidDataException)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var workspace = await UnrealVersionBridgeAgentWorkspace.CreateAsync(request, staging, exception.Message, cancellationToken).ConfigureAwait(false);
+            progress?.Report(new(null, "Conversion native bloquée ; tâche de réparation IA préparée. Aucune installation effectuée."));
+            return new(string.Empty, string.Empty, Path.Combine(workspace, "agent-diagnostic.txt"), 0, 0, AgentWorkspace: workspace);
         }
         finally
         {
@@ -426,14 +455,14 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner, s
         await WriteJsonAsync(destination, new { source = source.RootElement.Clone(), target = target.RootElement.Clone() }, cancellationToken).ConfigureAwait(false);
     }
 
-    private static string BuildVariantDirectory(UnrealVersionBridgeRequest request) => CombineContained(
+    internal static string BuildVariantDirectory(UnrealVersionBridgeRequest request) => CombineContained(
         request.StorageRoot,
         Path.Combine(
             SanitizeSegment(request.AssetId),
             SanitizeSegment(request.ArtifactId),
             $"UE_{request.TargetEngine.Version.Major}.{request.TargetEngine.Version.Minor}"));
 
-    private static void PublishVariant(string publishing, string target)
+    internal static void PublishVariant(string publishing, string target)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
         if (Directory.Exists(target))

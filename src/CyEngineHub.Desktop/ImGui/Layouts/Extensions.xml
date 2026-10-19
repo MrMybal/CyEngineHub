@@ -93,7 +93,7 @@
               <Border>
                 <StackPanel>
                   <TextBlock Text="CONVERSION CONTRÔLÉE — PAS DE PATCH AVEUGLE DES .UASSET" FontSize="10" Foreground="#F0B95F" />
-                  <TextBlock Text="Chaque asset est analysé dans une copie temporaire. Natif expérimental : Texture2D BGRA8/G8, pixels bruts et propriétés contrôlées, sans import d'image. Les données GPU sont régénérées par le moteur cible. Réouverture et comparaison obligatoires avant installation. Les autres types natifs restent bloqués." FontSize="10" Foreground="#D7C39C" TextWrapping="Wrap" />
+                  <TextBlock Text="Chaque asset est analysé dans une copie temporaire. Les adaptateurs natifs reconstruisent les types pris en charge ; les autres restent bloquants. Assistance IA / MCP facultative : l’agent peut réparer une copie, y compris le code d’un plugin. Recompilation, contrôle des dépendances et réouverture cible obligatoires avant publication. Aucun downgrade universel ni équivalence visuelle garantis." FontSize="10" Foreground="#D7C39C" TextWrapping="Wrap" />
                 </StackPanel>
               </Border>
               <Grid ColumnDefinitions="*,*,*">
@@ -137,6 +137,19 @@
                   <TextBlock Text="Catalogue de profils personnalisé (JSON, facultatif)" />
                   <TextBox Classes="path" Text="{Binding UnrealVersionBridgeAssetProfileFile}" PlaceholderText="Vide : catalogue intégré UE 5.6 → 5.5" />
                   <TextBlock Text="Éditable en JSON. Un catalogue ne peut pas activer un adaptateur absent du code. Les options du script permettent de choisir natif/portable et Analyser seulement." FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" />
+                  <Expander Header="Assistance IA optionnelle · MCP / CyToolsCore">
+                    <StackPanel>
+                      <TextBlock Text="Python privé du compagnon MCP (facultatif)" />
+                      <TextBox Classes="path" Text="{Binding UnrealVersionBridgeAgentPython}" PlaceholderText="…/Scripts/python.exe · CyToolsCore 0.10.1 + MCP 1.30.0" />
+                      <TextBlock Text="Préparation explicite : Extensions/cyenginehub.unreal-version-bridge/mcp/Setup.ps1 -Python chemin_python_3.11 -EnvironmentDirectory nouveau_dossier. Aucun téléchargement ou agent lancé automatiquement." FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" />
+                      <TextBlock Text="Dans le script Convertir puis installer, activez Assistance IA. En cas de blocage, ouvrez le mcp.json de la tâche dans votre client IA. Une fois la réparation terminée, renseignez son dossier dans Reprendre une tâche IA. Les modules C++ exigent les sources autorisées et la toolchain cible." FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" />
+                      <TextBlock Text="Autoriser les scripts et la compilation donne les droits de votre compte à Python, C++ et Build.cs. Ce n’est pas un bac à sable OS. Fournisseur, confidentialité et coûts restent ceux du client IA choisi. Vérifiez le résultat visuel et le comportement." FontSize="9" Foreground="#F0B95F" TextWrapping="Wrap" />
+                      <WrapPanel>
+                        <Button Content="Ouvrir les tâches IA" Command="{Binding OpenUnrealVersionBridgeAgentTasksCommand}" />
+                        <Button Content="Dossier SDK / guide" Command="{Binding OpenUnrealVersionBridgeSdkFolderCommand}" />
+                      </WrapPanel>
+                    </StackPanel>
+                  </Expander>
                   <Button Classes="accent" Content="Enregistrer / recharger les profils" Command="{Binding SaveUnrealVersionBridgeSettingsCommand}" />
                   <Expander Header="Profils par type : adaptations et contrôles prévus">
                     <TextBlock Text="{Binding UnrealVersionBridgeAssetProfilesSummary}" FontSize="11" TextWrapping="Wrap" />

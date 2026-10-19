@@ -15,6 +15,7 @@
     <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/Commands.cs" Link="Desktop/Commands.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/ObservableObject.cs" Link="Desktop/ObservableObject.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/MarketplaceConnectorViewModel.cs" Link="Desktop/MarketplaceConnectorViewModel.cs" />
+    <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/MarketplaceCompressionChoice.cs" Link="Desktop/MarketplaceCompressionChoice.cs" />
     <ProjectReference Include="../../src/CyEngineHub.Extensions/CyEngineHub.Extensions.csproj" />
     <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/ConnectorLibraryViewModel.cs" Link="Desktop/ConnectorLibraryViewModel.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/Views/MarketplaceBrowserPolicy.cs" Link="Desktop/MarketplaceBrowserPolicy.cs" />

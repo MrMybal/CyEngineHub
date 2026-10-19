@@ -34,6 +34,22 @@ internal sealed partial class ImGuiWorkspace
     private static UiNode? SettingsPanel(UiNode page, string property) => page.Descendants()
         .FirstOrDefault(n => n["IsVisible"] == "{Binding " + property + "}");
 
+    private void MarketplaceSettingsFooter(object model, string label, string command, string status, bool openInventory = false)
+    {
+        ActionButton(model, label, command, true);
+        Record("marketplace-settings/save");
+        if (openInventory)
+        {
+            const string openLabel = "Ouvrir l’inventaire dans CyEngineHub";
+            var required = Gui.GetItemRectSize().X + Gui.GetStyle().ItemSpacing.X + Gui.CalcTextSize(openLabel).X + Gui.GetStyle().FramePadding.X * 2;
+            if (Gui.GetContentRegionAvail().X >= required) Gui.SameLine();
+            ActionButton(model, openLabel, "OpenInventoryCommand");
+            Record("marketplace-settings/open-inventory");
+        }
+        Gui.TextWrapped("Chemins, quotas et ordre des bibliothèques : sauvegarde automatique après modification.");
+        Gui.TextWrapped(status);
+    }
+
     private bool DrawOrganizedSettings(MainWindowViewModel vm, UiNode page)
     {
         if (vm.IsSettingsAppearanceSelected)
@@ -100,15 +116,21 @@ internal sealed partial class ImGuiWorkspace
                 }
                 else Gui.TextWrapped("Le téléchargement authentifié Unity n’est pas encore disponible. Aucun réglage de connexion fictif n’est appliqué.");
                 if (card is not null) DrawNode(card, vm);
-                ActionButton(vm, "Enregistrer " + _settingsMarket, _settingsMarket == "Fab" ? "SaveFabMarketplacePanelCommand" : _settingsMarket == "Megascans" ? "SaveQuixelMarketplacePanelCommand" : "SaveUnityMarketplacePanelCommand", true);
-                Gui.TextWrapped(vm.MarketplaceStorageSaveStatus);
+                MarketplaceSettingsFooter(vm, "Enregistrer " + _settingsMarket,
+                    _settingsMarket == "Fab" ? "SaveFabMarketplacePanelCommand" : _settingsMarket == "Megascans" ? "SaveQuixelMarketplacePanelCommand" : "SaveUnityMarketplacePanelCommand",
+                    vm.MarketplaceStorageSaveStatus);
                 Gui.TextWrapped(vm.StatusMessage);
             }
             else
             {
                 var connector = vm.MarketplaceConnectors.FirstOrDefault(c => c.Id == _settingsMarket);
                 var template = panel?.Descendants().FirstOrDefault(n => n.Kind == "ItemsControl" && n["ItemsSource"] == "{Binding MarketplaceConnectors}")?.Descendants().FirstOrDefault(n => n.Kind == "DataTemplate");
-                if (connector is not null && template is not null) DrawChildren(template, connector);
+                if (connector is not null && template is not null)
+                {
+                    Gui.TextWrapped("Téléchargements via le navigateur intégré. Le réglage de connexions Fab / Megascans ne s’applique pas à ce connecteur.");
+                    DrawChildren(template, connector);
+                    MarketplaceSettingsFooter(connector, connector.SettingsSaveLabel, "SaveCommand", connector.SaveStatus, openInventory: true);
+                }
             }
             return true;
         }

@@ -50,6 +50,8 @@ public sealed class FabInstallationPipeline(IFabInstallationScriptRegistry regis
             progress?.Report(new(null, $"Étape {index + 1}/{steps.Count} · {script.Descriptor.DisplayName}"));
             var result = await script.InstallAsync(context with { Configuration = configuration }, progress, cancellationToken).ConfigureAwait(false);
             results.Add(result);
+            if (result.Outputs.GetValueOrDefault("agentPending") == "true")
+                return results; // No later installation step may run on an unresolved conversion.
             if (prepares)
             {
                 if (!result.Outputs.TryGetValue("variant", out var variant)) throw new InvalidDataException("Une étape de préparation n’a pas fourni sa sortie.");

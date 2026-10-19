@@ -38,6 +38,7 @@ try {
     Invoke-DotNet (@('publish', 'src/CyEngineHub.Updater/CyEngineHub.Updater.csproj') + $publishArguments + @('-o', (Join-Path $appStage 'Updater')))
     Invoke-DotNet (@('publish', 'src/CyEngineHub.Mcp/CyEngineHub.Mcp.csproj') + $publishArguments + @('-o', (Join-Path $appStage 'Mcp')))
     Invoke-DotNet (@('publish', 'src/CyEngineHub.AssetBridge.Tool/CyEngineHub.AssetBridge.Tool.csproj') + $publishArguments + @('-o', (Join-Path $appStage 'Extensions\cyenginehub.asset-bridge\tools')))
+    Invoke-DotNet (@('publish', 'src/CyEngineHub.VersionBridge.Tool/CyEngineHub.VersionBridge.Tool.csproj') + $publishArguments + @('-o', (Join-Path $appStage 'Extensions\cyenginehub.unreal-version-bridge\mcp\tools')))
 
     # Some native NuGet packages supply symbols even when DebugSymbols=false.
     foreach ($symbols in Get-ChildItem -LiteralPath $appStage -Filter '*.pdb' -Recurse -File) {
@@ -49,7 +50,7 @@ try {
     }
     # Executable project references may contribute orphan hosts at the app root;
     # the real tools live in their own self-contained folders above.
-    foreach ($toolName in @('CyEngineHub.Updater', 'CyEngineHub.AssetBridge.Tool', 'CyEngineHub.Mcp')) {
+    foreach ($toolName in @('CyEngineHub.Updater', 'CyEngineHub.AssetBridge.Tool', 'CyEngineHub.Mcp', 'CyEngineHub.VersionBridge.Tool')) {
         foreach ($extension in @('.exe', '.deps.json', '.runtimeconfig.json')) {
             $orphan = Join-Path $appStage ($toolName + $extension)
             if (Test-Path -LiteralPath $orphan -PathType Leaf) { Remove-Item -LiteralPath $orphan }
@@ -59,13 +60,14 @@ try {
     $extensionsRoot = Join-Path $repoRoot 'extensions\builtin'
     foreach ($file in Get-ChildItem -LiteralPath $extensionsRoot -Recurse -File) {
         # Copy extension manifests/scripts, never local bytecode or test outputs.
-        if ($file.Extension -notin @('.json', '.py', '.uplugin', '.cs', '.cpp', '.h', '.hpp', '.inl')) { continue }
+        if ($file.Extension -notin @('.json', '.py', '.uplugin', '.cs', '.cpp', '.h', '.hpp', '.inl', '.md', '.ps1', '.txt', '.whl')) { continue }
         $relative = [IO.Path]::GetRelativePath($extensionsRoot, $file.FullName)
         $destination = Join-Path (Join-Path $appStage 'Extensions') $relative
         New-Item -ItemType Directory -Path (Split-Path $destination) -Force | Out-Null
         Copy-Item -LiteralPath $file.FullName -Destination $destination
     }
     Copy-Item -LiteralPath (Join-Path $repoRoot 'README.md'), (Join-Path $repoRoot 'THIRD_PARTY_NOTICES.md') -Destination $appStage
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'LICENCES') -Destination $appStage -Recurse
     # Only audited runtime files, never native build projects, intermediates or symbols.
     foreach ($nativeVersion in @('5.3', '5.5', '5.6', '5.7')) {
         foreach ($relative in @('CyHubNativeBridge.uplugin', 'Binaries/Win64/UnrealEditor-CyHubNativeBridge.dll', 'Binaries/Win64/UnrealEditor.modules')) {
@@ -121,6 +123,13 @@ try {
     $required = @('CyEngineHub.Desktop.exe', 'coreclr.dll', 'Updater\CyEngineHub.Updater.exe',
         'Mcp\CyEngineHub.Mcp.exe', 'Mcp\coreclr.dll',
         'Updater\coreclr.dll', 'Extensions\cyenginehub.asset-bridge\tools\CyEngineHub.AssetBridge.Tool.exe',
+        'Extensions\cyenginehub.unreal-version-bridge\mcp\tools\CyEngineHub.VersionBridge.Tool.exe',
+        'Extensions\cyenginehub.unreal-version-bridge\mcp\tools\coreclr.dll',
+        'Extensions\cyenginehub.unreal-version-bridge\mcp\server.py',
+        'Extensions\cyenginehub.unreal-version-bridge\mcp\Setup.ps1',
+        'Extensions\cyenginehub.unreal-version-bridge\mcp\requirements.txt',
+        'Extensions\cyenginehub.unreal-version-bridge\mcp\vendor\cytools_core-0.10.1-py3-none-any.whl',
+        'LICENCES\CyToolsCore-MIT.txt', 'LICENCES\SOURCES.txt',
         'Extensions\cyenginehub.unreal-version-bridge\scripts\source-export.py',
         'Extensions\cyenginehub.unreal-relocated-install\scripts\relocate-pack.py')
     foreach ($relative in $required) {

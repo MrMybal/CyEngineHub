@@ -200,6 +200,8 @@ internal sealed partial class ImGuiWorkspace : IDisposable
                 var value = UiBinding.Boolean(context, node["IsChecked"], false);
                 if (Gui.Checkbox(Text(context, node["Content"]) + "###value", ref value)) Set(context, node["IsChecked"], value);
                 Record("check/" + (UiBinding.Path(node["IsChecked"]) ?? node.Id));
+                if (context is MarketplaceConnectorViewModel connector && UiBinding.Path(node["IsChecked"]) == "IsEnabled")
+                    Record("connector-enabled/" + connector.Id);
                 if (context is FabInstallationConfigurationOptionViewModel option) Record("script-option/" + option.Id);
                 if (node.Children.Length > 0)
                 {
@@ -232,6 +234,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
                 var expanded = UiBinding.Boolean(context, node["IsExpanded"], false);
                 if (expanded) Gui.SetNextItemOpen(true, ImGuiCond.Once);
                 var open = Gui.CollapsingHeader(Text(context, node["Header"]) + "###expander");
+                if (node["Name"] is not null) Record("expander/" + node["Name"]);
                 if (node["IsExpanded"] is not null && open != expanded) Set(context, node["IsExpanded"], open);
                 if (open) DrawChildren(node, context);
                 break;
@@ -392,6 +395,14 @@ internal sealed partial class ImGuiWorkspace : IDisposable
                 var label = display is not null ? Text(item, display) : Label(item);
                 if (template is not null) label = template.Descendants().Prepend(template).Where(child => child.Kind == "TextBlock").Select(child => Text(item, child["Text"])).FirstOrDefault(text => !string.IsNullOrEmpty(text)) ?? label;
                 if (Gui.Selectable(label, Equals(item, selected))) Set(context, node["SelectedItem"], item);
+                var compressionMode = item switch
+                {
+                    MarketplaceCompressionOptionViewModel compression => compression.StorageMode.ToString(),
+                    MarketplaceCompressionChoice compression => compression.StorageMode,
+                    _ => null,
+                };
+                if (compressionMode is not null)
+                    Record("combo-option/" + UiBinding.Path(node["SelectedItem"]) + "/" + compressionMode);
                 if (Equals(item, selected)) Gui.SetItemDefaultFocus();
                 Gui.PopID();
             }

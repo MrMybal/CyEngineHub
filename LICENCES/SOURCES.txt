@@ -1,0 +1,10 @@
+CyToolsCore 0.10.1 (MIT, Copyright (c) 2026 Cyberalien)
+https://github.com/MrMybal/CyToolsCore
+https://github.com/MrMybal/CyToolsCore/blob/main/Docs/UnrealIntegration.md
+https://github.com/MrMybal/CyToolsCore/blob/main/Docs/FullOperationAccess.md
+
+The optional Unreal Version Bridge MCP companion uses the official Core wheel,
+not a copied runtime. Its Python dependencies are installed only on explicit setup.
+MCP Python SDK 1.30.0: https://github.com/modelcontextprotocol/python-sdk
+CyUEMCPSDK reference integration guide: https://github.com/MrMybal/CyUEMCPSDK
+No CyUEMCPSDK code or Unreal assistant runtime is embedded in this integration.

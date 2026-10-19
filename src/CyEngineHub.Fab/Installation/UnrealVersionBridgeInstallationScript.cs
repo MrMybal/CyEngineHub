@@ -4,6 +4,10 @@ using CyEngineHub.Core.Settings;
 using CyEngineHub.Fab.Import;
 using CyEngineHub.Fab.Packaging;
 using CyEngineHub.Unreal.Models;
+using CyEngineHub.Plugins.Compatibility;
+using CyEngineHub.Plugins.Discovery;
+using CyEngineHub.Plugins.Installation;
+using CyEngineHub.Plugins.Parsing;
 
 namespace CyEngineHub.Fab.Installation;
 
@@ -14,6 +18,7 @@ public static class UnrealVersionBridgeSettings
     public const string KeepStaging = "plugins.unrealVersionBridge.keepStaging.v1";
     public const string ValidateOutput = "plugins.unrealVersionBridge.validateOutput.v1";
     public const string AssetProfileFile = "plugins.unrealVersionBridge.assetProfileFile.v1";
+    public const string AgentPython = "plugins.unrealVersionBridge.agentPython.v1";
 }
 
 public sealed record UnrealVersionBridgeVariantManifest(
@@ -43,11 +48,15 @@ public sealed class UnrealVersionBridgeInstallationScript(
     public FabInstallationScriptDescriptor Descriptor { get; } = new(
         ScriptId,
         "Unreal · Convertir puis installer",
-        "Alpha · Natif C++ Texture2D et graphes Material/MaterialInstanceConstant contrôlés : 5.7 vers 5.5/5.3. Sauvegarde native et comparaison après réouverture cible. Types et nœuds non adaptés bloquants.",
+        "Alpha · Conversion native contrôlée, avec réouverture cible. Assistance IA / MCP facultative pour réparer les blocages et adapter les plugins dans une copie. Compilation et validation obligatoires ; ni downgrade universel ni équivalence visuelle garantis.",
         "CyEngineHub",
-        [LibraryPackageContentKind.ContentPack, LibraryPackageContentKind.RawAsset, LibraryPackageContentKind.Unknown],
+        [LibraryPackageContentKind.ContentPack, LibraryPackageContentKind.RawAsset, LibraryPackageContentKind.Unknown,
+            LibraryPackageContentKind.CodePlugin, LibraryPackageContentKind.EnginePackage],
         [FabInstallationTargetKind.Project],
         [
+            new("enableAgentFallback", "Assistance IA / MCP si la conversion bloque", "Optionnelle : prépare une copie de réparation et une configuration MCP CyToolsCore. Aucun agent n’est lancé ni fournisseur sélectionné automatiquement ; aucune installation tant que la tâche n’est pas reprise et validée.", FabInstallationOptionKind.Boolean, "false", []),
+            new("allowAgentCodeExecution", "Autoriser les scripts et la compilation de l’agent", "Attention : Python, C++, Build.cs et plugins s’exécutent avec les droits de votre compte Windows. Le dossier isolé n’est pas un bac à sable OS. Laissez désactivé pour une analyse en lecture seule.", FabInstallationOptionKind.Boolean, "false", []),
+            new("agentWorkspace", "Reprendre une tâche IA (dossier)", "Vide : conversion habituelle. Sinon : dossier de réparation préparé pour ce pack/couple de moteurs. Le hub recompile le plugin et recharge tous les packages avant de publier et d’installer.", FabInstallationOptionKind.Text, string.Empty, []),
             new("conversionMode", "Méthode", "Natif : pixels source, graphes de matériaux et références pris en charge, contrôle C++ obligatoire. Portable : export/import expérimental sur accord explicite.", FabInstallationOptionKind.Choice, "native", ["native", "portable"]),
             new("assetProfileFile", "Profils par type (JSON)", "Vide : catalogue intégré adapté au couple (5.7 vers 5.5/5.3 ou 5.6 vers 5.5). Un fichier personnalisé n'active aucun code non implémenté.", FabInstallationOptionKind.Text, string.Empty, []),
             new("analyzeOnly", "Analyser seulement", "Produit un rapport par asset sans convertir, publier ni installer. Les diagnostics sont conservés.", FabInstallationOptionKind.Boolean, "false", []),
@@ -81,7 +90,9 @@ public sealed class UnrealVersionBridgeInstallationScript(
             ?? throw new InvalidOperationException(
                 $"Unreal Engine {FormatVersion(sourceVersion)} doit être installé pour lire ce pack.");
         var analyzeOnly = bool.TryParse(context.Configuration.GetValueOrDefault("analyzeOnly"), out var analyze) && analyze;
-        if (Compare(sourceEngine.Version, targetEngine.Version) <= 0)
+        var pluginPack = context.ContentKind is LibraryPackageContentKind.CodePlugin or LibraryPackageContentKind.EnginePackage;
+        if (Compare(sourceEngine.Version, targetEngine.Version) <= 0 && string.IsNullOrWhiteSpace(context.Configuration.GetValueOrDefault("agentWorkspace")) &&
+            !(pluginPack && ParseAgentBoolean(context.Configuration, "enableAgentFallback") && Compare(sourceEngine.Version, targetEngine.Version) != 0))
         {
             if (analyzeOnly)
                 throw new InvalidOperationException("L'analyse par profils concerne les conversions vers une version antérieure. Aucune installation effectuée.");
@@ -89,6 +100,8 @@ public sealed class UnrealVersionBridgeInstallationScript(
                 return new(Descriptor.Id, "Aucune conversion requise ; projet cible inchangé.",
                     new Dictionary<string, string> { ["variant"] = context.SourceDirectory });
             progress?.Report(new(0, "Le pack n’est pas plus récent : installation standard."));
+            if (pluginPack)
+                return await InstallPluginAsync(context, progress, cancellationToken).ConfigureAwait(false);
             return await InstallContentAsync(context.SourceDirectory, project.FilePath, context.Configuration, progress, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -124,7 +137,11 @@ public sealed class UnrealVersionBridgeInstallationScript(
                     context.Configuration.GetValueOrDefault("conversionMode", "native"),
                     assetProfileFile,
                     bool.TryParse(context.Configuration.GetValueOrDefault("allowLossyConversion"), out var allowLosses) && allowLosses,
-                    analyzeOnly),
+                    analyzeOnly,
+                    ParseAgentBoolean(context.Configuration, "enableAgentFallback"),
+                    ParseAgentBoolean(context.Configuration, "allowAgentCodeExecution"),
+                    context.Configuration.GetValueOrDefault("agentWorkspace"),
+                    await settings.GetAsync(UnrealVersionBridgeSettings.AgentPython, cancellationToken).ConfigureAwait(false)),
                 progress,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -132,6 +149,11 @@ public sealed class UnrealVersionBridgeInstallationScript(
             return new(Descriptor.Id,
                 $"Analyse préliminaire : {converted.UnsupportedAssetCount:N0} asset(s) bloquant(s). Contrôles C++ supplémentaires requis en natif. Aucune conversion ni installation. Rapport : {converted.ReportPath}",
                 new Dictionary<string, string> { ["report"] = converted.ReportPath });
+        if (converted.AgentWorkspace is not null)
+            return new(Descriptor.Id, $"En attente d’un agent IA : {converted.AgentWorkspace}. Connectez mcp.json, puis renseignez ce dossier dans « Reprendre une tâche IA ». Aucun asset converti, publié ou installé.",
+                new Dictionary<string, string> { ["agentPending"] = "true", ["agentWorkspace"] = converted.AgentWorkspace,
+                    ["mcpConfig"] = Path.Combine(converted.AgentWorkspace, "mcp.json"), ["report"] = converted.ReportPath,
+                    ["registerDerivedVariant"] = "false" });
         if (context.Configuration.GetValueOrDefault("prepareOnly") == "true")
             return new(Descriptor.Id, "Conversion préparée ; projet cible inchangé.", new Dictionary<string, string>
             {
@@ -139,8 +161,11 @@ public sealed class UnrealVersionBridgeInstallationScript(
                 ["report"] = converted.ReportPath, ["sourceVersion"] = FormatVersion(targetEngine.Version),
                 ["registerDerivedVariant"] = register ? "true" : "false",
             });
-        var installed = await InstallContentAsync(converted.VariantDirectory, project.FilePath, context.Configuration, progress, cancellationToken)
-            .ConfigureAwait(false);
+        FabInstallationScriptResult installed;
+        if (converted.ContainsPlugins)
+            installed = await InstallPluginAsync(context with { SourceDirectory = converted.VariantDirectory }, progress, cancellationToken).ConfigureAwait(false);
+        else
+            installed = await InstallContentAsync(converted.VariantDirectory, project.FilePath, context.Configuration, progress, cancellationToken).ConfigureAwait(false);
         return new(
             Descriptor.Id,
             $"Variante UE {FormatVersion(targetEngine.Version)} créée ({converted.ImportedAssetCount:N0} asset(s)) puis installée. {installed.Summary}",
@@ -152,6 +177,7 @@ public sealed class UnrealVersionBridgeInstallationScript(
                 ["registerDerivedVariant"] = register ? "true" : "false",
                 ["receipt"] = installed.Outputs.GetValueOrDefault("receipt", string.Empty),
                 ["backup"] = installed.Outputs.GetValueOrDefault("backup", string.Empty),
+                ["destination"] = installed.Outputs.GetValueOrDefault("destination", string.Empty),
             });
     }
 
@@ -181,6 +207,15 @@ public sealed class UnrealVersionBridgeInstallationScript(
             });
     }
 
+    private static Task<FabInstallationScriptResult> InstallPluginAsync(FabInstallationScriptContext context,
+        IProgress<FabInstallationScriptProgress>? progress, CancellationToken token)
+    {
+        var parser = new UpluginDescriptorParser();
+        var installer = new UnrealProjectPluginInstallationScript(new PluginDiscoveryService(parser),
+            new PluginInstallationService(new PluginCompatibilityService(), parser));
+        return installer.InstallAsync(context, progress, token);
+    }
+
     private async Task<bool> ResolveBooleanAsync(
         IReadOnlyDictionary<string, string> configuration,
         string configurationKey,
@@ -191,6 +226,12 @@ public sealed class UnrealVersionBridgeInstallationScript(
         var value = configuration.GetValueOrDefault(configurationKey, string.Empty);
         if (string.IsNullOrWhiteSpace(value)) value = await settings.GetAsync(settingKey, cancellationToken).ConfigureAwait(false);
         return bool.TryParse(value, out var parsed) ? parsed : fallback;
+    }
+
+    private static bool ParseAgentBoolean(IReadOnlyDictionary<string, string> configuration, string key)
+    {
+        var value = configuration.GetValueOrDefault(key, "false");
+        return bool.TryParse(value, out var parsed) ? parsed : throw new InvalidOperationException("Option IA invalide : " + key);
     }
 
     private static UnrealEngineInstallation? SelectSourceEngine(IReadOnlyList<UnrealEngineInstallation> engines, EngineVersion requested) => engines

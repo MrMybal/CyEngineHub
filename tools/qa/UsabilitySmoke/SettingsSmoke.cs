@@ -65,6 +65,14 @@ partial class Program
         Check(ImGuiDiagnostics.Elements(window).Contains("script-option/registerDerivedVariant"), "Downgrade script exposes a real checkbox for adding its derived version to the asset sheet");
         await ImGuiDiagnostics.ClickAsync(window, "script-option/registerDerivedVariant");
         Check(target.GetInstallationConfiguration()["registerDerivedVariant"].Equals("false", StringComparison.OrdinalIgnoreCase), "Derivative checkbox updates the configuration sent to the script");
+        await ImGuiDiagnostics.ClickAsync(window, "expander/AgentRepairOptions");
+        Check(ImGuiDiagnostics.Elements(window).Contains("script-option/enableAgentFallback") &&
+              ImGuiDiagnostics.Elements(window).Contains("script-option/allowAgentCodeExecution"), "Agent fallback and OS code execution are separate visible opt-in controls");
+        Check(target.GetInstallationConfiguration()["enableAgentFallback"].Equals("false", StringComparison.OrdinalIgnoreCase) &&
+              target.GetInstallationConfiguration()["allowAgentCodeExecution"].Equals("false", StringComparison.OrdinalIgnoreCase), "MCP repair and code execution are disabled by default");
+        await ImGuiDiagnostics.ClickAsync(window, "script-option/enableAgentFallback");
+        Check(target.GetInstallationConfiguration()["enableAgentFallback"].Equals("true", StringComparison.OrdinalIgnoreCase) &&
+              target.GetInstallationConfiguration()["allowAgentCodeExecution"].Equals("false", StringComparison.OrdinalIgnoreCase), "Enabling AI analysis never silently enables Python/C++ execution");
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "settings-downgrade-options.png"));
         await ImGuiDiagnostics.ClickAsync(window, "command/CloseFabInstallationScriptConfigurationCommand");
     }

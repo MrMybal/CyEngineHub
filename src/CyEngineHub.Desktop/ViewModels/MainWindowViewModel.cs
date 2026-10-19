@@ -316,6 +316,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _unrealVersionBridgeAssetProfileFile = string.Empty;
     private bool _unrealVersionBridgeKeepStaging;
     private bool _unrealVersionBridgeValidateOutput = true;
+    private string _unrealVersionBridgeAgentPython = string.Empty;
     private HubExtensionInstallPlan? _pendingHubExtensionInstall;
     private string _pendingHubExtensionInstallSummary = string.Empty;
     private HubExtensionExecutionPlan? _pendingHubExtensionExecution;
@@ -1304,6 +1305,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SaveUnrealVersionBridgeSettingsCommand = new AsyncRelayCommand(
             SaveUnrealVersionBridgeSettingsAsync,
             onError: ShowError);
+        OpenUnrealVersionBridgeAgentTasksCommand = new AsyncRelayCommand(async () =>
+        {
+            var path = Path.Combine(UnrealVersionBridgeStorageRoot, ".staging");
+            if (!Directory.Exists(path)) { StatusMessage = "Aucune tâche de réparation IA préparée pour ce stockage."; return; }
+            await _platformLauncher.OpenFolderAsync(path).ConfigureAwait(true);
+        }, onError: ShowError);
+        OpenUnrealVersionBridgeSdkFolderCommand = new AsyncRelayCommand(() =>
+            _platformLauncher.OpenFolderAsync(Path.Combine(AppContext.BaseDirectory, "Extensions", "cyenginehub.unreal-version-bridge", "mcp")), onError: ShowError);
         PreviousLibraryPageCommand = new RelayCommand(ShowPreviousLibraryPage);
         NextLibraryPageCommand = new RelayCommand(ShowNextLibraryPage);
         ToggleAdvancedLibraryFilterCommand = new RelayCommand(() =>
@@ -1510,13 +1519,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<SettingsCategoryOptionViewModel> SettingsCategories { get; } = [];
 
     public ObservableCollection<MarketplaceCompressionOptionViewModel> MarketplaceCompressionOptions { get; } =
-    [
-        new(LibraryPackageStorageMode.ZipStore, "Stockage", "ZIP sans recompression"),
-        new(LibraryPackageStorageMode.ZipFastest, "Rapide", "Priorité à la vitesse"),
-        new(LibraryPackageStorageMode.ZipBalanced, "Moyen", "Équilibre vitesse et taille"),
-        new(LibraryPackageStorageMode.ZipHigh, "Élevé", "Réduction de taille renforcée"),
-        new(LibraryPackageStorageMode.ZipUltra, "Ultra", "Taille minimale, plus lent"),
-    ];
+        [.. MarketplaceCompressionOptionViewModel.ZipOptions];
 
     public ObservableCollection<MarketplaceLibraryLocationViewModel> FabLibraryLocations { get; } = [];
 
@@ -1715,6 +1718,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ICommand TrimEpicVaultNativeCacheCommand { get; }
 
     public ICommand SaveUnrealVersionBridgeSettingsCommand { get; }
+    public ICommand OpenUnrealVersionBridgeAgentTasksCommand { get; }
+    public ICommand OpenUnrealVersionBridgeSdkFolderCommand { get; }
 
     public ICommand PreviousLibraryPageCommand { get; }
 
@@ -4657,6 +4662,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         set => SetProperty(ref _unrealVersionBridgeStorageRoot, value);
     }
 
+    public string UnrealVersionBridgeAgentPython
+    {
+        get => _unrealVersionBridgeAgentPython;
+        set => SetProperty(ref _unrealVersionBridgeAgentPython, value);
+    }
+
     public string UnrealVersionBridgeProfile
     {
         get => _unrealVersionBridgeProfile;
@@ -5051,6 +5062,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         var versionBridgeProfile = await _settings.GetAsync(UnrealVersionBridgeSettings.ConversionProfile).ConfigureAwait(true);
         UnrealVersionBridgeAssetProfileFile = await _settings.GetAsync(UnrealVersionBridgeSettings.AssetProfileFile).ConfigureAwait(true) ?? string.Empty;
+        UnrealVersionBridgeAgentPython = await _settings.GetAsync(UnrealVersionBridgeSettings.AgentPython).ConfigureAwait(true) ?? string.Empty;
         UnrealVersionBridgeProfile = string.Equals(versionBridgeProfile, "extended", StringComparison.OrdinalIgnoreCase)
             ? "extended"
             : "safe";
@@ -5904,6 +5916,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task SaveUnrealVersionBridgeSettingsAsync()
     {
+        if (!string.IsNullOrWhiteSpace(UnrealVersionBridgeAgentPython))
+        {
+            var python = Path.GetFullPath(UnrealVersionBridgeAgentPython.Trim().Trim((char)34));
+            if (!File.Exists(python)) throw new InvalidOperationException("Choisissez le python.exe de l’environnement privé MCP préparé avec Setup.ps1.");
+            UnrealVersionBridgeAgentPython = python;
+        }
         if (!string.IsNullOrWhiteSpace(UnrealVersionBridgeAssetProfileFile))
         {
             var profilePath = Path.GetFullPath(UnrealVersionBridgeAssetProfileFile.Trim().Trim((char)34));
@@ -5930,6 +5948,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             : "safe";
         await _settings.SetAsync(UnrealVersionBridgeSettings.StorageRoot, root).ConfigureAwait(true);
         await _settings.SetAsync(UnrealVersionBridgeSettings.AssetProfileFile, UnrealVersionBridgeAssetProfileFile).ConfigureAwait(true);
+        await _settings.SetAsync(UnrealVersionBridgeSettings.AgentPython, UnrealVersionBridgeAgentPython).ConfigureAwait(true);
         OnPropertyChanged(nameof(UnrealVersionBridgeAssetProfilesSummary));
         await _settings.SetAsync(
             UnrealVersionBridgeSettings.ConversionProfile,
@@ -9194,6 +9213,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IsFabInstallOptionsVisible = false;
         var completedDownloads = new List<(FabInstallVersionOptionViewModel Option, DirectFabDownloadResult Result)>();
         var completedInstallations = 0;
+        var pendingAgentWorkspaces = new List<string>();
         var packageStorageMode = ResolveMarketplaceStorageMode(asset);
         var marketplaceStorage = ResolveMarketplaceStorageProfile(asset);
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
@@ -9240,7 +9260,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                             foreach (var target in targets.Where(target =>
                                          CanInstallFabVersionIntoTarget(option.Version, target)))
                             {
-                                await ExecuteSelectedFabInstallationScriptAsync(
+                                var pendingAgent = await ExecuteSelectedFabInstallationScriptAsync(
                                         asset,
                                         option.Version,
                                         materialized,
@@ -9248,7 +9268,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                                         context,
                                         cancellationToken)
                                     .ConfigureAwait(false);
-                                completedInstallations++;
+                                if (pendingAgent is null) completedInstallations++;
+                                else pendingAgentWorkspaces.Add(pendingAgent);
                             }
                         }
                         finally
@@ -9277,7 +9298,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         .ToArray();
                     foreach (var target in compatibleTargets)
                     {
-                        await ExecuteSelectedFabInstallationScriptAsync(
+                        var pendingAgent = await ExecuteSelectedFabInstallationScriptAsync(
                                 asset,
                                 option.Version,
                                 result.DestinationDirectory,
@@ -9285,7 +9306,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                                 context,
                                 cancellationToken)
                             .ConfigureAwait(false);
-                        completedInstallations++;
+                        if (pendingAgent is null) completedInstallations++;
+                        else pendingAgentWorkspaces.Add(pendingAgent);
                     }
                     var packageProgress = new InlineProgress<DirectFabDownloadProgress>(value =>
                     {
@@ -9308,7 +9330,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         .ConfigureAwait(false);
                     completedDownloads.Add((option, result));
                 }
-                context.Report(1, "Toutes les installations sont terminées.");
+                context.Report(1, pendingAgentWorkspaces.Count == 0 ? "Toutes les installations sont terminées." :
+                    $"{pendingAgentWorkspaces.Count} tâche(s) en attente d’un agent IA ; aucune installation pour ces tâches.");
             }));
 
         var completed = await handle.Completion.ConfigureAwait(true);
@@ -9329,10 +9352,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         FabDownloadStatus = selectedDerived is null
             ? $"{versions.Length:N0} version(s) téléchargée(s) · {completedInstallations:N0} installation(s) compatible(s) terminée(s)."
             : $"Dérivé local installé · {completedInstallations:N0} installation(s) compatible(s) terminée(s).";
+        if (pendingAgentWorkspaces.Count > 0)
+            FabDownloadStatus = $"{completedInstallations:N0} installation(s) terminée(s) · {pendingAgentWorkspaces.Count:N0} tâche(s) IA à reprendre : {string.Join(" ; ", pendingAgentWorkspaces)}";
         StatusMessage = FabDownloadStatus;
     }
 
-    private async Task ExecuteSelectedFabInstallationScriptAsync(
+    private async Task<string?> ExecuteSelectedFabInstallationScriptAsync(
         RemoteFabAsset asset,
         RemoteFabProjectVersion version,
         string sourceDirectory,
@@ -9396,6 +9421,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             await registration;
         }
         taskContext.Report(null, $"{target.Name} · {result.Summary}");
+        return result.Outputs.GetValueOrDefault("agentPending") == "true" ? result.Outputs["agentWorkspace"] : null;
     }
 
     private async Task RegisterDerivedVariantAsync(

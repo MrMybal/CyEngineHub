@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../CyEngineHub.Fab/CyEngineHub.Fab.csproj" />
+    <Compile Include="../CyEngineHub.Infrastructure/Processes/SystemProcessRunner.cs" Link="SystemProcessRunner.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../extensions/builtin/cyenginehub.unreal-version-bridge/scripts/agent-validate.py" Link="Extensions/cyenginehub.unreal-version-bridge/scripts/agent-validate.py" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

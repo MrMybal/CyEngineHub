@@ -59,4 +59,48 @@ public sealed class MarketplaceConnectorAutosaveTests
         Assert.Equal("corrected", saved!.DownloadDirectory);
         Assert.Equal("Enregistré automatiquement", vm.SaveStatus);
     }
+
+    [Theory]
+    [InlineData("Uncompressed", "Non compressé")]
+    [InlineData("ZipStore", "Stockage")]
+    [InlineData("ZipFastest", "Rapide")]
+    [InlineData("ZipBalanced", "Moyen")]
+    [InlineData("ZipHigh", "Élevé")]
+    [InlineData("ZipUltra", "Ultra")]
+    public async Task FriendlyCompressionOptionsKeepExistingStorageKeys(string mode, string label)
+    {
+        MarketplaceConnectorSettings? saved = null;
+        var vm = Create(snapshot => { saved = snapshot; return Task.CompletedTask; });
+        vm.SelectedCompressionOption = vm.CompressionOptions.Single(option => option.StorageMode == mode);
+        await vm.SaveAsync();
+        Assert.Equal(label, vm.SelectedCompressionOption.Label);
+        Assert.Equal(mode, vm.Compression);
+        Assert.Equal(mode, saved!.Compression);
+    }
+
+    [Fact]
+    public async Task UpdatingTheStoredModeNotifiesTheFriendlySelection()
+    {
+        var vm = Create(_ => Task.CompletedTask);
+        var notified = false;
+        vm.PropertyChanged += (_, change) => notified |= change.PropertyName == nameof(vm.SelectedCompressionOption);
+        vm.Compression = "ZipUltra";
+        await vm.PendingWrite;
+        Assert.True(notified);
+        Assert.Equal("Ultra", vm.SelectedCompressionOption.Label);
+    }
+
+    [Fact]
+    public void LibraryPriorityNotifiesItsNumberAndFormattedLabel()
+    {
+        var row = new ConnectorLibraryLocationViewModel("fixture", "", true, _ => { }, _ => { }, _ => { });
+        var changed = new List<string?>();
+        row.PropertyChanged += (_, change) => changed.Add(change.PropertyName);
+        row.SetPriority(7);
+        Assert.Equal(7, row.Priority);
+        Assert.Equal("#7", row.PriorityLabel);
+        Assert.Equal([nameof(row.Priority), nameof(row.PriorityLabel)], changed);
+        row.SetPriority(7);
+        Assert.Equal(2, changed.Count);
+    }
 }

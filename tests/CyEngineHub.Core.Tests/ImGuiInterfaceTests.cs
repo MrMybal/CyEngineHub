@@ -6,6 +6,21 @@ namespace CyEngineHub.Core.Tests;
 public sealed class ImGuiInterfaceTests
 {
     [Fact]
+    public void ConnectorLibraryRowsUseTheSameColumnsAsFab()
+    {
+        var panel = UiDocument.Load("Main").Root.Descendants().Single(node => node.Kind == "StackPanel" &&
+            UiBinding.Path(node["IsVisible"]) == "IsSettingsMarketplacesSelected");
+        var connector = panel.Descendants().Single(node => node.Kind == "ItemsControl" && UiBinding.Path(node["ItemsSource"]) == "MarketplaceConnectors");
+        var nativeRows = panel.Descendants().Single(node => node.Kind == "ItemsControl" && UiBinding.Path(node["ItemsSource"]) == "FabLibraryLocations");
+        var connectorRows = connector.Descendants().Single(node => node.Kind == "ItemsControl" && UiBinding.Path(node["ItemsSource"]) == "LibraryLocations");
+        Assert.Equal(nativeRows.Descendants().Single(node => node.Kind == "Grid")["ColumnDefinitions"],
+            connectorRows.Descendants().Single(node => node.Kind == "Grid")["ColumnDefinitions"]);
+        Assert.Contains(connectorRows.Descendants(), node => UiBinding.Path(node["Text"]) == "PriorityLabel");
+        Assert.Contains(connector.Descendants(), node => UiBinding.Path(node["Command"]) == "AddLibraryCommand" && node["Content"] == "+ Ajouter un dossier");
+        Assert.DoesNotContain(connector.Descendants(), node => UiBinding.Path(node["ItemsSource"]) == "CompressionModes");
+    }
+
+    [Fact]
     public void DownloadedSupplierVersionsExposeTheSameLocalInstallActionAsDerivedVersions()
     {
         var nodes = UiDocument.Load("Main").Root.Descendants().ToArray();

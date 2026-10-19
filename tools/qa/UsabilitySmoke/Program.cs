@@ -111,6 +111,7 @@ static partial class Program
     static bool ResourceLayoutOnly;
     static bool GroupsOnly;
     static bool SettingsOnly;
+    static bool CosmosSettingsOnly;
     static bool EngineIdentityOnly;
     static readonly FixtureEngineBackend EngineBackend = new();
     const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -128,6 +129,7 @@ static partial class Program
         ResourceLayoutOnly = args.Contains("--resource-layout-only");
         GroupsOnly = args.Contains("--groups-only");
         SettingsOnly = args.Contains("--settings-only");
+        CosmosSettingsOnly = args.Contains("--cosmos-settings-only");
         EngineIdentityOnly = args.Contains("--engine-identity-only");
         Directory.CreateDirectory(Output);
         AppBuilder.Configure<FixtureApp>().UsePlatformDetect().SetupWithoutStarting();
@@ -205,7 +207,8 @@ static partial class Program
         if (ImGuiDiagnostics.IsHosted(window))
         {
             if (EngineIdentityOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestEngineIdentity(window, vm); Console.WriteLine("OUTPUT " + Output); }
-            else if (SettingsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestOrganizedSettings(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (SettingsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestOrganizedSettings(window, vm); await TestCosmosSettings(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (CosmosSettingsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestCosmosSettings(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (GroupsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestPackGroups(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (ResourceLayoutOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestResourceToolbarLayout(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (VariantsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestVariantLabels(window, vm); Console.WriteLine("OUTPUT " + Output); }

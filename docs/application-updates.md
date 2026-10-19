@@ -49,7 +49,10 @@ Son dernier échec est écrit dans `%TEMP%\CyEngineHub\Updater\last-error.log`.
    (installateur, ZIP, SHA256SUMS.txt) dans un nouveau dossier ignoré par Git.
 3. Vérifier l'application empaquetée, committer les sources et créer le tag correspondant.
 4. Créer une release GitHub sur ce tag, joindre les trois assets et publier.
-   Cocher **pre-release** pour une Alpha/Bêta ; ne pas la désigner comme release stable.
+   Par défaut, cocher **pre-release** pour une Alpha/Bêta. À la demande explicite
+   du responsable, l’alpha.32 est publiée comme Release courante avec le badge
+   Latest : GitHub n’autorise pas ce badge sur une préversion. Son nom Alpha et
+   ses limites restent visibles ; il ne s’agit pas d’une qualification de stabilité.
 
 Le compilateur d'installateur n'est ni embarqué ni téléchargé automatiquement par le script.
 Les versions autonomes embarquent .NET ; l'updater est lui aussi autonome.

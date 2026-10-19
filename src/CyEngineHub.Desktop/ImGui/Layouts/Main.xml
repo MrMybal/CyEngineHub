@@ -3543,34 +3543,57 @@
                               <Border Classes="card">
                                 <StackPanel>
                                   <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Text="{Binding Name}" />
+                                    <StackPanel>
+                                      <TextBlock Text="{Binding SettingsHeading}" FontSize="16" />
+                                      <TextBlock Text="{Binding SettingsSubtitle}" FontSize="10" Foreground="#70A8FA" />
+                                      <TextBlock Text="{Binding Description}" TextWrapping="Wrap" FontSize="9" Foreground="#8294A8" />
+                                    </StackPanel>
                                     <ToggleSwitch Grid.Column="1" IsChecked="{Binding IsEnabled}" />
                                   </Grid>
-                                  <TextBlock Text="{Binding Description}" TextWrapping="Wrap" FontSize="11" Foreground="#8294A8" />
-                                  <TextBlock Text="{Binding InventoryUrl}" TextWrapping="Wrap" FontSize="10" />
-                                  <TextBlock Text="DOSSIER DE TÉLÉCHARGEMENT" FontSize="10" />
-                                  <TextBox Text="{Binding DownloadDirectory, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Chemin absolu du dossier de téléchargement" />
+                                  <TextBlock Text="{Binding InventoryUrl}" TextWrapping="Wrap" FontSize="9" Foreground="#A8C9F2" />
                                   <StackPanel IsVisible="{Binding HasPackageStorage}">
-                                  <TextBlock Text="COSMOS : JSON, COMPRESSION ET BIBLIOTHÈQUES ORDONNÉES" FontSize="10" />
-                                  <ComboBox ItemsSource="{Binding CompressionModes}" SelectedItem="{Binding Compression}" />
-                                  <Button Content="Ajouter une bibliothèque" Command="{Binding AddLibraryCommand}" />
-                                  <ItemsControl ItemsSource="{Binding LibraryLocations}">
-                                    <ItemsControl.ItemTemplate><DataTemplate>
-                                      <Grid ColumnDefinitions="Auto,*,120,Auto,Auto,Auto">
-                                        <CheckBox IsChecked="{Binding IsEnabled}" />
-                                        <TextBox Grid.Column="1" Text="{Binding Path}" PlaceholderText="Chemin absolu de bibliothèque" />
-                                        <TextBox Grid.Column="2" Text="{Binding MaximumGigabytes}" PlaceholderText="Quota Gio · illimité" />
-                                        <Button Grid.Column="3" Content="↑" Command="{Binding MoveUpCommand}" />
-                                        <Button Grid.Column="4" Content="↓" Command="{Binding MoveDownCommand}" />
-                                        <Button Grid.Column="5" Classes="danger" Content="×" Command="{Binding RemoveCommand}" />
-                                      </Grid>
-                                    </DataTemplate></ItemsControl.ItemTemplate>
-                                  </ItemsControl>
+                                    <Grid ColumnDefinitions="*,240">
+                                      <StackPanel>
+                                        <TextBlock Text="COMPRESSION DES PACKAGES" FontSize="10" Foreground="#70A8FA" />
+                                        <TextBlock Text="Le manifeste JSON reste à côté du ZIP ou du dossier de contenu pour une lecture immédiate." TextWrapping="Wrap" FontSize="9" Foreground="#8294A8" />
+                                      </StackPanel>
+                                      <ComboBox Grid.Column="1" ItemsSource="{Binding CompressionOptions}" SelectedItem="{Binding SelectedCompressionOption}">
+                                        <ComboBox.ItemTemplate><DataTemplate><StackPanel>
+                                          <TextBlock Text="{Binding Label}" />
+                                          <TextBlock Text="{Binding Description}" FontSize="9" Foreground="#8294A8" />
+                                        </StackPanel></DataTemplate></ComboBox.ItemTemplate>
+                                      </ComboBox>
+                                    </Grid>
                                   </StackPanel>
-                                  <TextBlock Text="Enregistrement automatique. Cosmos copie les nouveaux fichiers en packages ; les originaux et les anciens téléchargements ne sont pas déplacés." TextWrapping="Wrap" FontSize="10" Foreground="#8294A8" />
-                                  <TextBlock Text="{Binding SaveStatus}" TextWrapping="Wrap" FontSize="11" />
-                                  <Button Content="Enregistrer ce connecteur" Command="{Binding SaveCommand}" />
-                                  <Button Content="Ouvrir dans CyEngineHub" Command="{Binding OpenInventoryCommand}" />
+                                  <Border Height="1" />
+                                  <Grid ColumnDefinitions="150,*">
+                                    <TextBlock Text="Dossier de téléchargement" FontSize="10" Foreground="#8294A8" />
+                                    <TextBox Grid.Column="1" Classes="path" Text="{Binding DownloadDirectory, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Chemin absolu du dossier de téléchargement" />
+                                  </Grid>
+                                  <TextBlock Text="Les fichiers téléchargés sont conservés. Changer ce chemin ne déplace aucun téléchargement existant." TextWrapping="Wrap" FontSize="9" Foreground="#718398" />
+                                  <StackPanel IsVisible="{Binding HasPackageStorage}">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                      <StackPanel>
+                                        <TextBlock Text="BIBLIOTHÈQUES ORDONNÉES" FontSize="10" Foreground="#70A8FA" />
+                                        <TextBlock Text="Le premier dossier actif disposant du quota et de l’espace requis est utilisé." FontSize="9" Foreground="#8294A8" TextWrapping="Wrap" />
+                                      </StackPanel>
+                                      <Button Grid.Column="1" Classes="ghost" Content="+ Ajouter un dossier" Command="{Binding AddLibraryCommand}" />
+                                    </Grid>
+                                    <ItemsControl ItemsSource="{Binding LibraryLocations}">
+                                      <ItemsControl.ItemTemplate><DataTemplate>
+                                        <Grid ColumnDefinitions="Auto,34,*,140,Auto,Auto,Auto">
+                                          <CheckBox IsChecked="{Binding IsEnabled}" />
+                                          <TextBlock Grid.Column="1" Text="{Binding PriorityLabel}" Foreground="#70A8FA" />
+                                          <TextBox Grid.Column="2" Classes="path" Text="{Binding Path, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Dossier de bibliothèque" />
+                                          <TextBox Grid.Column="3" Text="{Binding MaximumGigabytes, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Quota Gio · illimité" />
+                                          <Button Grid.Column="4" Classes="ghost" Content="↑" Command="{Binding MoveUpCommand}" />
+                                          <Button Grid.Column="5" Classes="ghost" Content="↓" Command="{Binding MoveDownCommand}" />
+                                          <Button Grid.Column="6" Classes="danger" Content="×" Command="{Binding RemoveCommand}" />
+                                        </Grid>
+                                      </DataTemplate></ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="Les nouveaux fichiers sont copiés en packages ; les originaux et les anciens téléchargements ne sont pas déplacés." TextWrapping="Wrap" FontSize="9" Foreground="#718398" />
+                                  </StackPanel>
                                 </StackPanel>
                               </Border>
                             </DataTemplate>
@@ -4623,7 +4646,25 @@
           <ScrollViewer Grid.Row="2">
             <StackPanel>
               <TextBlock Text="{Binding SelectedFabInstallationScriptTarget.InstallationScriptSummary}" Foreground="#9EB0C4" TextWrapping="Wrap" />
-              <ItemsControl ItemsSource="{Binding SelectedFabInstallationScriptTarget.InstallationConfiguration}">
+              <Expander Name="AgentRepairOptions" Header="Assistance IA / MCP · facultative" IsVisible="{Binding SelectedFabInstallationScriptTarget.HasAgentInstallationConfiguration}">
+                <ItemsControl ItemsSource="{Binding SelectedFabInstallationScriptTarget.AgentInstallationConfiguration}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Border>
+                        <StackPanel>
+                          <Grid ColumnDefinitions="250,*">
+                            <TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap" />
+                            <CheckBox Grid.Column="1" IsVisible="{Binding IsBoolean}" IsChecked="{Binding BooleanValue}" />
+                            <TextBox Grid.Column="1" IsVisible="{Binding IsText}" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" />
+                          </Grid>
+                          <TextBlock Text="{Binding Description}" FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Expander>
+              <ItemsControl ItemsSource="{Binding SelectedFabInstallationScriptTarget.StandardInstallationConfiguration}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate>
                     <Border>
