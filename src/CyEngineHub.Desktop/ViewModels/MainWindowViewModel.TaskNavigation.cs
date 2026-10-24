@@ -6,6 +6,8 @@ namespace CyEngineHub.Desktop.ViewModels;
 
 public sealed class TaskLinkViewModel(HubTaskLink link, Action<HubTaskLink> navigate)
 {
+    public string Kind { get; } = link.Kind;
+    public string Id { get; } = link.Id;
     public string Label { get; } = link.Label;
     public ICommand OpenCommand { get; } = new RelayCommand(() => navigate(link));
 }

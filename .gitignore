@@ -27,6 +27,7 @@ __pycache__/
 *.pyc
 
 # Private local data and diagnostic outputs
+**/AvaloniaUI/BuildServices/
 .cyrevision/
 /.openai/hosting.json
 !.env.example

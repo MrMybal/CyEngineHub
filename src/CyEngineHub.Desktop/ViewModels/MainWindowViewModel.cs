@@ -849,7 +849,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             () => !IsEngineUninstallActive,
             ShowError);
         ShowSelectedProjectPluginsCommand = new RelayCommand(OpenSelectedProjectPlugins);
-        ShowSelectedProjectBuildsCommand = new RelayCommand(() => ShowSection(PageSection.Builds));
+        ShowSelectedProjectBuildsCommand = new RelayCommand(OpenSelectedProjectBuilds);
         ShowLogsCommand = new RelayCommand(() => ShowSection(PageSection.Logs));
         ShowPluginsCommand = new RelayCommand(() => ShowSection(PageSection.Plugins));
         ShowHubExtensionsCommand = new RelayCommand(() => ShowSection(PageSection.HubExtensions));
@@ -1209,7 +1209,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             IsFabInstallationScriptConfigurationVisible = false);
         OpenFabImagePreviewCommand = new RelayCommand(() =>
         {
-            if (SelectedRemoteFabAssetCard?.HasPreviewImage != true)
+            if (SelectedRemoteFabAssetCard is null)
             {
                 return;
             }
@@ -1360,6 +1360,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             UpdateSelectedEngineComponentsAsync,
             () => SelectedEngineDetails?.IsOfficialEpic == true &&
                   IsEngineInstallationEditing &&
+                  !_updatingEnginePaths.Contains(SelectedEngineDetails.Path) &&
                   !IsEpicBusy,
             ShowError);
         UpdateSelectedEngineComponentsCommand = _updateSelectedEngineComponentsCommand;
@@ -2289,6 +2290,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (SetProperty(ref _selectedProjectDetails, value))
             {
                 OnPropertyChanged(nameof(IsUnrealProjectDetailsSelected));
+                NotifyProjectBuildState();
             }
         }
     }
@@ -2517,6 +2519,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         get => _selectedProjectCreationPreset;
         set
         {
+            var previousFamily = _selectedProjectCreationPreset?.Preset.Engine;
             if (SetProperty(ref _selectedProjectCreationPreset, value) && value is not null)
             {
                 if (SelectedProjectCreationConfiguration?.Profile.Engine != value.Preset.Engine)
@@ -2524,9 +2527,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     SelectedProjectCreationConfiguration = ProjectCreationConfigurations.FirstOrDefault(item =>
                         item.Profile.Engine == value.Preset.Engine);
                 }
-                ApplyProjectCreationPluginDefaults();
+                if (!_changingProjectCodeKind) ApplyProjectCreationPluginDefaults();
+                if (previousFamily != value.Preset.Engine)
+                    NewProjectEngineAssociation = value.Preset.Engine == EngineFamily.Unreal ? SelectedProjectCreationEngine?.Association ?? string.Empty : string.Empty;
                 OnPropertyChanged(nameof(IsUnrealProjectCreation));
                 OnPropertyChanged(nameof(CanCreateProjectConfiguration));
+                OnPropertyChanged(nameof(SelectedProjectCreationFamily));
+                OnPropertyChanged(nameof(SelectedProjectCreationCodeKind));
+                OnPropertyChanged(nameof(ProjectCreationCodeKindDescription));
             }
         }
     }
@@ -2554,6 +2562,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (SetProperty(ref _selectedProjectCreationEngine, value) && value is not null)
             {
                 NewProjectEngineAssociation = value.Association;
+                RefreshProjectPluginTemplateChoices();
                 _ = RefreshProjectCreationEnginePluginsAsync(value.Engine);
             }
         }
@@ -2654,14 +2663,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
         get => _newProjectName;
         set
         {
-            if (SetProperty(ref _newProjectName, value)) RebuildProjectIniPreview();
+            if (SetProperty(ref _newProjectName, value))
+            {
+                RebuildProjectIniPreview();
+                OnPropertyChanged(nameof(ProjectCreationDestinationPreview));
+            }
         }
     }
 
     public string NewProjectParentDirectory
     {
         get => _newProjectParentDirectory;
-        set => SetProperty(ref _newProjectParentDirectory, value);
+        set { if (SetProperty(ref _newProjectParentDirectory, value)) OnPropertyChanged(nameof(ProjectCreationDestinationPreview)); }
     }
 
     public string NewProjectEngineAssociation
@@ -7180,6 +7193,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             }
             StatusMessage = "Bibliothèque Fab directe actualisée.";
             AppendRawLog("INFO", "Library/Fab", $"Catalogue Fab actualisé : {assets.Count:N0} élément(s).");
+            await CheckDownloadedFabUpdatesAsync().ConfigureAwait(true);
         }
         finally
         {
@@ -7301,10 +7315,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
             OpenRemoteFabInstall,
             OpenFabCollectionEditor,
             preference?.IsHidden == true,
-            imageCache.LoadAsync);
+            imageCache.LoadAsync,
+            imageCache.LoadGalleryThumbnailAsync);
         if (_fabCollections.TryGetValue(asset.AssetId, out var collections)) card.SetCollections(collections);
         card.SetStoredLocally(_libraryLocalIndex.Contains(
             NormalizeAssetSource(asset), asset.AssetId, asset.Title));
+        ApplyFabUpdateReport(card);
         card.UpdateInstalledEngineVersions(_currentEngines
             .Where(engine => engine.Health != EngineHealth.Broken)
             .Select(engine => $"{engine.Version.Major}.{engine.Version.Minor}")
@@ -7321,6 +7337,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         detailCard.EnsureThumbnailLoaded();
         SelectedRemoteFabAssetCard?.Dispose();
         SelectedRemoteFabAssetCard = detailCard;
+        detailCard.EnsureGalleryLoaded();
         SelectedRemoteFabAsset = detailCard.Asset;
         _activeDerivedInstallArtifactId = null;
         RestoreSupplierInstallVersions(detailCard);
@@ -7869,6 +7886,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 OpenDerivedWorkspaceCreator,
                 OpenPackTestCreator,
                 stored.EngineVersions));
+            if (_fabUpdateReports.TryGetValue(stored.AssetId, out var report) && report.Versions.TryGetValue(stored.Path, out var update))
+                SelectedFabStoredDownloads[^1].UpdateLabel = update;
         }
         OnPropertyChanged(nameof(HasSelectedFabStoredDownloads));
         if (ConfirmDeleteAllFabDownloadsCommand is AsyncRelayCommand command)
@@ -8095,13 +8114,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
             result.ManifestPath,
             result.UncompressedBytes,
             result.StoredBytes,
-            asset.Title));
+            asset.Title,
+            EngineVersions: option.Version.EngineVersions.ToArray(),
+            SourceManifest: result.SourceManifest));
+        _fabUpdateReports.Remove(asset.AssetId);
         await PersistStoredFabDownloadsAsync().ConfigureAwait(true);
         foreach (var card in GetRealizedRemoteFabCards().Where(card =>
                      string.Equals(card.Asset.AssetId, asset.AssetId, StringComparison.OrdinalIgnoreCase) &&
                      string.Equals(NormalizeAssetSource(card.Asset), NormalizeAssetSource(asset), StringComparison.OrdinalIgnoreCase)))
         {
             card.SetStoredLocally(true);
+            ApplyFabUpdateReport(card);
         }
         RebuildSelectedFabStoredDownloads(asset.AssetId);
     }
@@ -8132,13 +8155,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
             exception is DirectFabException or QuixelException or HttpRequestException)
         {
             AppendRawLog("WARN", "Library/Fab", $"Détail produit indisponible pour {card.Name} : {exception.Message}");
+            if (!ReferenceEquals(SelectedRemoteFabAssetCard, card)) return;
             card.EnsureGalleryLoaded();
             StatusMessage = $"{card.Name} · résumé du catalogue affiché; détail web momentanément indisponible.";
         }
         finally
         {
-            IsRemoteFabProductLoading = false;
+            if (ReferenceEquals(SelectedRemoteFabAssetCard, card)) IsRemoteFabProductLoading = false;
         }
+    }
+
+    internal async Task RetryFabGalleryAsync()
+    {
+        if (IsRemoteFabProductLoading || SelectedRemoteFabAssetCard is not { } card) return;
+        await LoadRemoteFabProductDetailsAsync(card).ConfigureAwait(true);
+        if (ReferenceEquals(SelectedRemoteFabAssetCard, card)) card.RetryGalleryImages();
     }
 
     private void SelectLibrarySource(string source)
@@ -10934,6 +10965,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 .ToArray(),
         };
         await _workspacePreferencesService.SaveAsync(_workspacePreferences).ConfigureAwait(true);
+        if (kind == WorkspaceItemKind.Engine)
+        {
+            foreach (var option in ProjectCreationEngines.Where(item => SameWorkspaceKey(item.Path, key)))
+                option.UpdateAlias(updated.Alias);
+            OnPropertyChanged(nameof(ManagedProjectProfileEngineSummary));
+            UpdateProjectCreationPluginCompatibilitySummary();
+        }
         ApplyEngineFamilyFilters();
         if (kind == WorkspaceItemKind.Asset)
         {
@@ -11032,6 +11070,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             .Where(item => item.IsSelected)
             .Select(item => item.CreateSelection())
             .ToArray();
+        var creationEngine = SelectedProjectCreationEngine?.Engine;
         StatusMessage = $"Création du projet {NewProjectName}…";
         var result = await _projectCreation.CreateAsync(new ProjectCreationRequest(
                 preset,
@@ -11046,14 +11085,25 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     .Concat(starterLocalPacks.Select(pack => pack.Id))
                     .ToArray(),
                 postCreationScripts,
-                SelectedProjectCreationEngine?.Path,
+                creationEngine?.RootPath,
                 IniFileOverrides: IsUnrealProjectCreation
                     ? ProjectCreationIniDocuments.ToDictionary(item => item.FileName, item => item.Content, StringComparer.OrdinalIgnoreCase)
                     : null))
             .ConfigureAwait(true);
 
-        ManualProjectRoot = result.ProjectRoot;
-        await AddProjectRootAsync().ConfigureAwait(true);
+        if (result.Preset.Engine == EngineFamily.Unreal)
+        {
+            var parsed = await new CyEngineHub.Projects.Parsing.UprojectDescriptorParser().ParseAsync(result.ProjectMarker).ConfigureAwait(true);
+            await _projectCatalog.UpsertAsync(parsed).ConfigureAwait(true);
+            await AddUniquePathAsync(ProjectRootsSetting, result.ProjectRoot).ConfigureAwait(true);
+            ReplaceCatalog(_currentEngines, _currentUnrealProjects.Where(item => !SameWorkspaceKey(item.FilePath, parsed.FilePath)).Append(parsed).ToArray());
+            await MarkProjectsExplicitUnderPathAsync(result.ProjectRoot).ConfigureAwait(true);
+        }
+        else
+        {
+            ManualProjectRoot = result.ProjectRoot;
+            await AddProjectRootAsync().ConfigureAwait(true);
+        }
         var createdProject = Projects.FirstOrDefault(item =>
             string.Equals(
                 Path.GetFullPath(item.Project.RootPath),
@@ -11071,11 +11121,19 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 selectedCollections);
         }
         IsProjectCreatorVisible = false;
+        if (createdProject is not null) OpenUnrealProjectDetails(createdProject);
+        else
+        {
+            var local = LocalEngineProjects.FirstOrDefault(item => SameWorkspaceKey(item.Project.MarkerPath, result.ProjectMarker));
+            if (local is not null) OpenLocalProjectDetails(local);
+        }
         NewProjectName = string.Empty;
         StatusMessage =
             starterAssets.Length + starterLocalPacks.Length == 0
                 ? $"Projet {Path.GetFileName(result.ProjectRoot)} créé avec le preset {result.Preset.DisplayName}."
                 : $"Projet créé · installation de {starterAssets.Length + starterLocalPacks.Length:N0} package(s) de collection en arrière-plan.";
+        if (result.Preset.Engine == EngineFamily.Unreal && result.Preset.IsCodeProject && createdProject is not null)
+            _ = PrepareProjectEditorAsync(createdProject.Project, creationEngine, stayOnProject: true);
     }
 
     private static string[] SplitProjectCreationPlugins(string value) => value.Split(
@@ -11623,7 +11681,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ref _projectCreationEnginePluginRefreshVersion);
         IsProjectCreationPluginLoading = true;
         ProjectCreationPluginCompatibilitySummary =
-            $"Analyse des plugins de {engine.DisplayName} en arrière-plan…";
+            $"Analyse des plugins de {SelectedProjectCreationEngine?.Name ?? engine.DisplayName} en arrière-plan…";
         try
         {
             var plugins = await Task.Run(() => _pluginDiscovery.RefreshAsync(
@@ -11679,7 +11737,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void UpdateProjectCreationPluginCompatibilitySummary()
     {
         if (IsProjectCreationPluginLoading) return;
-        var engine = SelectedProjectCreationEngine?.Engine;
+        var engine = SelectedProjectCreationEngine;
         if (engine is null)
         {
             ProjectCreationPluginCompatibilitySummary =
@@ -11689,7 +11747,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (_projectCreationEnginePlugins.Length == 0)
         {
             ProjectCreationPluginCompatibilitySummary =
-                $"Aucun plugin n’a été trouvé dans {engine.DisplayName}.";
+                $"Aucun plugin n’a été trouvé dans {engine.Name}.";
             return;
         }
 
@@ -11701,7 +11759,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var missing = profilePlugins.Where(plugin => !available.Contains(plugin)).ToArray();
         ProjectCreationPluginCompatibilitySummary = missing.Length == 0
-            ? $"{_projectCreationEnginePlugins.Length:N0} plugin(s) détecté(s) dans {engine.DisplayName} · " +
+            ? $"{_projectCreationEnginePlugins.Length:N0} plugin(s) détecté(s) dans {engine.Name} · " +
               (ProjectCompositionIssues.Length == 0 ? "profil et packs compatibles." : "dépendances à vérifier (voir ci-dessous).")
             : $"{_projectCreationEnginePlugins.Length:N0} plugin(s) moteur · requis mais absent(s) : {string.Join(", ", missing.Take(6))}" +
               (missing.Length > 6 ? $" (+{missing.Length - 6})" : string.Empty);
@@ -11724,7 +11782,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
                      .ThenByDescending(engine => engine.Version.Minor)
                      .ThenByDescending(engine => engine.Version.Patch))
         {
-            ProjectCreationEngines.Add(new ProjectCreationEngineOptionViewModel(engine));
+            ProjectCreationEngines.Add(new ProjectCreationEngineOptionViewModel(engine,
+                FindWorkspacePreference(WorkspaceItemKind.Engine, engine.RootPath)?.Alias));
         }
         SelectedProjectCreationEngine = ProjectCreationEngines.FirstOrDefault(item =>
                                             string.Equals(
@@ -11785,6 +11844,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void RebuildProjectPostCreationScriptOptions()
     {
+        var configurations = ProjectPostCreationScripts.ToDictionary(item => item.Id, item => item.CreateSelection().Configuration, StringComparer.OrdinalIgnoreCase);
         var selected = ProjectPostCreationScripts.Where(item => item.IsSelected)
             .Select(item => item.Id)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -11795,9 +11855,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
             {
                 IsSelected = selected.Contains(descriptor.Id),
             };
+            if (configurations.TryGetValue(option.Id, out var previous))
+                foreach (var value in option.Options)
+                    if (previous.TryGetValue(value.Id, out var saved)) value.Value = saved;
             ProjectPostCreationScripts.Add(option);
         }
         OnPropertyChanged(nameof(HasProjectPostCreationScripts));
+        RefreshProjectPluginTemplateChoices();
+    }
+
+    private void RefreshProjectPluginTemplateChoices()
+    {
+        var option = ProjectPostCreationScripts.FirstOrDefault(item => item.Id == UnrealCreatePluginPostCreationScript.ScriptId)
+            ?.Options.FirstOrDefault(item => item.Id == "template");
+        if (option is null) return;
+        var choices = UnrealPluginTemplates.Available(SelectedProjectCreationEngine?.Path);
+        option.Choices.Clear(); foreach (var choice in choices) option.Choices.Add(choice);
+        if (!choices.Contains(option.Value, StringComparer.OrdinalIgnoreCase)) option.Value = choices.Count > 0 ? choices[0] : string.Empty;
     }
 
     private async Task RefreshProjectCreationScriptsAsync()
@@ -12115,6 +12189,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private async Task UninstallSelectedEngineAsync()
     {
         var path = SelectedEngineManagementPath;
+        if (_updatingEnginePaths.Contains(path)) throw new InvalidOperationException("Annulez ou terminez la mise à jour avant de désinstaller ce moteur.");
         var name = SelectedEngineManagementName;
         var unrealEngine = SelectedEngineDetails?.Engine;
         ValidateEngineUninstallRoot(path, unrealEngine is not null);
@@ -12747,7 +12822,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var request = UnrealBuildCommandFactory.CreateSetup(new SetupEngineRequest(engine));
         return ExecuteUnrealOperationAsync(
             $"Setup · {engine.DisplayName}",
-            request);
+            request, EngineTaskLink(engine.RootPath, engine.DisplayName));
     }
 
     private async Task RegisterEngineAsync(UnrealEngineInstallation engine)
@@ -12779,7 +12854,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 Format: UnrealProjectFileFormat.VisualStudio2022));
         return ExecuteUnrealOperationAsync(
             $"Generate Project Files · {engine.DisplayName}",
-            request);
+            request, EngineTaskLink(engine.RootPath, engine.DisplayName));
     }
 
     private Task BuildEngineEditorAsync(UnrealEngineInstallation engine)
@@ -12791,7 +12866,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             "Development"));
         return ExecuteUnrealOperationAsync(
             $"Build UnrealEditor · {engine.DisplayName}",
-            request);
+            request, EngineTaskLink(engine.RootPath, engine.DisplayName));
     }
 
     private Task GenerateProjectProjectFilesAsync(UnrealProject project)
@@ -12799,30 +12874,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var engine = ResolveEngine(project.EngineAssociation)
             ?? throw new InvalidOperationException(
                 $"Aucun moteur local ne correspond à l’association '{project.EngineAssociation}'.");
-        var request = UnrealBuildCommandFactory.CreateGenerateProjectFiles(
-            new GenerateProjectFilesRequest(
-                engine,
-                project,
-                UnrealProjectFileFormat.VisualStudio2022));
-        return ExecuteUnrealOperationAsync(
-            $"Generate Project Files · {project.Name}",
-            request);
+        return ExecuteUnrealStepsAsync($"Générer la solution · {project.Name}",
+            [new UnrealBuildStep("Générer la solution Visual Studio", () => UnrealBuildCommandFactory.CreateGenerateProjectFiles(
+                new GenerateProjectFilesRequest(engine, project, UnrealProjectFileFormat.VisualStudio2022, IncludeEngineSource: engine.Type != EngineInstallationType.EpicBinary)), project.FilePath)],
+            ProjectTaskLink(project.FilePath, project.Name));
     }
 
     private Task BuildProjectEditorAsync(UnrealProject project)
     {
-        var engine = ResolveEngine(project.EngineAssociation)
-            ?? throw new InvalidOperationException(
-                $"Aucun moteur local ne correspond à l’association '{project.EngineAssociation}'.");
-        var request = UnrealBuildCommandFactory.CreateTargetBuild(new UnrealTargetBuildRequest(
-            engine,
-            $"{project.Name}Editor",
-            "Win64",
-            "Development",
-            Project: project));
-        return ExecuteUnrealOperationAsync(
-            $"Build {project.Name}Editor · Win64 Development",
-            request);
+        return PrepareProjectEditorAsync(project);
     }
 
     private Task PackageProjectAsync(UnrealProject project)
@@ -12844,7 +12904,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             archive));
         return ExecuteUnrealOperationAsync(
             $"Package {project.Name} · Win64 Development",
-            request);
+            request, ProjectTaskLink(project.FilePath, project.Name));
     }
 
     private async Task LoadBuildPresetsAsync()
@@ -13804,7 +13864,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             NoHostPlatform: true));
         return ExecuteUnrealOperationAsync(
             $"BuildPlugin {plugin.FriendlyName} · {target.Engine.DisplayName} · Win64",
-            request);
+            request, EngineTaskLink(target.Engine.RootPath, target.Engine.DisplayName));
     }
 
     private void SetPendingPluginInstall(PluginInstallPlan plan)
@@ -14632,7 +14692,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             engine,
             project,
             archive);
-        return ExecuteUnrealOperationAsync(operation.Title, operation.ProcessRequest);
+        return ExecuteUnrealOperationAsync(operation.Title, operation.ProcessRequest, ProjectTaskLink(project.FilePath, project.Name));
     }
 
     private UnrealEngineRegistration? FindRegistration(UnrealEngineInstallation engine)
@@ -14648,81 +14708,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    private async Task ExecuteUnrealOperationAsync(string title, ProcessRequest request)
-    {
-        await using var persistentLog = BuildLogFileWriter.Create(_operationLogsDirectory, title);
-        ShowSection(PageSection.Builds);
-        ActiveBuildTitle = title;
-        BuildSummary = "En attente dans la file…";
-        BuildLogs.Clear();
-        var preview = new BuildLogLine(
-            DateTimeOffset.Now,
-            BuildLogSeverity.Information,
-            UnrealBuildCommandFactory.FormatPreview(request));
-        AppendRawLog("INFO", "Build", preview.Text);
-        BuildLogs.Add(new BuildLogItemViewModel(preview));
-        OnPropertyChanged(nameof(HasNoBuildLogs));
-
-        UnrealBuildExecutionResult? result = null;
-        var progress = new Progress<BuildLogLine>(line =>
-        {
-            AppendRawLog(line.Severity.ToString().ToUpperInvariant(), "Build", line.Text);
-            BuildLogs.Add(new BuildLogItemViewModel(line));
-            while (BuildLogs.Count > 2_000)
-            {
-                BuildLogs.RemoveAt(0);
-            }
-
-            OnPropertyChanged(nameof(HasNoBuildLogs));
-        });
-        var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
-            "Build",
-            title,
-            async (context, cancellationToken) =>
-            {
-                context.Report(null, "Processus Unreal en cours");
-                result = await _buildExecutor.ExecuteAsync(
-                        request,
-                        progress,
-                        persistentLog,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                if (result.ExitCode != 0)
-                {
-                    var lastError = result.Tail.LastOrDefault(line =>
-                        line.Severity is BuildLogSeverity.Error or BuildLogSeverity.Fatal);
-                    var diagnosis = lastError is null
-                        ? null
-                        : BuildLogClassifier.Diagnose(lastError.Text);
-                    throw new BuildOperationException(
-                        diagnosis ?? $"Unreal a retourné le code {result.ExitCode}.",
-                        title,
-                        request.WorkingDirectory ?? string.Empty);
-                }
-            }));
-
-        var completed = await handle.Completion.ConfigureAwait(true);
-        if (completed.Status == HubTaskStatus.Canceled)
-        {
-            BuildSummary =
-                $"Opération annulée. L’arbre de processus a été arrêté. Log : {persistentLog.FilePath}";
-            StatusMessage = $"{title} annulé.";
-            return;
-        }
-
-        if (completed.Status == HubTaskStatus.Failed || result is null)
-        {
-            BuildSummary =
-                $"{completed.Error ?? "Échec de l’opération Unreal."} · Log : {persistentLog.FilePath}";
-            StatusMessage = $"{title} : échec";
-            return;
-        }
-
-        BuildSummary =
-            $"Terminé en {result.Duration:g} · {result.WarningCount} avertissement(s) · " +
-            $"{result.ErrorCount} erreur(s) classifiée(s) · Log : {persistentLog.FilePath}";
-        StatusMessage = $"{title} terminé.";
-    }
+    private Task ExecuteUnrealOperationAsync(string title, ProcessRequest request, HubTaskLink? target = null) =>
+        ExecuteUnrealStepsAsync(title, [new UnrealBuildStep(title, () => request)], target);
 
     private UnrealEngineInstallation? ResolveEngine(string? association)
     {
@@ -14793,6 +14780,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
             OnPropertyChanged(nameof(HasNoTasks));
             NotifyActivityQueues();
+            NotifyProjectBuildState();
             OnPropertyChanged(nameof(FooterProgressPercent));
             OnPropertyChanged(nameof(FooterActivityText));
         });
@@ -14937,6 +14925,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         var selected = SelectedEngineDetails
             ?? throw new InvalidOperationException("Aucun moteur Unreal n’est sélectionné.");
+        if (_updatingEnginePaths.Contains(selected.Path)) throw new InvalidOperationException("Une mise à jour de ce moteur est déjà en cours.");
         if (!selected.IsOfficialEpic)
         {
             throw new InvalidOperationException(
@@ -15072,7 +15061,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         SelectedLocalProjectDetails = null;
         SelectedProjectDetails = project;
-        _ = LoadCosmosProjectSettingsAsync(project);
         ShowSection(PageSection.ProjectDetails);
     }
 
@@ -15099,6 +15087,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void OpenSelectedProjectPlugins()
     {
+        if (SelectedProjectDetails is { } project)
+            SelectedPluginTarget = PluginTargets.FirstOrDefault(item => item.Target.Id == "project:" + project.Project.Id) ?? SelectedPluginTarget;
         var family = SelectedProjectDetails is not null
             ? EngineFamily.Unreal
             : SelectedLocalProjectDetails?.Project.Family;
@@ -15265,6 +15255,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void NotifySectionProperties()
     {
+        OnPropertyChanged(nameof(NavigationBackLabel));
         OnPropertyChanged(nameof(IsEnginesNavigationActive));
         OnPropertyChanged(nameof(IsProjectsNavigationActive));
         OnPropertyChanged(nameof(IsLibraryNavigationActive));
@@ -15495,7 +15486,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         string? DerivationName = null,
         string? DerivationNotes = null,
         string? SourceArtifactId = null,
-        string[]? EngineVersions = null);
+        string[]? EngineVersions = null,
+        DirectFabSourceManifest? SourceManifest = null);
 
     private sealed record QuixelLocalEntry(
         string Name,

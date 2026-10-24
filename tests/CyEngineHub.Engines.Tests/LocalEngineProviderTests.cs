@@ -136,7 +136,9 @@ public sealed class LocalEngineProviderTests
         var snapshot = await provider.DiscoverAsync(new LocalEngineDiscoveryRequest(
             [Path.Combine(temporary.Path, "CryEngines")],
             [Path.Combine(temporary.Path, "Projects")]));
-        var installation = Assert.Single(snapshot.Installations);
+        // The provider also discovers real registered installations on developer machines.
+        var installation = Assert.Single(snapshot.Installations, item =>
+            string.Equals(item.EditorPath, editor, StringComparison.OrdinalIgnoreCase));
         var discoveredProject = Assert.Single(snapshot.Projects);
         var launch = provider.CreateProjectLaunch(discoveredProject, [installation]);
 

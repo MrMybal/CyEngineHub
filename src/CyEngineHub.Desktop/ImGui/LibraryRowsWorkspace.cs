@@ -9,17 +9,18 @@ internal sealed partial class ImGuiWorkspace
     private string? _remoteRowsSortValue;
     private void DrawRemoteAssetRows(MainWindowViewModel vm, string binding)
     {
-        if (!Gui.BeginTable("library-assets", 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY | ImGuiTableFlags.BordersInnerH,
+        if (!Gui.BeginTable("library-assets", 6, ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY | ImGuiTableFlags.BordersInnerH,
             new(0, System.Math.Max(120, Gui.GetContentRegionAvail().Y - 4)))) return;
         Gui.TableSetupColumn("Nom", ImGuiTableColumnFlags.WidthStretch, 3);
         Gui.TableSetupColumn("Catégorie", ImGuiTableColumnFlags.WidthStretch, 1.2f);
         Gui.TableSetupColumn("Versions", ImGuiTableColumnFlags.WidthStretch, 1.4f);
         Gui.TableSetupColumn("Acquisition", ImGuiTableColumnFlags.WidthFixed, 140 * UiScale);
         Gui.TableSetupColumn("Taille locale", ImGuiTableColumnFlags.WidthFixed, 110 * UiScale);
+        Gui.TableSetupColumn("Mise à jour", ImGuiTableColumnFlags.WidthStretch, 1.8f);
         Gui.TableSetupScrollFreeze(0, 1);
         if (_remoteRowsSortValue != vm.SelectedLibrarySort) _tableSorts.Remove("library-assets");
         var oldSort = _tableSorts.GetValueOrDefault("library-assets", (-1, false));
-        var sort = SortableHeaders("library-assets", ["Nom", "Catégorie", "Versions", "Acquisition", "Taille locale"]);
+        var sort = SortableHeaders("library-assets", ["Nom", "Catégorie", "Versions", "Acquisition", "Taille locale", "Mise à jour"], unsortable: 5);
         if (sort != oldSort)
         {
             // The VM sorts the complete filtered catalog asynchronously before pagination.
@@ -52,6 +53,9 @@ internal sealed partial class ImGuiWorkspace
             Gui.TableNextColumn(); Gui.TextDisabled(card.Asset.AcquiredAt?.ToLocalTime().ToString("d", System.Globalization.CultureInfo.CurrentCulture) ?? "Inconnue");
             Gui.TableNextColumn(); Gui.TextDisabled(vm.ResourceSizeBytes(card) is not null ? vm.ResourceSizeLabel(card) : "—");
             if (Gui.IsItemHovered()) Gui.SetTooltip(vm.ResourceSizeEvidence(card));
+            Gui.TableNextColumn();
+            Gui.TextColored(Color(card, "{Binding UpdateForeground}", ImGuiTheme.Muted), Elide(card.UpdateLabel, Gui.GetContentRegionAvail().X));
+            if (Gui.IsItemHovered()) Gui.SetTooltip(card.UpdateLabel);
             Gui.PopID();
         });
         if (Gui.GetScrollMaxY() - Gui.GetScrollY() < 500) _actions.Enqueue(vm.LoadMoreLibraryItems);

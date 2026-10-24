@@ -17,7 +17,7 @@ internal sealed unsafe class ImGuiGlRenderer : IDisposable
     private readonly uint _vertexArray;
     private uint _font;
     private readonly int _projection;
-    private readonly Dictionary<Bitmap, (uint Texture, long Frame)> _images = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<Bitmap, (uint Texture, long Frame, long Bytes)> _images = new(ReferenceEqualityComparer.Instance);
     private long _frame;
     private int _uploads;
     internal int ImageUploadCount => _uploads;
@@ -109,7 +109,7 @@ internal sealed unsafe class ImGuiGlRenderer : IDisposable
     {
         if (_images.TryGetValue(bitmap, out var entry))
         {
-            _images[bitmap] = (entry.Texture, _frame);
+            _images[bitmap] = (entry.Texture, _frame, entry.Bytes);
             return (nint)entry.Texture;
         }
         // Decoding is asynchronous; GL uploads must stay on this context, with a frame budget.
@@ -119,7 +119,7 @@ internal sealed unsafe class ImGuiGlRenderer : IDisposable
         using var buffer = pixels.Lock();
         bitmap.CopyPixels(buffer);
         var texture = Upload(buffer.Address, bitmap.PixelSize.Width, bitmap.PixelSize.Height);
-        _images.Add(bitmap, (texture, _frame));
+        _images.Add(bitmap, (texture, _frame, (long)bitmap.PixelSize.Width * bitmap.PixelSize.Height * 4));
         return (nint)texture;
     }
 
@@ -178,9 +178,12 @@ internal sealed unsafe class ImGuiGlRenderer : IDisposable
         gl.Disable(EnableCap.ScissorTest);
         gl.BindVertexArray(0);
         gl.UseProgram(0);
-        foreach (var image in _images.OrderBy(pair => pair.Value.Frame).Where((pair, index) => _frame-pair.Value.Frame > 600 || (_images.Count - index > 128 && pair.Value.Frame < _frame)).ToArray())
+        var imageBytes = _images.Values.Sum(image => image.Bytes);
+        foreach (var image in _images.OrderBy(pair => pair.Value.Frame).ToArray())
         {
+            if (_frame - image.Value.Frame <= 600 && (_images.Count <= 128 && imageBytes <= 128L * 1024 * 1024 || image.Value.Frame >= _frame - 1)) continue;
             gl.DeleteTexture(image.Value.Texture);
+            imageBytes -= image.Value.Bytes;
             _images.Remove(image.Key);
         }
     }

@@ -64,6 +64,12 @@ internal sealed partial class ImGuiWorkspace
             ItemMenuCommand("open", "Ouvrir la fiche", item, _contextOpenCommand);
             ItemMenuCommand("launch", "Lancer / ouvrir le projet", item, "LaunchCommand");
             ItemMenuCommand("download", "Télécharger les versions…", item, "DownloadCommand");
+            if (item is RemoteFabAssetCardViewModel fab && fab.Source.Equals("Fab", StringComparison.OrdinalIgnoreCase))
+            {
+                if (Gui.MenuItem("Vérifier la mise à jour Fab", "", false, !vm.IsCheckingFabUpdates && vm.IsDirectFabConnected))
+                    _actions.Enqueue(() => vm.CheckFabAssetUpdates(fab));
+                Record("item-context/fab-updates");
+            }
             ItemMenuCommand("install", "Installer…", item, item is FabStoredDownloadViewModel ? "InstallCommand" : item is FabLocalContentPackCardViewModel ? "UseForImportCommand" : "OpenInstallCommand");
             ItemMenuCommand("collections", "Collections…", item, item is FabLocalContentPackCardViewModel ? "EditCollectionsCommand" : "OpenCollectionsCommand");
             ItemMenuCommand("web", "Page officielle", item, "OpenListingCommand");

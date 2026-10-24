@@ -160,7 +160,60 @@ the pack below `<declared-assets>/CyEngineHubImports/<sanitized-pack-name>`.
 
 This route also consumes only content already present on disk.
 
-## Local extracted-pack library
+## Engine revisions and downloaded Fab updates
+
+- Official engine revisions can be applied from the engine sheet or its context menu,
+  after confirming the existing installation directory. Git engines use their repository instead.
+- The updater checks SHA-1 file identities from the Epic manifest, downloads only
+  the required chunks and reconstructs changed files before touching the installation.
+  Existing optional components are retained without installing every optional platform.
+- Patch component selection uses Epic's explicit install tags from a local manifest
+  whose Build.version matches the installation. A core Android header or Linux tool
+  does not enable an entire optional SDK. Without tagged metadata the fallback is
+  conservative about absent optional files; component installation remains explicit.
+- Verified ranges from the installed manifest and unchanged target files can supply
+  patch chunks locally. Every reconstructed file must still match the new manifest's
+  SHA-1; stale local data is retried from Epic before any installed file is replaced.
+- Network chunks are prefetched through a bounded 64 MiB disk window (or one larger
+  chunk when required), with a separate 128 MiB decoded-memory cache. The entire
+  compressed update is no longer retained alongside all prepared files.
+- The patch plan separates estimated network transfer, additional temporary headroom,
+  and final size delta. Headroom counts remaining prepared files, the bounded chunk
+  window, the new local manifest receipt, and a capped safety margin; already prepared
+  verified files and existing chunk-cache allocation are not charged a second time.
+  It is not a promise that every engine patch requires negligible temporary space:
+  changed files are still staged for verification and rollback safety.
+- Overwritten files are moved to a sibling staging backup with a recovery journal.
+  Cancellation or a commit failure restores those files; Build.version is committed last.
+  A subsequent attempt recovers an interrupted commit before doing more work.
+  Unknown files, project copies and personal plugins are not deleted.
+- Fab refresh checks supplier packages already downloaded into the library. A separate
+  button and product context action can request a check. Only distribution metadata and
+  manifests are fetched, never asset chunks or installed project files.
+- New downloads store a SHA-256 revision fingerprint over the manifest's per-file
+  paths, lengths and hashes. Thus a changed artifact is detected even if its build
+  label is reused. The existing package JSON supplies the baseline for older records.
+  Missing baselines, unavailable manifests and removed artifacts are explicitly
+  non-verifiable, never silently reported as current. Local derivatives are excluded.
+- Updated Fab versions use the normal download flow and are stored alongside the old
+  supplier copies. Verification itself does not install, replace or convert any assets.
+
+## Product image galleries
+
+- Product fiches expose at most 32 distinct HTTPS images from catalogue/product metadata;
+  an unavailable detail response is labelled as a catalogue-only gallery, with a manual retry.
+- Large previews are decoded only for the selected image (maximum edge 2048); visible
+  strip thumbnails use a separate maximum edge of 192. Selection changes cancel stale
+  requests, discard late results and release the previous preview. Closing the fiche
+  cancels and releases all its image work. No pack is downloaded by gallery browsing.
+- The existing remote image cache accepts supported image signatures, limits each
+  response to 16 MiB and shares four download slots. Its generated SHA256 `.image`
+  entries are now evicted oldest-first above 256 MiB per cache directory (target 192 MiB).
+  User-named files and active `.partial` transfers are never cache-eviction targets.
+- The GPU image cache also evicts unused textures above 128 MiB, retaining images
+  required by the current frame. Descriptions do not execute HTML or load inline images.
+
+## Local extracted-pack library (safety limits)
 
 This library is a convenience index over folders chosen by the user. It is not
 the Fab account library and does not prove ownership or entitlement.

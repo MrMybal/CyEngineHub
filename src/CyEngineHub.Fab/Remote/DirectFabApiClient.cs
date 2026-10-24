@@ -3,7 +3,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace CyEngineHub.Fab.Remote;
 
@@ -164,7 +163,7 @@ public sealed partial class DirectFabApiClient : IDirectFabClient, IDisposable
             "body");
         var rawDescription = descriptions
             .OrderByDescending(value => value.Length)
-            .FirstOrDefault() ?? asset.Description;
+            .FirstOrDefault() ?? asset.RichDescription ?? asset.Description;
         var images = new List<Uri>(asset.GalleryUris);
         CollectFabMediaUris(document.RootElement, images, 0);
         return new RemoteFabProductDetails(
@@ -172,7 +171,7 @@ public sealed partial class DirectFabApiClient : IDirectFabClient, IDisposable
             images
                 .DistinctBy(uri => uri.AbsoluteUri, StringComparer.OrdinalIgnoreCase)
                 .Take(32)
-                .ToArray());
+                .ToArray()) { RichDescription = rawDescription };
     }
 
     public async Task<DirectFabDownloadEstimate?> EstimateDownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version,
@@ -184,6 +183,17 @@ public sealed partial class DirectFabApiClient : IDirectFabClient, IDisposable
         var manifest = EpicManifestParser.Parse(bytes, distribution.BaseUri);
         if (manifest.Files.Count == 0 || manifest.Chunks.Count == 0) throw new DirectFabException("Manifest vide : taille inconnue.");
         return new(manifest.DownloadSize, manifest.Files.Sum(file => file.Size), manifest.Files.Count);
+    }
+
+    public async Task<DirectFabSourceManifest?> GetSourceManifestAsync(RemoteFabAsset asset, RemoteFabProjectVersion version,
+        CancellationToken cancellationToken = default)
+    {
+        var session = await EnsureSessionAsync(cancellationToken).ConfigureAwait(false);
+        var distribution = await GetDistributionAsync(asset, version, session, cancellationToken).ConfigureAwait(false);
+        var bytes = await ReadBoundedBytesAsync(distribution.ManifestUri, MaximumManifestBytes, cancellationToken).ConfigureAwait(false);
+        var manifest = EpicManifestParser.Parse(bytes, distribution.BaseUri);
+        if (manifest.Files.Count == 0) throw new DirectFabException("Manifest Fab vide : révision non vérifiable.");
+        return FabPackageRevision.FromManifest(manifest);
     }
 
     public async Task<DirectFabDownloadResult> DownloadAsync(
@@ -328,13 +338,7 @@ public sealed partial class DirectFabApiClient : IDirectFabClient, IDisposable
             manifest.Files.Count,
             completedBytes,
             DateTimeOffset.UtcNow,
-            new DirectFabSourceManifest(
-                "EpicBuildPatchManifest",
-                manifest.AppName,
-                manifest.BuildVersion,
-                manifest.Version,
-                manifest.Files.Count,
-                manifest.DownloadSize));
+            FabPackageRevision.FromManifest(manifest));
     }
 
     private async Task<DirectFabSession> EnsureSessionAsync(CancellationToken cancellationToken)
@@ -646,7 +650,7 @@ public sealed partial class DirectFabApiClient : IDirectFabClient, IDisposable
             assetId,
             assetNamespace,
             title,
-            OptionalString(element, "description") ?? string.Empty,
+            MarketplaceRichText.ToPlainText(OptionalString(element, "description")),
             OptionalString(element, "source") ?? "Fab",
             OptionalString(element, "distributionMethod") ?? string.Empty,
             listingUri,
@@ -654,7 +658,8 @@ public sealed partial class DirectFabApiClient : IDirectFabClient, IDisposable
             categories,
             versions,
             imageUris,
-            ReadOptionalDate(element, "acquiredAt", "acquisitionDate", "createdAt", "entitledAt"));
+            ReadOptionalDate(element, "acquiredAt", "acquisitionDate", "createdAt", "entitledAt"))
+            { RichDescription = OptionalString(element, "description") };
     }
 
     private static DateTimeOffset? ReadOptionalDate(JsonElement element, params string[] names)
@@ -763,21 +768,7 @@ public sealed partial class DirectFabApiClient : IDirectFabClient, IDisposable
         }
     }
 
-    private static string NormalizeRichText(string value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return string.Empty;
-        }
-        var withBreaks = Regex.Replace(
-            value,
-            "<(br\\s*/?|/p|/div|/li|/h[1-6])>",
-            Environment.NewLine,
-            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-        var withoutTags = Regex.Replace(withBreaks, "<[^>]+>", string.Empty);
-        var decoded = WebUtility.HtmlDecode(withoutTags).Replace("\\n", Environment.NewLine, StringComparison.Ordinal);
-        return Regex.Replace(decoded, "(\\r?\\n){3,}", Environment.NewLine + Environment.NewLine).Trim();
-    }
+    private static string NormalizeRichText(string value) => MarketplaceRichText.ToPlainText(value);
 
     private static string NormalizeLibraryRoot(string value)
     {

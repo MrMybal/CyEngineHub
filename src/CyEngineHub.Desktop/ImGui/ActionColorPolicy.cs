@@ -15,7 +15,7 @@ internal static class ActionColorPolicy
              command is "RemoveCommand" or "DeleteCommand" or "DeleteProjectProfileCommand" or "RequestUnregisterCommand" or "ConfirmUnregisterCommand" or "ApplyEngineAssociationCommand"))
             return ActionTone.Danger;
         if (command is "ToggleProjectCreatorCommand" or "ToggleEngineImporterCommand" or "PrepareUnrealUtilityCommand" or "ConfirmUtilityLaunchCommand" or
-            "BuildEditorCommand" or "BuildPluginCommand" or "RunCommand" or "RunCrossCompileCommand" or "SetupCommand" ||
+            "BuildEditorCommand" or "BuildPluginCommand" or "RunCommand" or "RunCrossCompileCommand" or "SetupCommand" or "ConfirmOfficialEngineUpdateCommand" ||
             command?.StartsWith("Launch", StringComparison.Ordinal) == true)
             return ActionTone.Start;
         return primary ? ActionTone.Primary : ActionTone.Neutral;

@@ -25,7 +25,8 @@ public sealed partial class UnrealCreatePluginPostCreationScript : IProjectPostC
             new("friendlyName", "Nom affiché", "Nom visible dans Unreal Editor.", ProjectPostCreationOptionKind.Text, "My Plugin", []),
             new("createdBy", "Créateur", "Auteur ou studio du plugin.", ProjectPostCreationOptionKind.Text, "", []),
             new("description", "Description", "Description enregistrée dans le .uplugin.", ProjectPostCreationOptionKind.Text, "Plugin créé par CyEngineHub.", []),
-            new("moduleType", "Type de plugin", "Type du module principal.", ProjectPostCreationOptionKind.Choice, "Runtime", ["Runtime", "Editor", "DeveloperTool", "ContentOnly"], true),
+            new("template", "Modèle de plugin", "Modèle natif fourni par le moteur sélectionné (Blank, Content Only, Blueprint Library, Editor Mode, fenêtre ou barre d’outils…).", ProjectPostCreationOptionKind.Choice, "Blank", UnrealPluginTemplates.Names, true),
+            new("moduleType", "Type du module", "Runtime / Editor / DeveloperTool pour les modèles génériques ; les modèles éditeur imposent Editor. ContentOnly force un plugin sans code.", ProjectPostCreationOptionKind.Choice, "Runtime", ["Runtime", "Editor", "DeveloperTool", "ContentOnly"], true),
             new("canContainContent", "Peut contenir du contenu", "Crée aussi le dossier Content du plugin.", ProjectPostCreationOptionKind.Boolean, "true", []),
         ],
         IsBuiltIn: true);
@@ -50,13 +51,16 @@ public sealed partial class UnrealCreatePluginPostCreationScript : IProjectPostC
         var createdBy = Get(context, "createdBy", string.Empty).Trim();
         var description = Get(context, "description", "Plugin créé par CyEngineHub.").Trim();
         var moduleType = Get(context, "moduleType", "Runtime").Trim();
-        var contentOnly = moduleType.Equals("ContentOnly", StringComparison.OrdinalIgnoreCase);
+        var template = Get(context, "template", "Blank").Trim();
+        var templateInfo = UnrealPluginTemplates.Find(template);
+        var contentOnly = templateInfo.Directory == "ContentOnly" || moduleType.Equals("ContentOnly", StringComparison.OrdinalIgnoreCase);
+        if (templateInfo.IsEditor) moduleType = "Editor";
         if (!contentOnly && !SupportedModuleTypes.Contains(moduleType))
         {
             throw new InvalidOperationException("Le type du plugin n’est pas pris en charge.");
         }
 
-        var canContainContent = bool.TryParse(Get(context, "canContainContent", "true"), out var parsed) && parsed;
+        var canContainContent = contentOnly || (bool.TryParse(Get(context, "canContainContent", "true"), out var parsed) && parsed);
         var pluginRoot = Path.Combine(context.ProjectRoot, "Plugins", pluginName);
         if (Directory.Exists(pluginRoot) || File.Exists(pluginRoot))
         {
@@ -65,7 +69,12 @@ public sealed partial class UnrealCreatePluginPostCreationScript : IProjectPostC
 
         Directory.CreateDirectory(pluginRoot);
         if (canContainContent) Directory.CreateDirectory(Path.Combine(pluginRoot, "Content"));
-        if (!contentOnly)
+        if (!string.IsNullOrWhiteSpace(context.EngineRoot))
+            await UnrealPluginTemplates.CopyAsync(context.EngineRoot, contentOnly ? "Content Only" : template,
+                pluginRoot, pluginName, cancellationToken).ConfigureAwait(false);
+        else if (templateInfo.Directory is not ("Blank" or "ContentOnly"))
+            throw new InvalidOperationException("Sélectionnez un moteur local pour utiliser ses modèles de plugin.");
+        else if (!contentOnly)
         {
             await CreateModuleAsync(pluginRoot, pluginName, moduleType, cancellationToken)
                 .ConfigureAwait(false);
@@ -103,6 +112,7 @@ public sealed partial class UnrealCreatePluginPostCreationScript : IProjectPostC
             {
                 ["plugin"] = Path.Combine("Plugins", pluginName, $"{pluginName}.uplugin"),
                 ["moduleType"] = contentOnly ? "ContentOnly" : moduleType,
+                ["template"] = contentOnly ? "Content Only" : template,
             });
     }
 

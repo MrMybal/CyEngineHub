@@ -8,6 +8,29 @@ namespace CyEngineHub.Build.Tests;
 
 public sealed class UnrealBuildCommandFactoryTests : IDisposable
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task SolutionGenerationSupportsSourceWrappersAndEpicInstalledBuildFallback(bool sourceWrapper)
+    {
+        var engine = CreateEngine();
+        var project = CreateProject();
+        var directory = Path.Combine(engine.RootPath, "Engine", "Build", "BatchFiles");
+        Directory.CreateDirectory(directory);
+        var script = sourceWrapper ? Path.Combine(engine.RootPath, "GenerateProjectFiles.bat") : Path.Combine(directory, "Build.bat");
+        await File.WriteAllTextAsync(script, "@echo off\r\necho ARGS=%*\r\nexit /b 0\r\n");
+        var request = UnrealBuildCommandFactory.CreateGenerateProjectFiles(new(engine, project, UnrealProjectFileFormat.VisualStudio2022, IncludeEngineSource: false));
+        Assert.Contains("-Project=" + project.FilePath, request.RawArguments, StringComparison.Ordinal);
+        Assert.Contains("-2022", request.RawArguments, StringComparison.Ordinal);
+        Assert.Contains("-NoEngine", request.RawArguments, StringComparison.Ordinal);
+        if (!sourceWrapper) Assert.Contains("-ProjectFiles", request.RawArguments, StringComparison.Ordinal);
+        if (OperatingSystem.IsWindows())
+        {
+            var result = await new SystemProcessRunner().RunAsync(request);
+            Assert.True(result.Succeeded);
+            Assert.Contains(result.CapturedOutput, line => line.Text.Contains("-Project=" + project.FilePath, StringComparison.Ordinal));
+        }
+    }
     private readonly string _testDirectory = Path.Combine(
         Path.GetTempPath(),
         "CyEngineHub.Tests",

@@ -142,6 +142,11 @@ internal sealed partial class ImGuiWorkspace
         CardTitle(asset.Name, 2);
         Record("asset/details/" + asset.Asset.AssetId);
         Gui.TextColored(Color(asset, "{Binding LocalStatusForeground}", ImGuiTheme.Muted), Elide(asset.LocalStatusLabel, Gui.GetContentRegionAvail().X));
+        if (!string.IsNullOrWhiteSpace(asset.UpdateLabel))
+        {
+            Gui.TextColored(Color(asset, "{Binding UpdateForeground}", ImGuiTheme.Muted), Elide(asset.UpdateLabel, Gui.GetContentRegionAvail().X));
+            if (Gui.IsItemHovered()) Gui.SetTooltip(asset.UpdateLabel);
+        }
         Gui.TextColored(ImGuiTheme.Accent, Elide(asset.CategoryLabel, Gui.GetContentRegionAvail().X));
         Gui.TextDisabled(Elide(asset.AcquisitionLabel, Gui.GetContentRegionAvail().X));
         var footerY = height - Gui.GetStyle().WindowPadding.Y - Gui.GetFrameHeight() - 1;
@@ -301,7 +306,7 @@ internal sealed partial class ImGuiWorkspace
             if (item is EngineDownloadCardViewModel pending)
             {
                 Gui.TextColored(ImGuiTheme.Warning, pending.StatusLabel);
-                Gui.ProgressBar((float)pending.ProgressPercent / 100, new(-1, 8), "");
+                OperationProgress((float)pending.ProgressPercent / 100, new(-1, 8), pending.StatusLabel);
                 MutedText(pending.ProgressPercent.ToString("0.#", System.Globalization.CultureInfo.CurrentCulture) + " %");
                 foreach (var line in pending.Message.Split('\n').Skip(1)) MutedText(Elide(line, Gui.GetContentRegionAvail().X));
                 if (Gui.IsWindowHovered()) TextTooltip(pending.Message);

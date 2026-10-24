@@ -293,17 +293,6 @@ public sealed class ProjectProfileIniSettingViewModel : ObservableObject
         Value);
 }
 
-public sealed class ProjectCreationEngineOptionViewModel(UnrealEngineInstallation engine)
-{
-    public UnrealEngineInstallation Engine { get; } = engine;
-    public string Name => Engine.DisplayName;
-    public string Version => Engine.Version.IsKnown
-        ? $"Unreal Engine {Engine.Version.Major}.{Engine.Version.Minor}.{Engine.Version.Patch}"
-        : Engine.AssociationId;
-    public string Association => Engine.AssociationId;
-    public string Path => Engine.RootPath;
-}
-
 public sealed class ProjectCreationCollectionOptionViewModel : ObservableObject
 {
     private bool _isSelected;
@@ -1749,6 +1738,9 @@ public sealed class FabCollectionOptionViewModel : ObservableObject
 
 public sealed class FabStoredDownloadViewModel : ObservableObject
 {
+    private string _updateLabel = string.Empty;
+    public string UpdateLabel { get => _updateLabel; set { if (SetProperty(ref _updateLabel, value)) OnPropertyChanged(nameof(UpdateForeground)); } }
+    public string UpdateForeground => UpdateLabel.StartsWith("À jour", StringComparison.Ordinal) ? "#65CCA9" : "#D9A55C";
     private bool _isDeleteConfirmationVisible;
     private readonly long? _uncompressedBytes;
     private readonly long? _storedBytes;
@@ -2965,17 +2957,27 @@ public sealed class RemoteFabAssetRowViewModel : IDisposable
     public void Dispose() => Recycle();
 }
 
-public sealed class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
+public sealed partial class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
 {
+    private string _updateLabel = string.Empty;
+    private bool _hasSupplierUpdate;
+    public string UpdateLabel { get => _updateLabel; private set => SetProperty(ref _updateLabel, value); }
+    public bool HasSupplierUpdate { get => _hasSupplierUpdate; private set => SetProperty(ref _hasSupplierUpdate, value); }
+    public string UpdateForeground => HasSupplierUpdate ? "#D9A55C" : UpdateLabel.Contains("à jour", StringComparison.Ordinal) ? "#65CCA9" : "#8294A8";
+    public void SetSupplierUpdate(string label, bool available) { UpdateLabel = label; HasSupplierUpdate = available; OnPropertyChanged(nameof(UpdateForeground)); }
     private readonly CancellationTokenSource _thumbnailCancellation = new();
     private readonly Func<Uri?, CancellationToken, Task<Bitmap?>> _loadThumbnail;
     private readonly Func<Uri?, CancellationToken, Task<Bitmap?>> _loadPreview;
+    private readonly Func<Uri?, CancellationToken, Task<Bitmap?>> _loadGalleryThumbnail;
     private Bitmap? _thumbnail;
     private bool _isThumbnailLoading;
     private bool _thumbnailLoadStarted;
     private bool _galleryLoadStarted;
     private bool _isGalleryLoading;
     private string _fullDescription;
+    private readonly string _summary;
+    private string _descriptionSource;
+    private MarketplaceDescriptionDocument? _descriptionDocument;
     private IReadOnlyList<Uri> _galleryUris;
     private Bitmap? _selectedGalleryImage;
     private double _cardWidth = 310;
@@ -2996,14 +2998,18 @@ public sealed class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
         Action<RemoteFabAssetCardViewModel>? openInstall = null,
         Action<RemoteFabAssetCardViewModel>? openCollections = null,
         bool isHidden = false,
-        Func<Uri?, CancellationToken, Task<Bitmap?>>? loadPreview = null)
+        Func<Uri?, CancellationToken, Task<Bitmap?>>? loadPreview = null,
+        Func<Uri?, CancellationToken, Task<Bitmap?>>? loadGalleryThumbnail = null)
     {
         Asset = asset;
         Organization = organization;
         _loadThumbnail = loadThumbnail;
         _loadPreview = loadPreview ?? loadThumbnail;
-        _fullDescription = asset.Description;
-        _galleryUris = asset.GalleryUris;
+        _loadGalleryThumbnail = loadGalleryThumbnail ?? loadThumbnail;
+        _summary = MarketplaceRichText.ToPlainText(asset.Description);
+        _fullDescription = _summary;
+        _descriptionSource = asset.RichDescription ?? asset.Description;
+        _galleryUris = NormalizeGalleryUris(asset.GalleryUris);
         _isHidden = isHidden;
         OpenDetailsCommand = new RelayCommand(() => openDetails(this));
         OpenListingCommand = new AsyncRelayCommand(
@@ -3028,7 +3034,8 @@ public sealed class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
 
     public string OriginalName => Asset.Title;
 
-    public string Summary => Asset.Description;
+    public string Summary => _summary;
+    public MarketplaceDescriptionDocument DescriptionDocument => _descriptionDocument ??= MarketplaceDescriptionDocument.Parse(_descriptionSource);
 
     public string Description
     {
@@ -3140,7 +3147,8 @@ public sealed class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
 
     public bool HasThumbnail => Thumbnail is not null;
 
-    public Bitmap? PreviewImage => SelectedGalleryImage ?? Thumbnail;
+    public Bitmap? PreviewImage => SelectedGalleryImage ?? GalleryImages.ElementAtOrDefault(_selectedGalleryIndex)?.Image ??
+        (_selectedGalleryIndex <= 0 ? Thumbnail : null);
 
     public bool HasPreviewImage => PreviewImage is not null;
 
@@ -3351,17 +3359,27 @@ public sealed class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
         }
         _galleryLoadStarted = true;
         EnsureThumbnailLoaded();
-        _ = LoadGalleryAsync();
+        RebuildGallery();
     }
 
     public void ApplyProductDetails(RemoteFabProductDetails details)
     {
-        Description = string.IsNullOrWhiteSpace(details.Description)
-            ? Asset.Description
-            : details.Description;
-        _galleryUris = details.ImageUris.Count > 0
+        var description = MarketplaceRichText.ToPlainText(details.Description);
+        Description = string.IsNullOrWhiteSpace(description) ? Summary : description;
+        _descriptionSource = string.IsNullOrWhiteSpace(description)
+            ? Asset.RichDescription ?? Asset.Description : details.RichDescription ?? details.Description;
+        _descriptionDocument = null;
+        OnPropertyChanged(nameof(DescriptionDocument));
+        var galleryUris = NormalizeGalleryUris(details.ImageUris.Count > 0
             ? details.ImageUris
-            : Asset.GalleryUris;
+            : Asset.GalleryUris);
+        _galleryDetailsAvailable = true;
+        if (!_galleryUris.SequenceEqual(galleryUris))
+        {
+            _galleryUris = galleryUris;
+            if (_galleryLoadStarted) RebuildGallery();
+        }
+        NotifyGalleryState();
     }
 
     public void Dispose()
@@ -3372,13 +3390,14 @@ public sealed class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
         }
 
         _disposed = true;
+        CancelGalleryPreview();
         _thumbnailCancellation.Cancel();
         _thumbnailCancellation.Dispose();
         Thumbnail?.Dispose();
         Thumbnail = null;
         foreach (var image in GalleryImages)
         {
-            image.Image.Dispose();
+            image.Dispose();
         }
         GalleryImages.Clear();
         SelectedGalleryImage = null;
@@ -3416,55 +3435,6 @@ public sealed class RemoteFabAssetCardViewModel : ObservableObject, IDisposable
         }
     }
 
-    private async Task LoadGalleryAsync()
-    {
-        IsGalleryLoading = true;
-        try
-        {
-            foreach (var uri in _galleryUris.Take(16))
-            {
-                var bitmap = await _loadPreview(uri, _thumbnailCancellation.Token);
-                if (_disposed)
-                {
-                    bitmap?.Dispose();
-                    return;
-                }
-                if (bitmap is not null)
-                {
-                    var item = new FabGalleryImageViewModel(bitmap, SelectGalleryImage);
-                    GalleryImages.Add(item);
-                    SelectedGalleryImage ??= bitmap;
-                    OnPropertyChanged(nameof(HasGalleryImages));
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        finally
-        {
-            if (!_disposed)
-            {
-                IsGalleryLoading = false;
-            }
-        }
-    }
-
-    private void SelectGalleryImage(FabGalleryImageViewModel image) =>
-        SelectedGalleryImage = image.Image;
-}
-
-public sealed class FabGalleryImageViewModel
-{
-    public FabGalleryImageViewModel(Bitmap image, Action<FabGalleryImageViewModel> select)
-    {
-        Image = image;
-        SelectCommand = new RelayCommand(() => select(this));
-    }
-
-    public Bitmap Image { get; }
-
-    public ICommand SelectCommand { get; }
 }
 
 public sealed class BuildPresetCardViewModel : ObservableObject
@@ -3661,6 +3631,8 @@ public sealed class TaskItemViewModel : ObservableObject
         Title = snapshot.Title;
         CancelCommand = new RelayCommand(() => cancel(snapshot.Id), () => CanCancel);
         Links = snapshot.Links.Select(link => new TaskLinkViewModel(link, navigate)).ToArray();
+        var primary = snapshot.Links.FirstOrDefault(link => link.Kind == "project") ?? (snapshot.Links.Count > 0 ? snapshot.Links[0] : null);
+        OpenTargetCommand = new RelayCommand(() => { if (primary is not null) navigate(primary); }, () => primary is not null);
     }
 
     public IReadOnlyList<TaskLinkViewModel> Links { get; }
@@ -3672,6 +3644,9 @@ public sealed class TaskItemViewModel : ObservableObject
         OnPropertyChanged(nameof(Status));
         OnPropertyChanged(nameof(Message));
         OnPropertyChanged(nameof(ProgressPercent));
+        OnPropertyChanged(nameof(IsProgressIndeterminate));
+        OnPropertyChanged(nameof(ProgressLabel));
+        OnPropertyChanged(nameof(StatusColor));
         OnPropertyChanged(nameof(Duration));
         OnPropertyChanged(nameof(CanCancel));
         ((RelayCommand)CancelCommand).NotifyCanExecuteChanged();
@@ -3699,6 +3674,16 @@ public sealed class TaskItemViewModel : ObservableObject
     public string Message => _snapshot.Error ?? _snapshot.Message ?? string.Empty;
 
     public double ProgressPercent => (_snapshot.Progress ?? 0) * 100;
+    public bool IsProgressIndeterminate => _snapshot.Progress is null && CanCancel;
+    public string ProgressLabel => IsProgressIndeterminate ? IsQueued ? "En attente…" : "En cours…" : $"{ProgressPercent:0.#} %";
+    public string StatusColor => _snapshot.Status switch
+    {
+        HubTaskStatus.Completed => "#5CD26E",
+        HubTaskStatus.Failed => "#F06474",
+        HubTaskStatus.Canceled => "#F5A623",
+        _ => "#56A8EC",
+    };
+    public ICommand OpenTargetCommand { get; }
 
     public string Duration => FormatDuration(_snapshot);
     public double DurationSeconds => _snapshot.StartedAt is { } start ? ((_snapshot.FinishedAt ?? DateTimeOffset.UtcNow) - start).TotalSeconds : 0;

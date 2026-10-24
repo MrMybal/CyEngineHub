@@ -6,6 +6,72 @@ namespace CyEngineHub.Core.Tests;
 public sealed class ImGuiInterfaceTests
 {
     [Fact]
+    public void FabProductExposesNativeGalleryAndAnEnlargedViewerWithAnEscapeCloseCommand()
+    {
+        var document = UiDocument.Load("Main");
+        Assert.Contains(document.Root.Descendants(), node => node["Name"] == "FabProductGallery");
+        var modal = Assert.Single(document.Modals, node => UiBinding.Path(node["IsVisible"]) == "IsFabImagePreviewVisible");
+        Assert.Contains(modal.Descendants(), node => node["Name"] == "FabGalleryViewer");
+        Assert.Contains(modal.Descendants(), node => UiBinding.Path(node["Command"]) == "CloseFabImagePreviewCommand");
+    }
+    [Fact]
+    public void ProjectFicheHasNoMarketplaceSpecificConfigurationAndPluginTargetsHaveLabels()
+    {
+        var document = UiDocument.Load("Main");
+        var project = document.Root.Descendants().Single(node => node["IsVisible"] == "{Binding IsProjectDetailsVisible}");
+        Assert.DoesNotContain(project.Descendants(), node => (node["Text"] ?? "").Contains("COSMOS", StringComparison.Ordinal));
+        Assert.DoesNotContain(project.Descendants(), node => UiBinding.Path(node["Command"]) == "SaveCosmosProjectSettingsCommand");
+        var target = document.Root.Descendants().Single(node => UiBinding.Path(node["SelectedItem"]) == "SelectedPluginTarget");
+        Assert.Equal("{Binding SelectionLabel}", target["DisplayMemberBinding"]);
+        Assert.Equal("{Binding Path}", target["ItemToolTipBinding"]);
+    }
+    [Fact]
+    public void ProjectBuildProgressAndBuildsReturnNavigationAreBoundToTheirProject()
+    {
+        var nodes = UiDocument.Load("Main").Root.Descendants().ToArray();
+        var build = nodes.Single(node => node["Name"] == "ProjectBuildProgress");
+        Assert.Contains(build.Descendants(), node => UiBinding.Path(node["Value"]) == "SelectedProjectBuildTask.ProgressPercent");
+        Assert.Contains(build.Descendants(), node => UiBinding.Path(node["IsIndeterminate"]) == "SelectedProjectBuildTask.IsProgressIndeterminate");
+        Assert.Contains(nodes, node => UiBinding.Path(node["Command"]) == "BackFromBuildsCommand");
+    }
+    [Fact]
+    public void ProjectCreationFormSeparatesCodeKindFromEngineAndLabelsItsLocationFields()
+    {
+        var nodes = UiDocument.Load("Main").Root.Descendants().ToArray();
+        var location = nodes.Single(node => node["Name"] == "ProjectCreationLocation");
+        Assert.Contains(location.Descendants(), node => node["Text"] == "Nom du projet");
+        Assert.Contains(location.Descendants(), node => node["Text"] == "Dossier parent");
+        Assert.Contains(location.Descendants(), node => node["Click"] == "BrowseNewProjectParentDirectory");
+        Assert.DoesNotContain(location.Descendants(), node => UiBinding.Path(node["Text"]) == "NewProjectEngineAssociation");
+        var kind = nodes.Single(node => node["Name"] == "ProjectCreationCodeKind");
+        Assert.Contains(kind.Descendants(), node => UiBinding.Path(node["SelectedItem"]) == "SelectedProjectCreationCodeKind");
+        Assert.Contains(nodes, node => UiBinding.Path(node["Text"]) == "ProjectCreationDestinationPreview");
+        var advanced = nodes.Single(node => node["Name"] == "ProjectCreationAdvanced");
+        Assert.Contains(advanced.Descendants(), node => UiBinding.Path(node["Text"]) == "NewProjectEngineAssociation" && node.Kind == "TextBlock");
+    }
+    [Fact]
+    public void ProjectEngineSelectorsUseTheAliasLabelAndBothSelectedAndPerOptionTooltips()
+    {
+        var combos = UiDocument.Load("Main").Root.Descendants().Where(node => node.Kind == "ComboBox" &&
+            UiBinding.Path(node["ItemsSource"]) == "ProjectCreationEngines").ToArray();
+        Assert.Equal(2, combos.Length);
+        Assert.All(combos, node =>
+        {
+            Assert.Equal("Label", UiBinding.Path(node["DisplayMemberBinding"]));
+            Assert.Equal("ToolTip", UiBinding.Path(node["ItemToolTipBinding"]));
+            Assert.Equal("SelectedProjectCreationEngine.ToolTip", UiBinding.Path(node["ToolTip.Tip"]));
+        });
+    }
+    [Fact]
+    public void FabProductAndStoredVersionsExposeRevisionStatusWithStatusColors()
+    {
+        var nodes = UiDocument.Load("Main").Root.Descendants().ToArray();
+        Assert.Contains(nodes, node => UiBinding.Path(node["Text"]) == "FabUpdateSummary");
+        Assert.Contains(nodes, node => UiBinding.Path(node["Text"]) == "SelectedRemoteFabAssetCard.UpdateLabel" &&
+            UiBinding.Path(node["Foreground"]) == "SelectedRemoteFabAssetCard.UpdateForeground");
+        Assert.Contains(nodes, node => UiBinding.Path(node["Text"]) == "UpdateLabel" && UiBinding.Path(node["Foreground"]) == "UpdateForeground");
+    }
+    [Fact]
     public void ConnectorLibraryRowsUseTheSameColumnsAsFab()
     {
         var panel = UiDocument.Load("Main").Root.Descendants().Single(node => node.Kind == "StackPanel" &&

@@ -46,6 +46,7 @@ public sealed record RemoteFabAsset(
     string? WebLibraryItemId = null,
     bool WebCanDownload = false)
 {
+    public string? RichDescription { get; init; }
     public IReadOnlyList<Uri> GalleryUris => ImageUris is { Count: > 0 }
         ? ImageUris
         : ThumbnailUri is null ? [] : [ThumbnailUri];
@@ -86,11 +87,15 @@ public sealed record DirectFabSourceManifest(
     string BuildVersion,
     uint Version,
     int FileCount,
-    long DownloadSize);
+    long DownloadSize,
+    string? ContentHash = null);
 
 public sealed record RemoteFabProductDetails(
     string Description,
-    IReadOnlyList<Uri> ImageUris);
+    IReadOnlyList<Uri> ImageUris)
+{
+    public string? RichDescription { get; init; }
+}
 
 public interface IDirectFabSessionStore
 {
@@ -103,6 +108,8 @@ public interface IDirectFabSessionStore
 
 public interface IDirectFabClient
 {
+    Task<DirectFabSourceManifest?> GetSourceManifestAsync(RemoteFabAsset asset, RemoteFabProjectVersion version,
+        CancellationToken cancellationToken = default) => Task.FromResult<DirectFabSourceManifest?>(null);
     void SetDownloadConnections(int connections) { }
     Task<DirectFabDownloadEstimate?> EstimateDownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version,
         CancellationToken cancellationToken = default) => Task.FromResult<DirectFabDownloadEstimate?>(null);

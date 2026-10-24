@@ -765,12 +765,17 @@
                 </WrapPanel>
               </Grid>
               <StackPanel IsVisible="{Binding IsUnrealProjectDetailsSelected}">
-                <Border Classes="card" IsVisible="{Binding IsCosmosProjectSettingsVisible}">
+                <Border Name="ProjectBuildProgress" Classes="card" IsVisible="{Binding HasSelectedProjectBuild}">
                   <StackPanel>
-                    <TextBlock Text="COSMOS · ALPHA · DOSSIER DES ASSETS DU PROJET" Foreground="#70A8FA" />
-                    <TextBlock Text="Sous /Game. Les références et dépendances sont reconstruites par Unreal avant installation. Ne déplace pas les imports déjà présents." TextWrapping="Wrap" />
-                    <TextBox Text="{Binding CosmosProjectDestination}" PlaceholderText="Assets/Cosmos" />
-                    <Button Content="Enregistrer le dossier Cosmos" Command="{Binding SaveCosmosProjectSettingsCommand}" />
+                    <TextBlock Text="{Binding SelectedProjectBuildTask.Title}" />
+                    <TextBlock Text="{Binding SelectedProjectBuildTask.Status}" Foreground="{Binding SelectedProjectBuildTask.StatusColor}" />
+                    <ProgressBar Value="{Binding SelectedProjectBuildTask.ProgressPercent}" Maximum="100" IsIndeterminate="{Binding SelectedProjectBuildTask.IsProgressIndeterminate}" OperationStatus="{Binding SelectedProjectBuildTask.Status}" />
+                    <TextBlock Text="{Binding SelectedProjectBuildTask.ProgressLabel}" />
+                    <TextBlock Text="{Binding SelectedProjectBuildTask.Message}" Foreground="#8294A8" TextWrapping="Wrap" />
+                    <WrapPanel>
+                      <Button Content="Voir le build / les logs" Command="{Binding ShowSelectedProjectBuildsCommand}" />
+                      <Button Content="Annuler le build" Command="{Binding SelectedProjectBuildTask.CancelCommand}" IsVisible="{Binding SelectedProjectBuildTask.CanCancel}" />
+                    </WrapPanel>
                   </StackPanel>
                 </Border>
                 <Border Classes="card">
@@ -801,7 +806,7 @@
                       <Button Classes="accent" Content="Ouvrir le projet" Command="{Binding SelectedProjectDetails.LaunchCommand}" />
                       <Button Classes="ghost" Content="Build" Command="{Binding SelectedProjectDetails.BuildEditorCommand}" />
                       <Button Classes="ghost" Content="Package" Command="{Binding SelectedProjectDetails.PackageCommand}" />
-                      <Button Classes="ghost" Content="GPF" Command="{Binding SelectedProjectDetails.GenerateProjectFilesCommand}" />
+                      <Button Classes="ghost" Content="Générer la solution (.sln)" Command="{Binding SelectedProjectDetails.GenerateProjectFilesCommand}" />
                       <Button Classes="ghost" Content="Dossier" Command="{Binding SelectedProjectDetails.OpenFolderCommand}" />
                     </WrapPanel>
                   </Grid>
@@ -888,7 +893,7 @@
                   </StackPanel>
                   <StackPanel Grid.Column="1">
                     <TextBlock Text="CIBLE D’INSTALLATION / BUILDPLUGIN" FontSize="10" Foreground="#65788D" />
-                    <ComboBox ItemsSource="{Binding PluginTargets}" SelectedItem="{Binding SelectedPluginTarget}" IsEnabled="{Binding HasPluginTargets}" PlaceholderText="Aucun moteur compatible">
+                    <ComboBox ItemsSource="{Binding PluginTargets}" SelectedItem="{Binding SelectedPluginTarget}" DisplayMemberBinding="{Binding SelectionLabel}" ItemToolTipBinding="{Binding Path}" ToolTip.Tip="{Binding SelectedPluginTarget.Path}" IsEnabled="{Binding HasPluginTargets}" PlaceholderText="Aucun moteur compatible">
                       <ComboBox.ItemTemplate>
                         <DataTemplate>
                           <TextBlock Text="{Binding SelectionLabel}" />
@@ -1615,6 +1620,7 @@
                               </StackPanel>
                             </Button>
                           </Grid>
+                          <TextBlock Text="{Binding FabUpdateSummary}" IsVisible="{Binding IsLibraryFabSelected}" FontSize="10" Foreground="#8294A8" TextWrapping="Wrap" />
                           <Grid Name="LibrarySearchToolbar" ColumnDefinitions="*,190,Auto,Auto">
                             <TextBox Classes="path" Text="{Binding LibrarySearchQuery}" PlaceholderText="Rechercher par nom, description, catégorie ou version moteur…" />
                             <ComboBox Grid.Column="1" ItemsSource="{Binding LibrarySortOptions}" SelectedItem="{Binding SelectedLibrarySort}" PlaceholderText="Trier par" />
@@ -1725,22 +1731,13 @@
                           <TextBlock Grid.Column="1" Text="{Binding LibraryProductHeading}" FontSize="10" Foreground="#65788D" />
                         </Grid>
                         <Border Classes="card">
-                          <Grid ColumnDefinitions="300,*,Auto">
-                            <Button Command="{Binding OpenFabImagePreviewCommand}" ToolTip.Tip="Afficher l’image en grand">
-                              <Border Height="185">
-                                <Grid>
-                                  <TextBlock Text="FAB" FontSize="26" Foreground="#29415A" />
-                                  <Image Source="{Binding SelectedRemoteFabAssetCard.PreviewImage}" IsVisible="{Binding SelectedRemoteFabAssetCard.HasPreviewImage}" />
-                                  <Border>
-                                    <TextBlock Text="⛶ Agrandir" FontSize="9" />
-                                  </Border>
-                                </Grid>
-                              </Border>
-                            </Button>
+                          <Grid Name="FabProductSummary" ColumnDefinitions="300,*,Auto" MinStretchColumnWidth="320">
+                            <StackPanel Name="FabProductGallery" />
                             <StackPanel Grid.Column="1">
                               <TextBlock Text="{Binding SelectedRemoteFabAssetCard.Organization.DisplayName}" FontSize="27" TextWrapping="Wrap" />
                               <TextBlock Text="{Binding SelectedRemoteFabAssetCard.Description}" FontSize="12" Foreground="#B7C4D1" TextWrapping="Wrap" MaxHeight="92" />
                               <TextBlock Text="{Binding SelectedRemoteFabAssetCard.ArtifactSummary}" FontSize="11" Foreground="#65CCA9" />
+                              <TextBlock Text="{Binding SelectedRemoteFabAssetCard.UpdateLabel}" FontSize="11" Foreground="{Binding SelectedRemoteFabAssetCard.UpdateForeground}" TextWrapping="Wrap" />
                               <TextBlock Text="{Binding SelectedRemoteFabAssetCard.Categories, StringFormat='Catégories · {0}'}" FontSize="10" Foreground="#8294A8" TextWrapping="Wrap" />
                               <TextBlock Text="{Binding SelectedRemoteFabAssetCard.Platforms, StringFormat='Plateformes · {0}'}" FontSize="10" Foreground="#8294A8" TextWrapping="Wrap" />
                             </StackPanel>
@@ -1807,6 +1804,7 @@
                                           <TextBlock Text="{Binding Version}" TextWrapping="Wrap" />
                                           <TextBlock Text="{Binding PackageSummary}" Foreground="#65CCA9" />
                                           <TextBlock Text="{Binding OriginLabel}" Foreground="#8CC2FF" />
+                                          <TextBlock Text="{Binding UpdateLabel}" Foreground="{Binding UpdateForeground}" TextWrapping="Wrap" />
                                           <TextBlock Text="{Binding DerivationNotes}" TextWrapping="Wrap" />
                                           <TextBlock Text="{Binding ArtifactId}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ArtifactId}" Foreground="#A4B3C2" />
                                         </StackPanel>
@@ -2786,10 +2784,11 @@
             <Border Classes="card">
               <Grid ColumnDefinitions="*,Auto">
                 <StackPanel>
+                  <Button Content="{Binding BuildBackLabel}" Command="{Binding BackFromBuildsCommand}" />
                   <TextBlock Text="{Binding ActiveBuildTitle}" FontSize="16" />
                   <TextBlock Text="{Binding BuildSummary}" FontSize="11" Foreground="#8193A7" />
                 </StackPanel>
-                <Button Grid.Column="1" Classes="ghost" Content="Voir les tâches" Command="{Binding ShowTasksCommand}" />
+                <Button Grid.Column="1" Classes="ghost" Content="Voir les actions" Command="{Binding ShowActionsCommand}" />
               </Grid>
             </Border>
             <Border Grid.Row="1" Classes="card">
@@ -3165,7 +3164,7 @@
                     <Border Classes="card">
                       <StackPanel>
                         <TextBlock Text="MOTEUR DE RÉFÉRENCE POUR LES PLUGINS" FontSize="10" Foreground="#70A8FA" />
-                        <ComboBox ItemsSource="{Binding ProjectCreationEngines}" SelectedItem="{Binding SelectedProjectCreationEngine}" PlaceholderText="Choisir une version Unreal installée">
+                        <ComboBox ItemsSource="{Binding ProjectCreationEngines}" SelectedItem="{Binding SelectedProjectCreationEngine}" DisplayMemberBinding="{Binding Label}" ItemToolTipBinding="{Binding ToolTip}" ToolTip.Tip="{Binding SelectedProjectCreationEngine.ToolTip}" PlaceholderText="Choisir une version Unreal installée">
                           <ComboBox.ItemTemplate>
                             <DataTemplate>
                               <StackPanel>
@@ -3944,42 +3943,38 @@
                   <Border>
                     <StackPanel>
                       <TextBlock Text="1 · PROJET ET MOTEUR" FontSize="10" Foreground="#70A8FA" />
-                      <Grid ColumnDefinitions="1.05*,1.2*,1.2*">
-                        <ComboBox ItemsSource="{Binding ProjectCreationPresets}" SelectedItem="{Binding SelectedProjectCreationPreset}" PlaceholderText="Type de projet">
-                          <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                              <StackPanel>
-                                <TextBlock Text="{Binding Name}" />
-                                <TextBlock Text="{Binding Description}" FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
-                              </StackPanel>
-                            </DataTemplate>
-                          </ComboBox.ItemTemplate>
-                        </ComboBox>
-                        <ComboBox Grid.Column="1" IsVisible="{Binding IsUnrealProjectCreation}" ItemsSource="{Binding ProjectCreationEngines}" SelectedItem="{Binding SelectedProjectCreationEngine}" PlaceholderText="Version Unreal installée">
-                          <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                              <StackPanel>
-                                <TextBlock Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
-                                <TextBlock Text="{Binding Version}" FontSize="9" Foreground="#70A8FA" />
-                                <TextBlock Text="{Binding Path}" FontSize="8" Foreground="#65788D" TextTrimming="CharacterEllipsis" />
-                              </StackPanel>
-                            </DataTemplate>
-                          </ComboBox.ItemTemplate>
-                        </ComboBox>
-                        <ComboBox Grid.Column="2" IsVisible="{Binding IsUnrealProjectCreation}" ItemsSource="{Binding ProjectCreationConfigurations}" SelectedItem="{Binding SelectedProjectCreationConfiguration}" PlaceholderText="Profil de configuration">
-                          <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                              <StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                  <TextBlock Text="{Binding Name}" />
-                                  <TextBlock Text="{Binding Origin}" FontSize="8" Foreground="#65CFA1" />
+                      <Grid Name="ProjectCreationSelectors" ColumnDefinitions="1.05*,1.2*,1.2*">
+                        <TextBlock Text="Environnement" />
+                        <TextBlock Grid.Column="1" Text="Moteur installé" IsVisible="{Binding IsUnrealProjectCreation}" />
+                        <TextBlock Grid.Column="2" Text="Profil de configuration" IsVisible="{Binding IsUnrealProjectCreation}" />
+                        <ComboBox Grid.Row="1" ItemsSource="{Binding ProjectCreationFamilies}" SelectedItem="{Binding SelectedProjectCreationFamily}" />
+                          <ComboBox Grid.Row="1" Grid.Column="1" IsVisible="{Binding IsUnrealProjectCreation}" ItemsSource="{Binding ProjectCreationEngines}" SelectedItem="{Binding SelectedProjectCreationEngine}" DisplayMemberBinding="{Binding Label}" ItemToolTipBinding="{Binding ToolTip}" ToolTip.Tip="{Binding SelectedProjectCreationEngine.ToolTip}" PlaceholderText="Choisir un moteur Unreal">
+                            <ComboBox.ItemTemplate>
+                              <DataTemplate>
+                                <StackPanel>
+                                  <TextBlock Text="{Binding Label}" />
+                                  <TextBlock Text="{Binding Path}" FontSize="8" Foreground="#65788D" TextTrimming="CharacterEllipsis" />
                                 </StackPanel>
-                                <TextBlock Text="{Binding Description}" FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding Inventory}" FontSize="8" Foreground="#5F9BD3" />
-                              </StackPanel>
-                            </DataTemplate>
-                          </ComboBox.ItemTemplate>
-                        </ComboBox>
+                              </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                          </ComboBox>
+                          <ComboBox Grid.Row="1" Grid.Column="2" IsVisible="{Binding IsUnrealProjectCreation}" ItemsSource="{Binding ProjectCreationConfigurations}" SelectedItem="{Binding SelectedProjectCreationConfiguration}" PlaceholderText="Profil de configuration">
+                            <ComboBox.ItemTemplate>
+                              <DataTemplate>
+                                <StackPanel>
+                                  <TextBlock Text="{Binding Name}" />
+                                  <TextBlock Text="{Binding Description}" FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
+                                </StackPanel>
+                              </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                          </ComboBox>
+                      </Grid>
+                      <Grid Name="ProjectCreationCodeKind" IsVisible="{Binding IsUnrealProjectCreation}" ColumnDefinitions="230,*">
+                        <StackPanel>
+                          <TextBlock Text="Type de projet" />
+                          <ComboBox ItemsSource="{Binding ProjectCreationCodeKinds}" SelectedItem="{Binding SelectedProjectCreationCodeKind}" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding ProjectCreationCodeKindDescription}" Foreground="#8294A8" TextWrapping="Wrap" />
                       </Grid>
                       <Grid IsVisible="{Binding IsUnrealProjectCreation}" ColumnDefinitions="*,Auto,Auto">
                         <StackPanel>
@@ -3989,11 +3984,26 @@
                         <Button Grid.Column="1" Classes="ghost" Content="Nouveau profil" Command="{Binding NewProjectProfileCommand}" />
                         <Button Grid.Column="2" Classes="ghost" Content="Modifier / Dupliquer" Command="{Binding EditProjectProfileCommand}" />
                       </Grid>
-                      <Grid ColumnDefinitions="1*,1.55*,0.75*">
-                        <TextBox Classes="path" Text="{Binding NewProjectName}" PlaceholderText="Nom technique du projet" />
-                        <TextBox Grid.Column="1" Classes="path" Text="{Binding NewProjectParentDirectory}" PlaceholderText="Dossier parent existant" />
-                        <TextBox Grid.Column="2" Classes="path" Text="{Binding NewProjectEngineAssociation}" PlaceholderText="Association moteur" />
+                      <Grid Name="ProjectCreationLocation" ColumnDefinitions="230,*,Auto">
+                        <TextBlock Text="Nom du projet" />
+                        <TextBlock Grid.Column="1" Text="Dossier parent" />
+                        <TextBox Grid.Row="1" Classes="path" Text="{Binding NewProjectName}" PlaceholderText="Ex. MonProjet" ToolTip.Tip="Nom technique utilisé pour le dossier, le fichier projet et les éventuels modules C++. Lettres, chiffres et underscore ; commencez par une lettre." />
+                        <TextBox Grid.Row="1" Grid.Column="1" Classes="path" Text="{Binding NewProjectParentDirectory}" PlaceholderText="Choisir un dossier existant…" ToolTip.Tip="Un nouveau sous-dossier portant le nom du projet sera créé ici." />
+                        <Button Grid.Row="1" Grid.Column="2" Content="Parcourir…" Click="BrowseNewProjectParentDirectory" ToolTip.Tip="Choisir le dossier parent ; aucun dossier n’est créé à cette étape." />
                       </Grid>
+                      <TextBlock Text="{Binding ProjectCreationDestinationPreview}" Foreground="#8294A8" TextWrapping="Wrap" />
+                      <StackPanel IsVisible="{Binding !IsUnrealProjectCreation}">
+                        <TextBlock Text="Version / association (facultative)" />
+                        <TextBox Classes="path" Text="{Binding NewProjectEngineAssociation}" PlaceholderText="Laisser vide pour utiliser la configuration par défaut" />
+                      </StackPanel>
+                      <Expander Name="ProjectCreationAdvanced" Header="Options avancées · modèle et association" IsVisible="{Binding IsUnrealProjectCreation}">
+                        <StackPanel>
+                          <TextBlock Text="Modèle de base (compatibilité)" />
+                          <ComboBox ItemsSource="{Binding ProjectCreationPresets}" SelectedItem="{Binding SelectedProjectCreationPreset}" />
+                          <TextBlock Text="{Binding NewProjectEngineAssociation, StringFormat='Association au moteur (automatique) : {0}'}" ToolTip.Tip="Identifiant enregistré dans le .uproject pour retrouver le moteur choisi. Il vient de son association Unreal, pas du nom personnalisé affiché dans CyEngineHub." />
+                          <TextBlock Text="{Binding SelectedProjectCreationEngine.Path}" Foreground="#8294A8" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </Expander>
                     </StackPanel>
                   </Border>
                   <Border Classes="card">
@@ -4692,7 +4702,7 @@
     </Grid>
     <Grid IsVisible="{Binding IsFabImagePreviewVisible}" Panel.ZIndex="2100">
       <Border />
-      <Border MaxWidth="1260" MaxHeight="780">
+      <Border Name="FabGalleryViewer" MaxWidth="1260" MaxHeight="780">
         <Grid RowDefinitions="Auto,*">
           <Grid ColumnDefinitions="*,Auto">
             <StackPanel>

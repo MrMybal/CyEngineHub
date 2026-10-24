@@ -70,7 +70,8 @@ internal sealed partial class ImGuiWorkspace
         var heading = node.Children.Single(child => child["Grid.Column"] is null);
         var actions = node.Children.Where(child => child["Grid.Column"] == "1" && Visible(child, vm)).ToArray();
         var spacing = Gui.GetStyle().ItemSpacing.X;
-        var width = ButtonWidth("Analyser les tailles") + actions.Sum(action => NaturalWidth(action, vm) + spacing) + 8 * UiScale;
+        var updateWidth = vm.IsLibraryFabSelected ? ButtonWidth("Vérifier les mises à jour") + spacing : 0;
+        var width = updateWidth + ButtonWidth("Analyser les tailles") + actions.Sum(action => NaturalWidth(action, vm) + spacing) + 8 * UiScale;
         var wide = Gui.GetContentRegionAvail().X >= width + 135 * UiScale;
         if (wide && Gui.BeginTable("library-catalog-header", 2, ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.NoSavedSettings))
         {
@@ -94,6 +95,12 @@ internal sealed partial class ImGuiWorkspace
                 ToolbarItem(ref first, right, NaturalWidth(action, vm)); DrawNode(action, vm);
             }
             ToolbarItem(ref first, right, ButtonWidth("Analyser les tailles")); DrawSizeAnalysisMenu(vm, "packs");
+            if (vm.IsLibraryFabSelected)
+            {
+                ToolbarItem(ref first, right, ButtonWidth("Vérifier les mises à jour"));
+                ActionButton(vm, "Vérifier les mises à jour", "CheckFabUpdatesCommand");
+                Record("fab/check-updates");
+            }
         }
     }
     private void DrawLibrarySearchToolbar(MainWindowViewModel vm, UiNode node)

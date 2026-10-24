@@ -49,6 +49,11 @@ partial class Program
             var fabCombo = ImGuiDiagnostics.ElementBounds(window, "combo/SelectedFabCompressionOption");
             var fabPath = ImGuiDiagnostics.ElementBounds(window, "field/FabDownloadDirectory");
             await ImGuiDiagnostics.ClickAsync(window, "settings-subtab/marketplaces/" + id);
+            Check(ImGuiDiagnostics.Elements(window).Contains("cosmos-import/project"), "Per-project Cosmos destinations live in Cosmos marketplace settings, not project fiches");
+            vm.SelectedCosmosImportProject = vm.Projects.First();
+            while (!vm.SaveCosmosProjectSettingsCommand.CanExecute(null)) await Task.Delay(20);
+            await ImGuiDiagnostics.FramesAsync(window, 3);
+            Check(ImGuiDiagnostics.Elements(window).Contains("cosmos-import/folder"), "Selecting a project exposes only its Cosmos import destination");
             Check(connector.SelectedCompressionOption.Label == "Ultra" && connector.Compression == "ZipUltra",
                 "Cosmos maps saved technical compression values to the shared marketplace labels");
             Check(connector.CompressionOptions.Where(option => option.StorageMode != "Uncompressed")

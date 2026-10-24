@@ -16,6 +16,13 @@ internal static class ImGuiTheme
     public static readonly Vector4 Success = Rgb(0x5CD26E);
     public static readonly Vector4 OfficialRow = Rgb(0x334C3A);
     public static readonly Vector4 Warning = Rgb(0xF5A623);
+    internal static Vector4 ProgressColor(OperationProgressTone tone) => tone switch
+    {
+        OperationProgressTone.Completed => Success,
+        OperationProgressTone.Failed => Rgb(0xF06474),
+        OperationProgressTone.Canceled => Warning,
+        _ => Rgb(0x56A8EC),
+    };
     internal static int PushActionColors(string? command, bool primary, bool danger = false)
     {
         var tone = ActionColorPolicy.Resolve(command, primary, danger);

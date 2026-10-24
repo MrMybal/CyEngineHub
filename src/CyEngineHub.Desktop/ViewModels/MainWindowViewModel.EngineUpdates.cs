@@ -10,6 +10,78 @@ public sealed partial class MainWindowViewModel
     private bool _isCheckingOfficialEngineUpdates;
     private string _officialEngineUpdateSummary = "Les révisions officielles se vérifient avec la connexion Epic/Fab.";
     private readonly Dictionary<string, (EpicEngineBuild? Build, DateTimeOffset Checked)> _officialBuildCache = new(StringComparer.Ordinal);
+    private EngineCardViewModel? _pendingEngineUpdate;
+    private readonly HashSet<string> _updatingEnginePaths = new(StringComparer.OrdinalIgnoreCase);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, EpicEnginePatchPlan> _enginePatchPlans = new(StringComparer.OrdinalIgnoreCase);
+    internal EpicEnginePatchPlan? GetEnginePatchPlan(string path) => _enginePatchPlans.GetValueOrDefault(path);
+    public bool IsEngineUpdateConfirmationVisible => _pendingEngineUpdate is not null;
+    public string EngineUpdateConfirmationText => _pendingEngineUpdate is { } engine
+        ? $"Mettre à jour {engine.DisplayName} ({engine.VersionLabel}) dans {engine.Path} ? {engine.OfficialUpdateLabel}. Fermez l’éditeur et les compilations utilisant ce moteur. Seuls les fichiers modifiés sont préparés puis remplacés ; les composants installés et les fichiers personnels sont conservés."
+        : string.Empty;
+    public bool CanUpdateSelectedOfficialEngine => SelectedEngineDetails is { IsOfficialEpic: true, OfficialUpdateAvailable: true, IsInstallationAvailable: true } engine && !_updatingEnginePaths.Contains(engine.Path) && IsDirectFabConnected && !IsEpicBusy && !IsEngineUninstallActive;
+    public ICommand RequestOfficialEngineUpdateCommand => new RelayCommand(() => RequestOfficialEngineUpdate(SelectedEngineDetails), () => CanUpdateSelectedOfficialEngine);
+    public ICommand CancelOfficialEngineUpdateCommand => new RelayCommand(() => { _pendingEngineUpdate = null; OnPropertyChanged(nameof(IsEngineUpdateConfirmationVisible)); });
+    public ICommand ConfirmOfficialEngineUpdateCommand => new AsyncRelayCommand(ConfirmOfficialEngineUpdateAsync, () => _pendingEngineUpdate is not null, ShowError);
+
+    public void RequestOfficialEngineUpdate(EngineCardViewModel? engine)
+    {
+        if (engine is not { IsOfficialEpic: true, OfficialUpdateAvailable: true, IsInstallationAvailable: true } || _updatingEnginePaths.Contains(engine.Path) || IsEpicBusy || IsEngineUninstallActive) return;
+        OpenUnrealEngineDetails(engine);
+        _pendingEngineUpdate = engine;
+        OnPropertyChanged(nameof(IsEngineUpdateConfirmationVisible));
+        OnPropertyChanged(nameof(EngineUpdateConfirmationText));
+    }
+
+    private async Task ConfirmOfficialEngineUpdateAsync()
+    {
+        var engine = _pendingEngineUpdate ?? throw new InvalidOperationException("Aucun moteur à mettre à jour.");
+        if (IsEpicBusy || IsEngineUninstallActive || !IsDirectFabConnected) throw new InvalidOperationException("Connectez Epic et attendez la fin des autres modifications du moteur.");
+        if (!_updatingEnginePaths.Add(engine.Path)) return;
+        _enginePatchPlans.TryRemove(engine.Path, out _);
+        _pendingEngineUpdate = null;
+        OnPropertyChanged(nameof(IsEngineUpdateConfirmationVisible));
+        OnPropertyChanged(nameof(CanUpdateSelectedOfficialEngine));
+        try
+        {
+            var branch = $"{engine.Engine.Version.Major}.{engine.Engine.Version.Minor}";
+            var releases = await _epicBinaryEngineBackend.GetAvailableReleasesAsync().ConfigureAwait(true);
+            var release = releases.FirstOrDefault(item => item.Version == branch)
+                ?? throw new InvalidOperationException("La version officielle n’est plus disponible.");
+            var handle = _taskScheduler.Enqueue(new CyEngineHub.Core.Tasks.HubTaskDefinition(
+                "Moteurs · Epic", $"Mettre à jour {engine.DisplayName}", [EngineTaskLink(engine.Path, engine.DisplayName)],
+                async (context, cancellationToken) =>
+                {
+                    var transfer = new CyEngineHub.Core.Marketplaces.DownloadProgressText();
+                    string? patchSummary = null;
+                    var progress = new InlineProgress<EpicBinaryEngineDownloadProgress>(value =>
+                    {
+                        if (value.PatchPlan is { } plan) { patchSummary = plan.DisplayText; _enginePatchPlans[engine.Path] = plan; }
+                        var message = transfer.Format(value.Message, value.DownloadedBytes, value.TotalBytes, value.CachedBytes);
+                        context.Report(value.Fraction, patchSummary is null || value.Message == patchSummary ? message : patchSummary + "\n" + message);
+                    });
+                    await _epicBinaryEngineBackend.UpdateAsync(release, engine.Path, progress, cancellationToken).ConfigureAwait(false);
+                }) { IsDownload = true });
+            StatusMessage = $"Mise à jour de {engine.DisplayName} ajoutée aux téléchargements.";
+            var completed = await handle.Completion.ConfigureAwait(true);
+            if (completed.Status != CyEngineHub.Core.Tasks.HubTaskStatus.Completed)
+            {
+                StatusMessage = completed.Status == CyEngineHub.Core.Tasks.HubTaskStatus.Canceled
+                    ? "Mise à jour annulée ; installation restaurée si le remplacement avait commencé. Cache vérifié conservé."
+                    : $"Échec de la mise à jour : {completed.Error}";
+                return;
+            }
+            _officialBuildCache.Remove(branch);
+            await RefreshCatalogAsync().ConfigureAwait(true);
+            var refreshed = Engines.FirstOrDefault(item => SameWorkspaceKey(item.Path, engine.Path));
+            if (refreshed is not null) OpenUnrealEngineDetails(refreshed);
+            StatusMessage = "Moteur mis à jour et vérifié.";
+        }
+        finally
+        {
+            _updatingEnginePaths.Remove(engine.Path);
+            OnPropertyChanged(nameof(CanUpdateSelectedOfficialEngine));
+        }
+    }
     public bool IsCheckingOfficialEngineUpdates => _isCheckingOfficialEngineUpdates;
     public string OfficialEngineUpdateSummary => _officialEngineUpdateSummary;
     public ICommand CheckOfficialEngineUpdatesCommand => _checkOfficialEngineUpdatesCommand ??=
@@ -75,6 +147,7 @@ public sealed partial class MainWindowViewModel
         {
             SetProperty(ref _isCheckingOfficialEngineUpdates, false, nameof(IsCheckingOfficialEngineUpdates));
             _checkOfficialEngineUpdatesCommand?.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(CanUpdateSelectedOfficialEngine));
         }
     }
 }

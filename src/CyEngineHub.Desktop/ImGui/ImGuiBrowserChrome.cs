@@ -67,7 +67,9 @@ internal static class ImGuiBrowserChrome
                         Gui.TextUnformatted(item.Summary);
                         Gui.TextUnformatted(item.Timing);
                         surface.DrawnBrowserText.Add(item.Name); surface.DrawnBrowserText.Add(item.Summary); surface.DrawnBrowserText.Add(item.Timing);
-                        Gui.ProgressBar((float)item.Percent / 100, new(-1, 4), "");
+                        Gui.PushStyleColor(ImGuiCol.PlotHistogram, ImGuiTheme.ProgressColor(OperationProgressPolicy.Resolve(item.Status, (float)item.Percent / 100, item.IsIndeterminate)));
+                        Gui.ProgressBar(item.IsIndeterminate ? -(float)Gui.GetTime() : (float)item.Percent / 100, new(-1, 4), "");
+                        Gui.PopStyleColor();
                         Gui.Separator();
                     }
                 break;

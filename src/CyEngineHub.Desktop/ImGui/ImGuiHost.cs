@@ -184,7 +184,15 @@ internal sealed class ImGuiSurface : OpenGlControlBase
         {
             ushort[] ranges = [0x20, 0x17F, 0x2000, 0x27FF, 0];
             var pinned = GCHandle.Alloc(ranges, GCHandleType.Pinned);
-            try { io.Fonts.AddFontFromFileTTF(font, 14 * UiCardGrid.InterfaceScale * (float)scale, default, pinned.AddrOfPinnedObject()); io.Fonts.Build(); }
+            try
+            {
+                foreach (var name in new[] { "segoeui.ttf", "seguisb.ttf", "segoeuii.ttf", "seguisbi.ttf", "consola.ttf" })
+                {
+                    var path = Path.Combine(Path.GetDirectoryName(font)!, name);
+                    io.Fonts.AddFontFromFileTTF(File.Exists(path) ? path : font, 14 * UiCardGrid.InterfaceScale * (float)scale, default, pinned.AddrOfPinnedObject());
+                }
+                io.Fonts.Build();
+            }
             finally { pinned.Free(); }
         }
         else { io.Fonts.AddFontDefault(); io.FontGlobalScale = UiCardGrid.InterfaceScale; }

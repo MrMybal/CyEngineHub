@@ -10,6 +10,8 @@ public sealed class RemoteImageCache
     private const long MaximumImageBytes = 16 * 1024 * 1024;
     private static readonly HttpClient SharedHttpClient = CreateHttpClient();
     private static readonly SemaphoreSlim SharedDownloadGate = new(4, 4);
+    private static readonly object CacheTrimGate = new();
+    internal const long MaximumCacheBytes = 256L * 1024 * 1024;
     private readonly Func<string> _cacheDirectoryResolver;
 
     public RemoteImageCache(string cacheDirectory)
@@ -29,6 +31,9 @@ public sealed class RemoteImageCache
     public Task<Bitmap?> LoadThumbnailAsync(Uri? uri, CancellationToken cancellationToken = default) =>
         Task.Run(() => LoadQueuedAsync(uri, 640, cancellationToken), cancellationToken);
 
+    public Task<Bitmap?> LoadGalleryThumbnailAsync(Uri? uri, CancellationToken cancellationToken = default) =>
+        Task.Run(() => LoadQueuedAsync(uri, 192, cancellationToken), cancellationToken);
+
     private async Task<Bitmap?> LoadQueuedAsync(Uri? uri, int maximumEdge, CancellationToken cancellationToken)
     {
         if (uri is null || !uri.IsAbsoluteUri || uri.Scheme != Uri.UriSchemeHttps)
@@ -44,6 +49,9 @@ public sealed class RemoteImageCache
             var cached = TryLoadCached(cachePath, maximumEdge);
             if (cached is not null)
             {
+                try { File.SetLastWriteTimeUtc(cachePath, DateTime.UtcNow); }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
+                TrimCache(Path.GetDirectoryName(cachePath)!, cachePath);
                 return cached;
             }
 
@@ -111,6 +119,7 @@ public sealed class RemoteImageCache
                     return null;
                 }
                 File.Move(temporaryPath, cachePath, true);
+                TrimCache(Path.GetDirectoryName(cachePath)!, cachePath);
             }
             finally
             {
@@ -210,5 +219,29 @@ public sealed class RemoteImageCache
         Directory.CreateDirectory(cacheDirectory);
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(uri.AbsoluteUri)));
         return Path.Combine(cacheDirectory, $"{hash}.image");
+    }
+
+    // Only our SHA256-named cached images are eligible. Never touch packs, user files or active .partial transfers.
+    internal static void TrimCache(string directory, string? preservePath = null, long maximumBytes = MaximumCacheBytes)
+    {
+        lock (CacheTrimGate)
+        {
+            try
+            {
+                var files = new DirectoryInfo(directory).EnumerateFiles("*.image", SearchOption.TopDirectoryOnly)
+                    .Where(file => file.Name.Length == 70 && file.Name[..64].All(Uri.IsHexDigit) &&
+                        (file.Attributes & FileAttributes.ReparsePoint) == 0).OrderBy(file => file.LastWriteTimeUtc).ToArray();
+                var total = files.Sum(file => file.Length);
+                if (total <= maximumBytes) return;
+                foreach (var file in files)
+                {
+                    if (string.Equals(file.FullName, preservePath, StringComparison.OrdinalIgnoreCase)) continue;
+                    try { var length = file.Length; file.Delete(); total -= length; }
+                    catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
+                    if (total <= maximumBytes * 3 / 4) break;
+                }
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException) { }
+        }
     }
 }

@@ -34,18 +34,27 @@ public static class UnrealBuildCommandFactory
                 "Build",
                 "BatchFiles",
                 "GenerateProjectFiles.bat");
-        EnsureFileExists(script, "Generate project files", engine.RootPath);
-
         var arguments = new List<string>();
+        if (!File.Exists(script))
+        {
+            // Epic installed builds often omit both GenerateProjectFiles.bat wrappers.
+            // Build.bat forwards its arguments to the bundled UnrealBuildTool.
+            script = Path.Combine(engine.RootPath, "Engine", "Build", "BatchFiles", "Build.bat");
+            arguments.Add("-ProjectFiles");
+        }
+        EnsureFileExists(script, "Generate project files (UnrealBuildTool)", engine.RootPath);
         if (request.Project is not null)
         {
-            arguments.Add(request.Project.FilePath);
+            arguments.Add($"-Project={request.Project.FilePath}");
             arguments.Add("-Game");
             if (!request.IncludeEngineSource)
             {
                 arguments.Add("-NoEngine");
             }
         }
+
+        arguments.Add("-Progress");
+        arguments.Add("-WaitMutex");
 
         switch (request.Format)
         {

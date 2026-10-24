@@ -4,6 +4,25 @@ namespace CyEngineHub.Core.Tests;
 
 public sealed class HubTaskSchedulerTests
 {
+    [Fact]
+    public async Task AnUnquantifiedPhaseExplicitlyClearsPreviousProgressWithoutChangingMessageOnlyReports()
+    {
+        await using var scheduler = new HubTaskScheduler();
+        var snapshots = new List<HubTaskSnapshot>();
+        scheduler.TaskChanged += (_, change) => snapshots.Add(change.Task);
+        var task = scheduler.Enqueue(new HubTaskDefinition("Build", "Phases", (context, _) =>
+        {
+            context.Report(.8, "First phase");
+            context.Report(message: "Still first phase");
+            context.ReportIndeterminate("Preparing C++");
+            context.Report(.5, "Compiling");
+            return Task.CompletedTask;
+        }));
+        await task.Completion;
+        Assert.Equal(.8, snapshots.Single(item => item.Message == "Still first phase").Progress);
+        Assert.Null(snapshots.Single(item => item.Message == "Preparing C++").Progress);
+        Assert.Contains(snapshots, item => item.Message == "Compiling" && item.Progress == .5);
+    }
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

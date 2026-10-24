@@ -235,9 +235,9 @@ public sealed class HubTaskScheduler : IAsyncDisposable
             }
             _changed(started);
 
-            var context = new HubTaskContext((progress, message) => Update(snapshot => snapshot with
+            var context = new HubTaskContext((progress, message, indeterminate) => Update(snapshot => snapshot with
             {
-                Progress = progress ?? snapshot.Progress,
+                Progress = indeterminate ? null : progress ?? snapshot.Progress,
                 Message = message ?? snapshot.Message,
             }));
 

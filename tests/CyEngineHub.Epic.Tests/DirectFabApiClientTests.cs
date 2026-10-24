@@ -21,6 +21,11 @@ public sealed class DirectFabApiClientTests
         Assert.Equal("CyTester", status.DisplayName);
         var asset = Assert.Single(assets);
         Assert.Equal("Environment Pack", asset.Title);
+        Assert.Equal("Portable environment", asset.Description);
+        Assert.Contains("<strong>", asset.RichDescription);
+        var details = await client.GetProductDetailsAsync(asset);
+        Assert.Equal("Full details & data\n\nDocs (https://example.invalid/docs)", details.Description);
+        Assert.Contains("<a href=", details.RichDescription);
         Assert.Equal("artifact-1", asset.PreferredProjectVersion?.ArtifactId);
         Assert.Equal("5.5", Assert.Single(asset.PreferredProjectVersion!.EngineVersions));
         Assert.True(handler.SawAuthorizationCode);
@@ -102,7 +107,7 @@ public sealed class DirectFabApiClientTests
                           "assetId": "asset-1",
                           "assetNamespace": "ue",
                           "categories": [{ "id": "3d", "name": "3D" }],
-                          "description": "Portable environment",
+                          "description": "<p>Portable <strong>environment</strong></p>",
                           "distributionMethod": "assetPack",
                           "images": [],
                           "projectVersions": [{
@@ -120,6 +125,10 @@ public sealed class DirectFabApiClientTests
                     """);
             }
 
+            if (request.RequestUri?.Host == "www.fab.com" && request.RequestUri.AbsolutePath == "/i/listings/asset-1")
+                return Json(HttpStatusCode.OK, """
+                    { "description": "<p>Full details &amp; data</p><p><a href='https://example.invalid/docs'>Docs</a></p>" }
+                    """);
             return Json(HttpStatusCode.NotFound, "{}");
         }
 

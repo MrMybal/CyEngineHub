@@ -128,6 +128,21 @@ internal sealed partial class ImGuiWorkspace
                 {
                     Gui.TextColored(unreal.OfficialUpdateAvailable ? ImGuiTheme.Warning : ImGuiTheme.Muted, unreal.OfficialUpdateLabel);
                     ActionButton(vm, "Vérifier la révision officielle", "CheckOfficialEngineUpdatesCommand");
+                    if (unreal.OfficialUpdateAvailable)
+                        ActionButton(vm, "Mettre à jour le moteur…", "RequestOfficialEngineUpdateCommand");
+                    if (vm.IsEngineUpdateConfirmationVisible)
+                    {
+                        Gui.TextWrapped(vm.EngineUpdateConfirmationText);
+                        DetailActions((vm, "Confirmer la mise à jour", "ConfirmOfficialEngineUpdateCommand", false),
+                            (vm, "Annuler", "CancelOfficialEngineUpdateCommand", false));
+                    }
+                    if (vm.GetEnginePatchPlan(unreal.Path) is { } patch)
+                    {
+                        Gui.Separator(); Gui.TextDisabled("DERNIER PLAN DU PATCH");
+                        Gui.TextWrapped(patch.DisplayText);
+                        Gui.TextWrapped("Le temporaire comprend les fichiers modifiés préparés, le cache borné et une marge de sécurité.");
+                        Record("engine-patch-plan"); Gui.Separator();
+                    }
                 }
                 DetailActions((vm, "Plugins du moteur", "ShowSelectedEnginePluginsCommand", false),
                     (vm, "Outils / prérequis", "ShowToolchainsCommand", false));

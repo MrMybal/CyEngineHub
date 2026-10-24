@@ -93,6 +93,11 @@ internal sealed partial class ImGuiWorkspace
             if (Gui.MenuItem("Rechercher les mises à jour officielles")) _actions.Enqueue(() => vm.RunEngineSelectionAction(paths, "updates"));
             Record("engine-context/updates");
             if (Gui.IsItemHovered()) Gui.SetTooltip("Compare les révisions officielles de la même branche. Aucun remplacement automatique.");
+            if (paths.Length == 1 && vm.Engines.FirstOrDefault(engine => paths.Contains(engine.Path)) is { IsOfficialEpic: true, OfficialUpdateAvailable: true } updateEngine)
+            {
+                if (Gui.MenuItem("Mettre à jour le moteur…")) _actions.Enqueue(() => vm.RequestOfficialEngineUpdate(updateEngine));
+                Record("engine-context/apply-update");
+            }
             Gui.EndDisabled();
             if (paths.Length == 1 && Gui.MenuItem("Ouvrir la fiche / options")) Execute(_selectedResource, "{Binding OpenDetailsCommand}");
             Gui.Separator();

@@ -30,6 +30,7 @@ public sealed record EpicBinaryEngineDownloadProgress(
     long? TotalBytes)
 {
     public long CachedBytes { get; init; }
+    public EpicEnginePatchPlan? PatchPlan { get; init; }
 }
 
 public sealed record EpicBinaryEngineDownloadResult(
@@ -64,6 +65,13 @@ public interface IEpicBinaryEngineBackend
         string destinationDirectory,
         IProgress<EpicBinaryEngineDownloadProgress>? progress = null,
         CancellationToken cancellationToken = default);
+
+    Task<EpicBinaryEngineDownloadResult> UpdateAsync(
+        EpicBinaryEngineRelease release,
+        string existingDirectory,
+        IProgress<EpicBinaryEngineDownloadProgress>? progress = null,
+        CancellationToken cancellationToken = default) =>
+        throw new NotSupportedException("Ce backend ne permet pas la mise à jour en place.");
 
     Task<EpicBinaryEngineComponentUpdateResult> UpdateComponentsAsync(
         EpicBinaryEngineRelease release,
@@ -626,7 +634,8 @@ public sealed partial class OfficialEpicGamesLauncherEngineBackend : IEpicBinary
         var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         if (!normalizedStaging.StartsWith(normalizedParent + Path.DirectorySeparatorChar, comparison) ||
             (!normalizedStaging.EndsWith(".cyenginehub-download", comparison) &&
-             !normalizedStaging.EndsWith(".cyenginehub-components", comparison)))
+             !normalizedStaging.EndsWith(".cyenginehub-components", comparison) &&
+             !normalizedStaging.EndsWith(".cyenginehub-update", comparison)))
         {
             throw new InvalidOperationException("Le dossier de reprise calculé n’est pas sûr.");
         }
@@ -639,6 +648,9 @@ public sealed partial class OfficialEpicGamesLauncherEngineBackend : IEpicBinary
 
     private static string GetSafeDestination(string root, string relativePath)
     {
+        if (Path.IsPathRooted(relativePath) || relativePath.Contains(':', StringComparison.Ordinal) ||
+            relativePath.Replace('\\', '/').Split('/').Any(part => part is "" or "." or ".." || part.EndsWith(' ') || part.EndsWith('.')))
+            throw new InvalidOperationException("Un chemin du manifest moteur est invalide.");
         var normalizedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
         var destination = Path.GetFullPath(Path.Combine(normalizedRoot, relativePath.Replace('/', Path.DirectorySeparatorChar)));
         var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;

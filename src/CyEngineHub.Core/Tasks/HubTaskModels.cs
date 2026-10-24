@@ -43,9 +43,9 @@ public sealed record HubTaskDefinition(
 
 public sealed class HubTaskContext
 {
-    private readonly Action<double?, string?> _report;
+    private readonly Action<double?, string?, bool> _report;
 
-    internal HubTaskContext(Action<double?, string?> report)
+    internal HubTaskContext(Action<double?, string?, bool> report)
     {
         _report = report;
     }
@@ -57,8 +57,11 @@ public sealed class HubTaskContext
             throw new ArgumentOutOfRangeException(nameof(progress), "Progress must be between 0 and 1.");
         }
 
-        _report(progress, message);
+        _report(progress, message, false);
     }
+
+    /// <summary>Starts an unquantified phase without retaining a previous phase's percentage.</summary>
+    public void ReportIndeterminate(string? message = null) => _report(null, message, true);
 }
 
 public sealed class HubTaskHandle

@@ -65,7 +65,8 @@ public sealed partial class MainWindowViewModel
     }
     private AsyncRelayCommand? _runCrossCompileCommand;
     public ICommand RunCrossCompileCommand => _runCrossCompileCommand ??= new AsyncRelayCommand(
-        () => { var operation = CreateCrossCompileOperation(); return ExecuteUnrealOperationAsync(operation.Title, operation.ProcessRequest); },
+        () => { var operation = CreateCrossCompileOperation(); var project = CrossCompileProject!.Project;
+            return ExecuteUnrealOperationAsync(operation.Title, operation.ProcessRequest, ProjectTaskLink(project.FilePath, project.Name)); },
         () => CanCrossCompile, ShowError);
 
     private UnrealBuildPresetOperation CreateCrossCompileOperation()

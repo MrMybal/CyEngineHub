@@ -130,6 +130,7 @@ internal sealed partial class ImGuiWorkspace
                     Gui.TextWrapped("Téléchargements via le navigateur intégré. Le réglage de connexions Fab / Megascans ne s’applique pas à ce connecteur.");
                     DrawChildren(template, connector);
                     MarketplaceSettingsFooter(connector, connector.SettingsSaveLabel, "SaveCommand", connector.SaveStatus, openInventory: true);
+                    if (connector.Id == "cyenginehub.marketplace-cosmos") DrawCosmosImportOptions(vm);
                 }
             }
             return true;

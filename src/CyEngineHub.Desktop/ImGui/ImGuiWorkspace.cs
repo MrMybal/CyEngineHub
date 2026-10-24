@@ -147,6 +147,8 @@ internal sealed partial class ImGuiWorkspace : IDisposable
 
     private void DrawModalBody(UiNode border)
     {
+        if (border["Name"] == "FabGalleryViewer" && _root is MainWindowViewModel gallery)
+        { DrawFabGallery(gallery, enlarged: true); return; }
         var grid = border.Children.FirstOrDefault();
         var sections = grid?.Children.Where(node => !node.Kind.Contains('.', StringComparison.Ordinal)).ToArray() ?? [];
         var lastRow = sections.Length == 0 ? 0 : sections.Max(node => (int)node.Number("Grid.Row", 0));
@@ -183,7 +185,11 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         Gui.BeginDisabled(!UiBinding.Boolean(context, node["IsEnabled"]));
         switch (node.Kind)
         {
-            case "TextBlock": case "SelectableTextBlock": DrawText(node, context); break;
+            case "TextBlock": case "SelectableTextBlock":
+                if (UiBinding.Path(node["Text"]) == "SelectedRemoteFabAssetCard.Description" && _root is MainWindowViewModel description)
+                    DrawProductDescription(description);
+                else DrawText(node, context);
+                break;
             case "TextBox": DrawInput(node, context); break;
             case "NumericUpDown":
                 var numeric = int.TryParse(Text(context, node["Value"]), out var number) ? number : 0;
@@ -223,7 +229,8 @@ internal sealed partial class ImGuiWorkspace : IDisposable
                 break;
             case "WrapPanel":
             case "StackPanel":
-                if (_root is MainWindowViewModel product && node["Name"] == "ProductActionPanel") DrawProductActions(product);
+                if (_root is MainWindowViewModel gallery && node["Name"] == "FabProductGallery") DrawFabGallery(gallery, enlarged: false);
+                else if (_root is MainWindowViewModel product && node["Name"] == "ProductActionPanel") DrawProductActions(product);
                 else if (_root is MainWindowViewModel { IsLibraryVisible: true } library && node["Orientation"] == "Horizontal" &&
                     UiBinding.Path(node["IsVisible"]) == "IsLibraryQuixelSelected") DrawQuixelSubTabs(library);
                 else DrawStack(node, context);
@@ -241,7 +248,11 @@ internal sealed partial class ImGuiWorkspace : IDisposable
             case "ProgressBar":
                 var progress = float.TryParse(Text(context, node["Value"]), out var parsed) ? parsed : 0;
                 var maximum = node.Number("Maximum", 100);
-                Gui.ProgressBar(Math.Clamp(progress / Math.Max(1, maximum), 0, 1), new(-1, 5), "");
+                if (UiBinding.Path(node["Value"]) == "UsedPercent")
+                    Gui.ProgressBar(Math.Clamp(progress / Math.Max(1, maximum), 0, 1), new(-1, 5), "");
+                else OperationProgress(progress / Math.Max(1, maximum), new(-1, 5),
+                    node["OperationStatus"] is { } status ? Text(context, status) : Value(context, "Status"),
+                    UiBinding.Boolean(context, node["IsIndeterminate"], false), UiBinding.Path(node["Value"]));
                 break;
             case "Image": DrawImage(node, context); break;
             case "ScrollViewer":
@@ -261,7 +272,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
                 if (!node.Kind.Contains('.', StringComparison.Ordinal)) DrawChildren(node, context);
                 break;
         }
-        if (node["ToolTip.Tip"] is { } tip && Gui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) Gui.SetTooltip(Text(context, tip));
+        if (node.Kind != "ComboBox" && node["ToolTip.Tip"] is { } tip && Gui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) Gui.SetTooltip(Text(context, tip));
         Gui.EndDisabled();
         Gui.PopID();
     }
@@ -384,6 +395,12 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         Gui.SetNextItemWidth(-1);
         var open = Gui.BeginCombo("###combo", display is null ? Label(selected) : Text(selected, display));
         Record("combo/" + (UiBinding.Path(node["SelectedItem"]) ?? node.Id));
+        if (context is ProjectPostCreationOptionValueViewModel postOption) Record("post-creation-option/" + postOption.Id);
+        if (node["ToolTip.Tip"] is { } selectedTip && Gui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+        {
+            Gui.SetTooltip(Text(context, selectedTip));
+            Record("combo-tooltip/" + UiBinding.Path(node["SelectedItem"]));
+        }
         if (!open) return;
         var template = node.Children.FirstOrDefault(child => child.Kind.EndsWith(".ItemTemplate", StringComparison.Ordinal))?.Children.FirstOrDefault()?.Children.FirstOrDefault();
         if (UiBinding.Read(context, node["ItemsSource"]) is IEnumerable values)
@@ -393,8 +410,15 @@ internal sealed partial class ImGuiWorkspace : IDisposable
             {
                 Gui.PushID(i++);
                 var label = display is not null ? Text(item, display) : Label(item);
-                if (template is not null) label = template.Descendants().Prepend(template).Where(child => child.Kind == "TextBlock").Select(child => Text(item, child["Text"])).FirstOrDefault(text => !string.IsNullOrEmpty(text)) ?? label;
+                if (display is null && template is not null) label = template.Descendants().Prepend(template).Where(child => child.Kind == "TextBlock").Select(child => Text(item, child["Text"])).FirstOrDefault(text => !string.IsNullOrEmpty(text)) ?? label;
                 if (Gui.Selectable(label, Equals(item, selected))) Set(context, node["SelectedItem"], item);
+                if (node["ItemToolTipBinding"] is { } itemTip && Gui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                {
+                    Gui.SetTooltip(Text(item, itemTip));
+                    Record("combo-option-tooltip/" + UiBinding.Path(node["SelectedItem"]) + "/" + (i - 1));
+                }
+                Record("combo-option/" + UiBinding.Path(node["SelectedItem"]) + "/" + (i - 1));
+                if (context is ProjectPostCreationOptionValueViewModel postChoice) Record("post-creation-choice/" + postChoice.Id + "/" + (i - 1));
                 var compressionMode = item switch
                 {
                     MarketplaceCompressionOptionViewModel compression => compression.StorageMode.ToString(),
@@ -443,7 +467,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
             var cells = children.Where(child => (int)child.Number("Grid.Column", 0) == column).ToArray();
             return cells.Length == 0 ? 20 : cells.Max(child => Math.Clamp(NaturalWidth(child, context), 25, 240));
         }
-        var requiredWidth = columns.Select((spec, column) => spec.Trim() == "Auto" ? AutoWidth(column) : float.TryParse(spec, CultureInfo.InvariantCulture, out var fixedWidth) ? Math.Min(fixedWidth, 240) : 30).Sum() + columns.Length * 8;
+        var requiredWidth = columns.Select((spec, column) => spec.Trim() == "Auto" ? AutoWidth(column) : float.TryParse(spec, CultureInfo.InvariantCulture, out var fixedWidth) ? Math.Min(fixedWidth, 240) : node.Number("MinStretchColumnWidth", 30)).Sum() + columns.Length * 8;
         if (Gui.GetContentRegionAvail().X < requiredWidth)
         {
             foreach (var child in children) DrawNode(child, context);

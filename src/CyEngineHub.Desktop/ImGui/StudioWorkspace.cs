@@ -83,6 +83,11 @@ internal sealed partial class ImGuiWorkspace
         StudioNav("Paramètres", "ShowSettingsCommand", "IsSettingsNavigationActive");
         Gui.EndChild(); Gui.SameLine();
         Gui.BeginChild("studio-workspace", new(0, 0), ImGuiChildFlags.None, ImGuiWindowFlags.NoScrollbar);
+        if (!Flag(_root, "IsEngineDetailsVisible") && !Flag(_root, "IsProjectDetailsVisible") &&
+            _root is MainWindowViewModel navigation && navigation.NavigateBackCommand.CanExecute(null))
+        {
+            ActionButton(navigation, navigation.NavigationBackLabel, "NavigateBackCommand"); Gui.SameLine();
+        }
         if (Flag(_root, "IsEngineDetailsVisible") || Flag(_root, "IsProjectDetailsVisible"))
         {
             var engine = Flag(_root, "IsEngineDetailsVisible");
@@ -273,7 +278,7 @@ internal sealed partial class ImGuiWorkspace
             Gui.TableNextColumn();
             if (item is EngineDownloadCardViewModel download)
             {
-                Gui.ProgressBar((float)download.ProgressPercent / 100, new(-1, 7), "");
+                OperationProgress((float)download.ProgressPercent / 100, new(-1, 7), download.StatusLabel);
                 MutedText(download.ProgressPercent.ToString("0.#", CultureInfo.CurrentCulture) + " %");
             }
             else Gui.TextDisabled(engines ? Value(item, "EffectiveSizeLabel") : ResourceType(item));
@@ -382,21 +387,30 @@ internal sealed partial class ImGuiWorkspace
         foreach (var task in SortTableItems("task-table", items,
             (task, column) => column switch { 0 => task.Title, 1 => task.Status, 2 => task.ProgressPercent, _ => (object)task.DurationSeconds }))
         {
-            Gui.PushID(task.Id.ToString()); Gui.TableNextRow(); Gui.TableNextColumn();
-            Gui.TextUnformatted(Elide(task.Title, Gui.GetContentRegionAvail().X));
+            var messages = task.Message.Replace(" · Vitesse :", "\nVitesse :", StringComparison.Ordinal).Split('\n');
+            var rowHeight = Math.Max((messages.Length + 1) * Gui.GetTextLineHeightWithSpacing(),
+                (task.Links.Count + (task.CanCancel ? 1 : 0)) * (Gui.GetFrameHeight() + Gui.GetStyle().ItemSpacing.Y));
+            Gui.PushID(task.Id.ToString()); Gui.TableNextRow(ImGuiTableRowFlags.None, rowHeight); Gui.TableNextColumn();
+            var origin = Gui.GetCursorScreenPos();
+            var clicked = Gui.Selectable("###task", false, ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick | ImGuiSelectableFlags.AllowOverlap, new(0, rowHeight));
+            var openTarget = clicked && Gui.IsMouseDoubleClicked(ImGuiMouseButton.Left);
             Record("task/" + task.Id);
-            foreach (var line in task.Message.Replace(" · Vitesse :", "\nVitesse :", StringComparison.Ordinal).Split('\n')) MutedText(Elide(line, Gui.GetContentRegionAvail().X));
+            Gui.SetCursorScreenPos(origin);
+            Gui.TextUnformatted(Elide(task.Title, Gui.GetContentRegionAvail().X));
+            foreach (var line in messages) MutedText(Elide(line, Gui.GetContentRegionAvail().X));
             if (Gui.IsItemHovered()) TextTooltip(task.Message);
             Gui.TableNextColumn(); Gui.TextUnformatted(task.Status); Gui.TextDisabled(task.Category);
-            Gui.TableNextColumn(); Gui.ProgressBar((float)task.ProgressPercent / 100, new(-1, 5), "");
-            MutedText(task.ProgressPercent.ToString("0.#", CultureInfo.CurrentCulture) + " %");
+            Gui.TableNextColumn(); OperationProgress((float)task.ProgressPercent / 100, new(-1, 5), task.Status, task.IsProgressIndeterminate, task.Id.ToString());
+            MutedText(task.ProgressLabel);
             Gui.TableNextColumn(); Gui.TextUnformatted(task.Duration);
             Gui.TableNextColumn();
+            var actionsX = Gui.GetCursorScreenPos().X;
             if (task.CanCancel) { ActionButton(task, "Annuler", "CancelCommand"); Record("task/cancel/" + task.Id); }
             var resumable = vm.EpicEngineDownloads.FirstOrDefault(item => item.TaskId == task.Id && item.CanRetry);
             if (resumable is not null) { ActionButton(resumable, "Reprendre", "RetryCommand", true); Record("task/retry/" + task.Id); }
             var linkIndex = 0;
             foreach (var link in task.Links) { Gui.PushID(linkIndex++); ActionButton(link, link.Label, "OpenCommand"); Gui.PopID(); }
+            if (openTarget && Gui.GetMousePos().X < actionsX) Execute(task, "{Binding OpenTargetCommand}");
             Gui.PopID();
         }
         if (items.Length == 0) { Gui.TableNextRow(); Gui.TableNextColumn(); Gui.TextDisabled("Aucune opération dans cette file pour le moment."); }

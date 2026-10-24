@@ -33,4 +33,9 @@ internal sealed class DecodedChunkCache(long maximumBytes, Func<string, Cancella
         return data;
     }
     public void Dispose() { _entries.Clear(); _lru.Clear(); ResidentBytes = 0; }
+    public void Remove(string id)
+    {
+        if (!_entries.Remove(id, out var entry)) return;
+        ResidentBytes -= entry.Data.LongLength; _lru.Remove(entry.Node);
+    }
 }

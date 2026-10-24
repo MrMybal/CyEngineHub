@@ -44,6 +44,7 @@ public sealed partial class MainWindow : Window
                     case "BrowseManualEnginePath": BrowseManualEnginePath(this, new()); break;
                     case "BrowseSourceEngineTarget": BrowseSourceEngineTarget(this, new()); break;
                     case "BrowseEpicEngineTarget": BrowseEpicEngineTarget(this, new()); break;
+                    case "BrowseNewProjectParentDirectory": BrowseNewProjectParentDirectory(this, new()); break;
                     case "BrowseNativeStoreSource": BrowseNativeStoreSource(this, new()); break;
                     case "FocusEngineCompilation":
                         (Content as CyEngineHub.Desktop.ImGui.ImGuiHost)?.Surface.Workspace?.FocusCompilation(); break;
@@ -401,6 +402,12 @@ public sealed partial class MainWindow : Window
                 path,
                 selected?.AppName ?? "UE_Official");
         });
+    }
+
+    private async void BrowseNewProjectParentDirectory(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
+    {
+        if (_viewModel is null) return;
+        await BrowseFolderAsync("Choisir le dossier parent du nouveau projet", path => _viewModel.NewProjectParentDirectory = path);
     }
 
     private async void BrowseNativeStoreSource(object? sender, Avalonia.Interactivity.RoutedEventArgs args)

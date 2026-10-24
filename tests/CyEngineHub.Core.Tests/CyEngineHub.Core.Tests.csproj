@@ -11,9 +11,11 @@
     <Compile Include="../../src/CyEngineHub.Desktop/ImGui/UiCardGrid.cs" Link="ImGui/UiCardGrid.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/ImGui/UiMultiSelection.cs" Link="ImGui/UiMultiSelection.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/ImGui/ActionColorPolicy.cs" Link="ImGui/ActionColorPolicy.cs" />
+    <Compile Include="../../src/CyEngineHub.Desktop/ImGui/OperationProgressPolicy.cs" Link="ImGui/OperationProgressPolicy.cs" />
     <EmbeddedResource Include="../../src/CyEngineHub.Desktop/ImGui/Layouts/*.xml" LogicalName="CyEngineHub.Desktop.ImGui.Layouts.%(Filename)%(Extension)" />
     <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/Commands.cs" Link="Desktop/Commands.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/ObservableObject.cs" Link="Desktop/ObservableObject.cs" />
+    <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/ProjectCreationEngineOptionViewModel.cs" Link="Desktop/ProjectCreationEngineOptionViewModel.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/MarketplaceConnectorViewModel.cs" Link="Desktop/MarketplaceConnectorViewModel.cs" />
     <Compile Include="../../src/CyEngineHub.Desktop/ViewModels/MarketplaceCompressionChoice.cs" Link="Desktop/MarketplaceCompressionChoice.cs" />
     <ProjectReference Include="../../src/CyEngineHub.Extensions/CyEngineHub.Extensions.csproj" />

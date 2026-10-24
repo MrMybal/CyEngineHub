@@ -58,14 +58,22 @@ sealed class RecordingLauncher : IPlatformLauncher
 }
 sealed class FixtureFab : IDirectFabClient
 {
+    public bool FailProductDetails { get; set; }
+    public RemoteFabProductDetails? ProductDetails { get; set; }
+    public IReadOnlyList<RemoteFabAsset> Library { get; set; } = [];
+    public int RevisionChecks { get; private set; }
+    public DirectFabSourceManifest? SourceRevision { get; set; } = new("EpicBuildPatchManifest", "fixture", "new", 1, 1, 100, "NEW-CONTENT");
+    public Task<DirectFabSourceManifest?> GetSourceManifestAsync(RemoteFabAsset asset, RemoteFabProjectVersion version, CancellationToken cancellationToken = default)
+    { RevisionChecks++; return Task.FromResult(SourceRevision); }
     public int DownloadConnections { get; private set; } = 12;
     public void SetDownloadConnections(int connections) => DownloadConnections = connections;
     public Uri AuthorizationUri => new("https://example.invalid/fixture");
     public Task<DirectFabStatus> GetStatusAsync(CancellationToken cancellationToken = default) => Task.FromResult(new DirectFabStatus(DirectFabConnectionState.Connected, "Fixture"));
     public Task<DirectFabStatus> ConnectAsync(string code, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task DisconnectAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-    public Task<IReadOnlyList<RemoteFabAsset>> GetLibraryAsync(CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<RemoteFabAsset>>([]);
-    public Task<RemoteFabProductDetails> GetProductDetailsAsync(RemoteFabAsset asset, CancellationToken cancellationToken = default) => Task.FromResult(new RemoteFabProductDetails("Fixture", []));
+    public Task<IReadOnlyList<RemoteFabAsset>> GetLibraryAsync(CancellationToken cancellationToken = default) => Task.FromResult(Library);
+    public Task<RemoteFabProductDetails> GetProductDetailsAsync(RemoteFabAsset asset, CancellationToken cancellationToken = default) =>
+        FailProductDetails ? Task.FromException<RemoteFabProductDetails>(new DirectFabException("Fixture: product detail unavailable")) : Task.FromResult(ProductDetails ?? new RemoteFabProductDetails("Fixture", []));
     public Task<DirectFabDownloadResult> DownloadAsync(RemoteFabAsset asset, string root, IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public Task<DirectFabDownloadResult> DownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version, string root, IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 }
@@ -84,6 +92,14 @@ sealed class FixtureQuixel : IQuixelMegascansClient
 }
 sealed class FixtureEngineBackend : IEpicBinaryEngineBackend
 {
+    public int UpdateCalls { get; private set; }
+    public Task<EpicBinaryEngineDownloadResult> UpdateAsync(EpicBinaryEngineRelease release, string destinationDirectory, IProgress<EpicBinaryEngineDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        UpdateCalls++;
+        var plan = new EpicEnginePatchPlan(12, 50L << 20, 200L << 20, 320L << 20, 10L << 20, 64L << 20);
+        progress?.Report(new(.18, plan.DisplayText, 0, plan.EstimatedDownloadBytes) { PatchPlan = plan });
+        throw new IOException("Fixture update blocked; real engines are never modified by UI tests.");
+    }
     public int ChunkConcurrency { get; private set; } = 12;
     public void SetChunkConcurrency(int concurrency) => ChunkConcurrency = concurrency;
     public Func<EpicBinaryEngineRelease, string, IProgress<EpicBinaryEngineDownloadProgress>?, CancellationToken, Task<EpicBinaryEngineDownloadResult>>? DownloadHandler { get; set; }
@@ -113,13 +129,26 @@ static partial class Program
     static bool SettingsOnly;
     static bool CosmosSettingsOnly;
     static bool EngineIdentityOnly;
+    static bool UpdatesOnly;
+    static bool ProjectEnginePickerOnly;
+    static bool ProjectCreationFormOnly;
+    static bool ProjectBuildOnly;
+    static bool FabTextOnly;
+    static bool FabGalleryOnly;
+    static readonly ProjectBuildFixtureRunner ProjectBuildRunner = new();
     static readonly FixtureEngineBackend EngineBackend = new();
     const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
-    static readonly string Output = Path.GetFullPath("artifacts/usability-qa-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss"));
+    static readonly string Output = Path.GetFullPath("artifacts/usability-qa-" + DateTime.UtcNow.ToString("yyyyMMdd-HHmmss") + "-" + Environment.ProcessId);
     static void Call(object vm, string method, params object[] args) => vm.GetType().GetMethod(method, Private)!.Invoke(vm, args);
     static void Check(bool result, string message) { if (!result) throw new InvalidOperationException(message); Console.WriteLine("PASS " + message); }
     [STAThread] static void Main(string[] args)
     {
+        if (args.Contains("--real-project-build"))
+        {
+            try { RunRealProjectBuild(args).GetAwaiter().GetResult(); }
+            catch (Exception ex) { Console.WriteLine(ex); Environment.ExitCode = 1; }
+            return;
+        }
         DownloadsOnly = args.Contains("--engine-downloads-only");
         VariantsOnly = args.Contains("--variants-only");
         ToolsOnly = args.Contains("--tools-only");
@@ -131,6 +160,12 @@ static partial class Program
         SettingsOnly = args.Contains("--settings-only");
         CosmosSettingsOnly = args.Contains("--cosmos-settings-only");
         EngineIdentityOnly = args.Contains("--engine-identity-only");
+        UpdatesOnly = args.Contains("--updates-only");
+        ProjectEnginePickerOnly = args.Contains("--project-engine-picker-only");
+        ProjectCreationFormOnly = args.Contains("--project-creation-form-only");
+        ProjectBuildOnly = args.Contains("--project-build-only");
+        FabTextOnly = args.Contains("--fab-text-only");
+        FabGalleryOnly = args.Contains("--fab-gallery-only");
         Directory.CreateDirectory(Output);
         AppBuilder.Configure<FixtureApp>().UsePlatformDetect().SetupWithoutStarting();
         using var stop = new CancellationTokenSource(args.Contains("--interactive") ? TimeSpan.FromMinutes(20) : TimeSpan.FromSeconds(240));
@@ -156,6 +191,8 @@ static partial class Program
             "engineModules" => new EngineModuleRegistry([new UnrealEngineModule()]),
             "engineRegistration" => new FixtureRegistration(), "taskScheduler" => scheduler,
             "processRunner" when EngineIdentityOnly => new CyEngineHub.Infrastructure.Processes.SystemProcessRunner(),
+            "pluginDiscovery" when ProjectCreationFormOnly || ProjectBuildOnly => new CyEngineHub.Plugins.Discovery.PluginDiscoveryService(new CyEngineHub.Plugins.Parsing.UpluginDescriptorParser()),
+            "buildExecutor" when ProjectBuildOnly => new CyEngineHub.Build.Execution.UnrealBuildExecutor(ProjectBuildRunner),
             "appData" => paths, "platformLauncher" => launcher,
             "fabProjectContentImport" => new CyEngineHub.Fab.Import.FabProjectContentImportService(),
             "storageSnapshotCache" => new StorageSnapshotCache(store),
@@ -206,7 +243,13 @@ static partial class Program
         window.Show();
         if (ImGuiDiagnostics.IsHosted(window))
         {
-            if (EngineIdentityOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestEngineIdentity(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            if (FabGalleryOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestFabGallery(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (FabTextOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestFabText(window, vm, launcher); Console.WriteLine("OUTPUT " + Output); }
+            else if (ProjectBuildOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestProjectBuild(window, vm, engine); Console.WriteLine("OUTPUT " + Output); }
+            else if (ProjectCreationFormOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestProjectCreationForm(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (ProjectEnginePickerOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestProjectEnginePicker(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (UpdatesOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestEngineAndFabUpdates(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (EngineIdentityOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestEngineIdentity(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (SettingsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestOrganizedSettings(window, vm); await TestCosmosSettings(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (CosmosSettingsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestCosmosSettings(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (GroupsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestPackGroups(window, vm); Console.WriteLine("OUTPUT " + Output); }

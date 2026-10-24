@@ -1,11 +1,9 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
-using System.Net;
 
 namespace CyEngineHub.Fab.Remote;
 
 /// <summary>Read-only acquired library. Transport stays in the official authenticated browser.</summary>
-public sealed partial class FabWebLibraryClient(Func<string, CancellationToken, Task<string>> read)
+public sealed class FabWebLibraryClient(Func<string, CancellationToken, Task<string>> read)
 {
     public const string Source = "FabWeb";
     public const string FirstPage = "/i/library/search?sort_by=-createdAt&source=acquired";
@@ -54,12 +52,16 @@ public sealed partial class FabWebLibraryClient(Func<string, CancellationToken, 
         if (!Guid.TryParse(id, out _) || !Guid.TryParse(libraryId, out _) || title.Length == 0) return null;
         var categories = new List<string> { "Megascans", Text(listing, "listingType") };
         var description = new List<string>();
+        var richDescription = new List<string>();
         if (listing.TryGetProperty("assetFormats", out var formats) && formats.ValueKind == JsonValueKind.Array)
             foreach (var format in formats.EnumerateArray())
             {
                 if (format.TryGetProperty("assetFormatType", out var type)) categories.Add(Text(type, "name"));
                 if (format.TryGetProperty("technicalSpecs", out var specs))
-                    description.Add(WebUtility.HtmlDecode(HtmlTags().Replace(Text(specs, "technicalDetails"), " ")));
+                {
+                    richDescription.Add(Text(specs, "technicalDetails"));
+                    description.Add(MarketplaceRichText.ToPlainText(Text(specs, "technicalDetails")));
+                }
             }
         var images = new List<Uri>();
         if (listing.TryGetProperty("thumbnails", out var thumbnails) && thumbnails.ValueKind == JsonValueKind.Array)
@@ -78,11 +80,9 @@ public sealed partial class FabWebLibraryClient(Func<string, CancellationToken, 
             Source, "Fab web · acquis", new Uri("https://www.fab.com/" + uriPath), images.FirstOrDefault(),
             categories.Where(s => s.Length > 0).Distinct().ToArray(), [], images,
             DateTimeOffset.TryParse(Text(item, "createdAt"), out var date) ? date : null,
-            libraryId, canDownload);
+            libraryId, canDownload) { RichDescription = string.Join("\n\n", richDescription) };
     }
 
     private static string Text(JsonElement value, string name) => value.ValueKind == JsonValueKind.Object
         && value.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.String ? property.GetString()! : "";
-    [GeneratedRegex("<[^>]+>", RegexOptions.CultureInvariant, 1000)]
-    private static partial Regex HtmlTags();
 }

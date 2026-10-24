@@ -50,7 +50,7 @@ Son dernier échec est écrit dans `%TEMP%\CyEngineHub\Updater\last-error.log`.
 3. Vérifier l'application empaquetée, committer les sources et créer le tag correspondant.
 4. Créer une release GitHub sur ce tag, joindre les trois assets et publier.
    Par défaut, cocher **pre-release** pour une Alpha/Bêta. À la demande explicite
-   du responsable, l’alpha.32 est publiée comme Release courante avec le badge
+   du responsable, les alpha.32 et alpha.33 sont publiées comme Release courante avec le badge
    Latest : GitHub n’autorise pas ce badge sur une préversion. Son nom Alpha et
    ses limites restent visibles ; il ne s’agit pas d’une qualification de stabilité.
 

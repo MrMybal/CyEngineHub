@@ -92,6 +92,28 @@ public static class ImGuiDiagnostics
         Host(window).Surface.Input(io => io.AddKeyEvent(ImGuiNET.ImGuiKey.Escape, false));
         await FramesAsync(window).ConfigureAwait(true);
     }
+    public static async Task PointerGestureAsync(Window window, string element, float wheel = 0, Vector2 drag = default)
+    {
+        var surface = Host(window).Surface;
+        var rect = ElementBounds(window, element);
+        var center = new Vector2((rect.X + rect.Z) / 2, (rect.Y + rect.W) / 2);
+        surface.Input(io => io.AddMousePosEvent(center.X, center.Y));
+        await FramesAsync(window, 2).ConfigureAwait(true);
+        if (wheel != 0)
+        {
+            surface.Input(io => io.AddMouseWheelEvent(0, wheel));
+            await FramesAsync(window, 3).ConfigureAwait(true);
+        }
+        if (drag != Vector2.Zero)
+        {
+            surface.Input(io => io.AddMouseButtonEvent(0, true));
+            await FramesAsync(window, 2).ConfigureAwait(true);
+            surface.Input(io => io.AddMousePosEvent(center.X + drag.X, center.Y + drag.Y));
+            await FramesAsync(window, 2).ConfigureAwait(true);
+            surface.Input(io => io.AddMouseButtonEvent(0, false));
+            await FramesAsync(window, 3).ConfigureAwait(true);
+        }
+    }
     public static async Task CaptureAsync(Window window, string path)
     {
         var surface = Host(window).Surface;
