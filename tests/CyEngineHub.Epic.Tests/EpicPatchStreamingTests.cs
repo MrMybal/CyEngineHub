@@ -41,7 +41,7 @@ public sealed class EpicPatchStreamingTests
             {
                 if (value.PatchPlan is { } next) plan = next;
                 var cache = target + ".cyenginehub-update/chunks";
-                if (Directory.Exists(cache)) peakChunks = Math.Max(peakChunks, Directory.GetFiles(cache).Sum(path => new FileInfo(path).Length));
+                if (Directory.Exists(cache)) peakChunks = Math.Max(peakChunks, CacheBytes(cache));
                 if (scenario == "source-changes" && !changedSource && value.PatchPlan is not null)
                 { changedSource = true; System.IO.File.WriteAllBytes(Path.Combine(target, "Engine/Binaries/A.dll"), new byte[32]); }
                 if (scenario == "cancel-prepare" && value.Message.StartsWith("Préparation du patch", StringComparison.Ordinal)) cancellation.Cancel();
@@ -88,6 +88,17 @@ public sealed class EpicPatchStreamingTests
 
     private sealed class PatchProgress(Action<EpicBinaryEngineDownloadProgress> report) : IProgress<EpicBinaryEngineDownloadProgress>
     { public void Report(EpicBinaryEngineDownloadProgress value) => report(value); }
+    private static long CacheBytes(string directory)
+    {
+        long bytes = 0;
+        foreach (var path in Directory.GetFiles(directory))
+        {
+            // Parallel transfers can rename a .partial file between enumeration and stat.
+            try { bytes += new FileInfo(path).Length; }
+            catch (FileNotFoundException) { }
+        }
+        return bytes;
+    }
     private sealed class PatchSession : IDirectFabSessionStore
     {
         public Task<DirectFabSession?> LoadAsync(CancellationToken cancellationToken = default) => Task.FromResult<DirectFabSession?>(new("qa", "QA", "fixture-not-a-token", DateTimeOffset.UtcNow.AddHours(1), "fixture-refresh", DateTimeOffset.UtcNow.AddDays(1)));
@@ -103,7 +114,7 @@ public sealed class EpicPatchStreamingTests
         private readonly Dictionary<string, byte[]> _original = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, byte[]> _next = new(StringComparer.OrdinalIgnoreCase);
         private readonly byte[] _manifest;
-        public List<string> RequestedChunks { get; } = [];
+        public System.Collections.Concurrent.ConcurrentQueue<string> RequestedChunks { get; } = new();
         public static string Id(int number) => (number + 100).ToString("X32", CultureInfo.InvariantCulture);
 
         public PatchFixture(string target, string scenario)
@@ -165,7 +176,7 @@ public sealed class EpicPatchStreamingTests
             if (uri.AbsolutePath == "/build.manifest") return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(_manifest) });
             Assert.EndsWith(".chunk", uri.AbsolutePath, StringComparison.Ordinal);
             var id = Path.GetFileNameWithoutExtension(uri.AbsolutePath).Split('_')[1];
-            RequestedChunks.Add(id);
+            RequestedChunks.Enqueue(id);
             Assert.Equal(_original["Engine/Build/Build.version"], System.IO.File.ReadAllBytes(Path.Combine(_target, "Engine/Build/Build.version")));
             var data = Chunk(id); if (_scenario == "corrupt-network") data[^1] ^= 255;
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(data) });
