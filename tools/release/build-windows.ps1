@@ -61,7 +61,7 @@ try {
     $extensionsRoot = Join-Path $repoRoot 'extensions\builtin'
     foreach ($file in Get-ChildItem -LiteralPath $extensionsRoot -Recurse -File) {
         # Copy extension manifests/scripts, never local bytecode or test outputs.
-        if ($file.Extension -notin @('.json', '.py', '.uplugin', '.cs', '.cpp', '.h', '.hpp', '.inl', '.md', '.ps1', '.txt', '.whl')) { continue }
+        if ($file.Name -ne 'LICENSE' -and $file.Extension -notin @('.json', '.py', '.uplugin', '.cs', '.cpp', '.h', '.hpp', '.inl', '.md', '.ps1', '.txt', '.whl')) { continue }
         $relative = [IO.Path]::GetRelativePath($extensionsRoot, $file.FullName)
         $destination = Join-Path (Join-Path $appStage 'Extensions') $relative
         New-Item -ItemType Directory -Path (Split-Path $destination) -Force | Out-Null
@@ -69,16 +69,21 @@ try {
     }
     New-Item -ItemType Directory -Path (Join-Path $appStage 'UnrealPlugin') -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $repoRoot 'extensions/unreal/CyEngineHub') -Destination (Join-Path $appStage 'UnrealPlugin/CyEngineHub') -Recurse
-    Copy-Item -LiteralPath (Join-Path $repoRoot 'README.md'), (Join-Path $repoRoot 'THIRD_PARTY_NOTICES.md') -Destination $appStage
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'README.md'), (Join-Path $repoRoot 'LICENSE'), (Join-Path $repoRoot 'LICENSING.md'), (Join-Path $repoRoot 'THIRD_PARTY_NOTICES.md') -Destination $appStage
     Copy-Item -LiteralPath (Join-Path $repoRoot 'LICENCES') -Destination $appStage -Recurse
     # Only audited runtime files, never native build projects, intermediates or symbols.
     foreach ($nativeVersion in @('5.3', '5.5', '5.6', '5.7')) {
+        $nativeDestination = Join-Path $appStage "Extensions/cyenginehub.unreal-version-bridge/native-binaries/UE_$nativeVersion"
         foreach ($relative in @('CyHubNativeBridge.uplugin', 'Binaries/Win64/UnrealEditor-CyHubNativeBridge.dll', 'Binaries/Win64/UnrealEditor.modules')) {
             $source = Join-Path (Join-Path $NativeAdapterRoot "UE_$nativeVersion") $relative
             if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Missing native adapter runtime file for UE $nativeVersion" }
             $destination = Join-Path (Join-Path $appStage "Extensions/cyenginehub.unreal-version-bridge/native-binaries/UE_$nativeVersion") $relative
             New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
             Copy-Item -LiteralPath $source -Destination $destination
+        }
+        # Use the canonical notices, including when reusing an older audited DLL.
+        foreach ($notice in @('LICENSE', 'NOTICE.md')) {
+            Copy-Item -LiteralPath (Join-Path $repoRoot "extensions/builtin/cyenginehub.unreal-version-bridge/native-source/CyHubNativeBridge/$notice") -Destination $nativeDestination
         }
     }
 
@@ -123,7 +128,10 @@ try {
         }
     }
 
-    $required = @('CyEngineHub.Desktop.exe', 'coreclr.dll', 'Updater\CyEngineHub.Updater.exe', 'UnrealPlugin\CyEngineHub\CyEngineHub.uplugin',
+    $required = @('LICENSE', 'LICENSING.md', 'THIRD_PARTY_NOTICES.md',
+        'UnrealPlugin\CyEngineHub\LICENSE', 'UnrealPlugin\CyEngineHub\NOTICE.md',
+        'Extensions\cyenginehub.unreal-version-bridge\native-source\CyHubNativeBridge\LICENSE',
+        'CyEngineHub.Desktop.exe', 'coreclr.dll', 'Updater\CyEngineHub.Updater.exe', 'UnrealPlugin\CyEngineHub\CyEngineHub.uplugin',
         'Mcp\CyEngineHub.Mcp.exe', 'Mcp\coreclr.dll',
         'Updater\coreclr.dll', 'Extensions\cyenginehub.asset-bridge\tools\CyEngineHub.AssetBridge.Tool.exe',
         'Extensions\cyenginehub.unreal-version-bridge\mcp\tools\CyEngineHub.VersionBridge.Tool.exe',
@@ -162,6 +170,19 @@ try {
         foreach ($editorVersion in @('4.27', '5.2', '5.3', '5.4', '5.5', '5.6', '5.7', '5.8')) {
             $editorArchive = Join-Path $EditorPluginRoot "CyEngineHub-Editor-UE_$editorVersion-alpha.zip"
             if (-not (Test-Path -LiteralPath $editorArchive -PathType Leaf)) { throw "Missing precompiled editor plugin: UE $editorVersion" }
+            $editorZip = [IO.Compression.ZipFile]::OpenRead($editorArchive)
+            try {
+                foreach ($notice in @('LICENSE', 'NOTICE.md')) {
+                    $entry = $editorZip.GetEntry("CyEngineHub/$notice")
+                    if (-not $entry) { throw "Editor plugin archive lacks $notice; rebuild the archive before publishing." }
+                    $reader = [IO.StreamReader]::new($entry.Open())
+                    try { $actualNotice = $reader.ReadToEnd() } finally { $reader.Dispose() }
+                    $expectedNotice = Get-Content -LiteralPath (Join-Path $repoRoot "extensions/unreal/CyEngineHub/$notice") -Raw
+                    if ($actualNotice.Replace("`r", '').TrimEnd() -cne $expectedNotice.Replace("`r", '').TrimEnd()) {
+                        throw "Editor plugin archive has outdated $notice; rebuild it before publishing."
+                    }
+                }
+            } finally { $editorZip.Dispose() }
             & python (Join-Path $repoRoot 'scripts/check-release-privacy.py') --zip $editorArchive
             if ($LASTEXITCODE -ne 0) { throw 'Editor plugin archive privacy check failed.' }
             Copy-Item -LiteralPath $editorArchive -Destination $assets

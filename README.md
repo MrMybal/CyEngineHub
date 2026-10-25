@@ -2,6 +2,11 @@
 
 **English** · [Français](README.fr.md)
 
+CyEngineHub is licensed under **GPLv3 only**. Our native Unreal Editor plugin and
+conversion adapter are separately licensed under **MIT**; dependencies and Epic
+content retain their own terms. See [licensing and scope](LICENSING.md) and the
+[full GPLv3 text](LICENSE).
+
 A local-first, multi-engine development hub for Windows. Unreal Engine has the deepest
 integration; Unity, Godot and CRYENGINE have local providers.
 

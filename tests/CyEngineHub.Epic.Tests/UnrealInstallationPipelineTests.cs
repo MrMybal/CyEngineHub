@@ -171,6 +171,8 @@ public sealed class UnrealInstallationPipelineTests : IDisposable
     [InlineData("")]
     [InlineData("verify-error")]
     [InlineData("verify-count")]
+    [InlineData("missing-license")]
+    [InlineData("missing-notice")]
     public async Task NativeTexturesMustReopenAndMatchBeforeInstallation(string failure)
     {
         var context = Context() with { Configuration = new Dictionary<string, string> { ["conversionMode"] = "native", ["validateOutput"] = "false", ["keepStaging"] = "true" } };
@@ -180,6 +182,8 @@ public sealed class UnrealInstallationPipelineTests : IDisposable
             var plugin = Path.Combine(nativeRoot, "UE_" + version);
             var binaries = Directory.CreateDirectory(Path.Combine(plugin, "Binaries", "Win64")).FullName;
             await File.WriteAllTextAsync(Path.Combine(plugin, "CyHubNativeBridge.uplugin"), "{}");
+            await File.WriteAllTextAsync(Path.Combine(plugin, "LICENSE"), "fixture MIT license");
+            await File.WriteAllTextAsync(Path.Combine(plugin, "NOTICE.md"), "fixture native adapter notice");
             await File.WriteAllTextAsync(Path.Combine(binaries, "UnrealEditor-CyHubNativeBridge.dll"), "not executed");
             await File.WriteAllTextAsync(Path.Combine(binaries, "UnrealEditor.modules"), "{}");
             await File.WriteAllTextAsync(Path.Combine(binaries, "private.pdb"), "must not be staged");
@@ -187,6 +191,14 @@ public sealed class UnrealInstallationPipelineTests : IDisposable
         var runner = new FixtureRunner { Native = true, Failure = failure };
         var script = new UnrealVersionBridgeInstallationScript(new EngineStore([context.Target.Engine!, Engine(6)]), new Settings(), runner,
             new FabProjectContentImportService(), Path.Combine(_root, "Converted"), nativeRoot);
+        if (failure.StartsWith("missing-", StringComparison.Ordinal))
+        {
+            File.Delete(Path.Combine(nativeRoot, "UE_5.6", failure == "missing-license" ? "LICENSE" : "NOTICE.md"));
+            await Assert.ThrowsAsync<InvalidOperationException>(() => script.InstallAsync(context));
+            Assert.Equal(1, runner.Calls);
+            Assert.False(Directory.Exists(Path.Combine(context.Target.RootPath, "Content")));
+            return;
+        }
         if (!OperatingSystem.IsWindows())
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() => script.InstallAsync(context));
@@ -211,7 +223,10 @@ public sealed class UnrealInstallationPipelineTests : IDisposable
             Assert.Contains("r.Nanite.ProjectEnabled=True", conversionIni, StringComparison.Ordinal);
             Assert.Contains("D3D12TargetedShaderFormats=PCD3D_SM6", conversionIni, StringComparison.Ordinal);
             var pluginFiles = Directory.GetFiles(Path.Combine(Path.GetDirectoryName(request.Arguments[0])!, "Plugins", "CyHubNativeBridge"), "*", SearchOption.AllDirectories);
-            Assert.Equal(3, pluginFiles.Length);
+            Assert.Equal(5, pluginFiles.Length);
+            var pluginRoot = Path.Combine(Path.GetDirectoryName(request.Arguments[0])!, "Plugins", "CyHubNativeBridge");
+            Assert.Equal("fixture MIT license", await File.ReadAllTextAsync(Path.Combine(pluginRoot, "LICENSE")));
+            Assert.Equal("fixture native adapter notice", await File.ReadAllTextAsync(Path.Combine(pluginRoot, "NOTICE.md")));
             Assert.DoesNotContain(pluginFiles, f => f.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase));
         }
         Assert.False(File.Exists(Path.Combine(context.Target.RootPath, "Config", "DefaultEngine.ini")));

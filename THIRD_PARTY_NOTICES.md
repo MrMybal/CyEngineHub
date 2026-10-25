@@ -1,5 +1,9 @@
 # Third-party notices
 
+The Hub's own license is GPL-3.0-only, with separate MIT licenses for our two
+native Unreal plugins. See [LICENSING.md](LICENSING.md) for exact scope. The notices
+below concern third parties and do not relicense their code under the Hub license.
+
 ## Dear ImGui user interface
 
 - Dear ImGui / cimgui, via ImGui.NET 1.91.6.1 — MIT License. https://github.com/ocornut/imgui and https://github.com/ImGuiNET/ImGui.NET

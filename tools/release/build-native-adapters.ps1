@@ -32,7 +32,7 @@ foreach ($engine in $EngineRoots) {
         & (Join-Path $engine 'Engine/Build/BatchFiles/Build.bat') UnrealEditor Win64 Development "-Project=$project" "-plugin=$package/CyHubNativeBridge.uplugin" -NoPCH -NoSharedPCH -OverrideBuildEnvironment "-CompilerArguments=$compilerArguments" -WaitMutex -nohotreload
         if ($LASTEXITCODE -ne 0) { throw "Native compilation failed for $name" }
         $destination = Join-Path $output $name
-        foreach ($relative in @('CyHubNativeBridge.uplugin', 'Binaries/Win64/UnrealEditor-CyHubNativeBridge.dll', 'Binaries/Win64/UnrealEditor.modules')) {
+        foreach ($relative in @('LICENSE', 'NOTICE.md', 'CyHubNativeBridge.uplugin', 'Binaries/Win64/UnrealEditor-CyHubNativeBridge.dll', 'Binaries/Win64/UnrealEditor.modules')) {
             $target = Join-Path $destination $relative
             [void](New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force)
             Copy-Item -LiteralPath (Join-Path $package $relative) -Destination $target

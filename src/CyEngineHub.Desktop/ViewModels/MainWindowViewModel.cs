@@ -1429,6 +1429,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ConfirmProjectImportCandidatesAsync,
             onError: ShowError);
         RefreshRawLogCommand = new RelayCommand(LoadRawLog);
+        OpenHubLicensesCommand = new AsyncRelayCommand(() => OpenFolderAsync(AppContext.BaseDirectory), onError: ShowError);
+        OpenHubSourceCommand = new AsyncRelayCommand(
+            () => OpenOfficialUriAsync(new Uri("https://github.com/MrMybal/CyEngineHub"), "Sources CyEngineHub"), onError: ShowError);
+        OpenGplLicenseCommand = new AsyncRelayCommand(
+            () => OpenOfficialUriAsync(new Uri("https://www.gnu.org/licenses/gpl-3.0.html"), "Licence GPLv3"), onError: ShowError);
         OpenRawLogFolderCommand = new AsyncRelayCommand(
             () => OpenFolderAsync(Path.GetDirectoryName(_rawLogPath)!),
             onError: ShowError);
@@ -1699,6 +1704,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ICommand PostponeUpdateCommand { get; }
 
     public ICommand OpenAvailableUpdateReleaseCommand { get; }
+    public ICommand OpenHubLicensesCommand { get; }
+    public ICommand OpenHubSourceCommand { get; }
+    public ICommand OpenGplLicenseCommand { get; }
 
     public ICommand DownloadAndInstallUpdateCommand { get; }
 

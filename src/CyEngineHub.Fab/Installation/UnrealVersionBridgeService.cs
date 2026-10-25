@@ -278,8 +278,13 @@ internal sealed class UnrealVersionBridgeService(IProcessRunner processRunner, s
         if (!OperatingSystem.IsWindows() || !File.Exists(descriptor) || !File.Exists(Path.Combine(binaryRoot, "UnrealEditor-CyHubNativeBridge.dll")) || !File.Exists(Path.Combine(binaryRoot, "UnrealEditor.modules")))
             throw new InvalidOperationException($"Adaptateur natif compilé absent pour UE {engine.Version.Major}.{engine.Version.Minor}. Attendu : {descriptor}");
         var destination = Path.Combine(Path.GetDirectoryName(projectFile)!, "Plugins", "CyHubNativeBridge");
+        foreach (var notice in new[] { "LICENSE", "NOTICE.md" })
+            if (!File.Exists(Path.Combine(source, notice)))
+                throw new InvalidOperationException($"Avis de licence de l’adaptateur natif absent : {notice}. Réinstallez les adaptateurs.");
         Directory.CreateDirectory(destination);
         await CopyFileAsync(descriptor, Path.Combine(destination, "CyHubNativeBridge.uplugin"), cancellationToken).ConfigureAwait(false);
+        foreach (var notice in new[] { "LICENSE", "NOTICE.md" })
+            await CopyFileAsync(Path.Combine(source, notice), Path.Combine(destination, notice), cancellationToken).ConfigureAwait(false);
         Directory.CreateDirectory(Path.Combine(destination, "Binaries", "Win64"));
         foreach (var name in new[] { "UnrealEditor-CyHubNativeBridge.dll", "UnrealEditor.modules" })
             await CopyFileAsync(Path.Combine(binaryRoot, name), Path.Combine(destination, "Binaries", "Win64", name), cancellationToken).ConfigureAwait(false);

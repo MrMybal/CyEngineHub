@@ -6,6 +6,16 @@ namespace CyEngineHub.Core.Tests;
 public sealed class ImGuiInterfaceTests
 {
     [Fact]
+    public void AdvancedSettingsExposeLicensingWarrantyAndSourceNotices()
+    {
+        var notices = UiDocument.Load("Main").Root.Descendants().Single(node => node["Name"] == "HubLicenseNotices");
+        Assert.Contains(notices.Descendants(), node => (node["Text"] ?? "").Contains("GPLv3 uniquement", StringComparison.Ordinal) &&
+            node["Text"]!.Contains("sans aucune garantie", StringComparison.Ordinal));
+        Assert.Contains(notices.Descendants(), node => UiBinding.Path(node["Command"]) == "OpenGplLicenseCommand");
+        Assert.Contains(notices.Descendants(), node => UiBinding.Path(node["Command"]) == "OpenHubLicensesCommand");
+        Assert.Contains(notices.Descendants(), node => UiBinding.Path(node["Command"]) == "OpenHubSourceCommand");
+    }
+    [Fact]
     public void FabProductExposesNativeGalleryAndAnEnlargedViewerWithAnEscapeCloseCommand()
     {
         var document = UiDocument.Load("Main");

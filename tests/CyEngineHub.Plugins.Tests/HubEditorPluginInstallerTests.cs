@@ -19,6 +19,8 @@ public sealed class HubEditorPluginInstallerTests
             Directory.CreateDirectory(Path.Combine(Source, "Source/CyEngineHub"));
             File.WriteAllText(Path.Combine(Source, "CyEngineHub.uplugin"), "{\"EnabledByDefault\":true,\"Modules\":[{\"Name\":\"CyEngineHub\",\"Type\":\"Editor\"}]}");
             File.WriteAllText(Path.Combine(Source, "Source/CyEngineHub/CyEngineHub.Build.cs"), "fixture source");
+            File.WriteAllText(Path.Combine(Source, "LICENSE"), "fixture MIT license");
+            File.WriteAllText(Path.Combine(Source, "NOTICE.md"), "fixture native plugin notice");
             Directory.CreateDirectory(Path.Combine(Engine, "Engine/Build"));
             File.WriteAllText(Path.Combine(Engine, "Engine/Build/Build.version"), JsonSerializer.Serialize(new { MajorVersion = major, MinorVersion = minor }));
         }
@@ -52,9 +54,23 @@ public sealed class HubEditorPluginInstallerTests
         var destination = await new HubEditorPluginInstaller(runner).InstallAsync(fixture.Source, fixture.Engine, fixture.Work, null, CancellationToken.None);
         Assert.Equal(fixture.Destination, destination);
         Assert.True(File.Exists(Path.Combine(destination, "CyEngineHub.uplugin")));
+        Assert.Equal("fixture MIT license", await File.ReadAllTextAsync(Path.Combine(destination, "LICENSE")));
+        Assert.Equal("fixture native plugin notice", await File.ReadAllTextAsync(Path.Combine(destination, "NOTICE.md")));
         Assert.Empty(Directory.EnumerateFileSystemEntries(fixture.Work));
         Assert.False(Directory.Exists(Path.Combine(destination, "Intermediate")));
         Assert.Equal(1, runner.Calls);
+    }
+    [Theory]
+    [InlineData("LICENSE")]
+    [InlineData("NOTICE.md")]
+    public async Task MissingLicenseNoticeRefusesBuildAndLeavesEngineUntouched(string missing)
+    {
+        using var fixture = new Fixture(); var runner = new Runner();
+        File.Delete(Path.Combine(fixture.Source, missing));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => new HubEditorPluginInstaller(runner).InstallAsync(fixture.Source, fixture.Engine, fixture.Work, null, CancellationToken.None));
+        Assert.Equal(0, runner.Calls);
+        Assert.False(Directory.Exists(fixture.Destination));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(fixture.Work));
     }
     [Fact] public async Task ExistingPluginNeverReplaced()
     {

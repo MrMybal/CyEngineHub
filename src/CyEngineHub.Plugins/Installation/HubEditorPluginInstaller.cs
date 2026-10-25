@@ -64,12 +64,14 @@ public sealed class HubEditorPluginInstaller(IProcessRunner runner)
         {
             token.ThrowIfCancellationRequested(); EnsurePlainPath(file);
             var relative = Path.GetRelativePath(source, file);
-            if (relative != "CyEngineHub.uplugin" && !relative.StartsWith("Source" + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
+            if (relative is not ("CyEngineHub.uplugin" or "LICENSE" or "NOTICE.md") && !relative.StartsWith("Source" + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
             if (new FileInfo(file).Length > 1_048_576) throw new InvalidOperationException("Fichier source trop volumineux.");
             var target = Path.Combine(destination, relative);
             Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(file, target);
         }
         if (!File.Exists(Path.Combine(destination, "CyEngineHub.uplugin"))) throw new InvalidOperationException("Sources du plugin éditeur absentes.");
+        if (!File.Exists(Path.Combine(destination, "LICENSE")) || !File.Exists(Path.Combine(destination, "NOTICE.md")))
+            throw new InvalidOperationException("Licence MIT ou notice du plugin éditeur absente : installation refusée.");
     }
     private static void EnsurePlainPath(string path)
     {

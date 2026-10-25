@@ -2,6 +2,11 @@
 
 # CyEngineHub — Alpha
 
+CyEngineHub est sous **GPLv3 uniquement**. Notre plugin éditeur Unreal et notre
+adaptateur de conversion natif sont séparément sous **MIT** ; les dépendances et
+le contenu Epic conservent leurs propres conditions. Voir le
+[périmètre des licences](LICENSING.md) et le [texte intégral GPLv3](LICENSE).
+
 Hub de développement multi-moteur, local-first, pour Windows. Unreal Engine est
 le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers locaux.
 

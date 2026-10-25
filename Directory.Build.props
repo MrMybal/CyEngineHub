@@ -12,6 +12,8 @@
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
     <FileVersion>2.0.0.34</FileVersion>
     <RepositoryUrl>https://github.com/MrMybal/CyEngineHub</RepositoryUrl>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <Copyright>Copyright (c) 2026 CyberAlien and CyEngineHub contributors</Copyright>
     <NativeBridgeAdapterRoot Condition="'$(NativeBridgeAdapterRoot)' == ''">$(MSBuildThisFileDirectory)artifacts/native-texture-adapters</NativeBridgeAdapterRoot>
   </PropertyGroup>
 </Project>

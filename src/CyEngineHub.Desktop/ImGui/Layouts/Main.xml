@@ -3719,6 +3719,16 @@
                     <Button Classes="accent" Content="Ouvrir l’analyse du stockage" Command="{Binding ShowStorageCommand}" />
                   </StackPanel>
                   <StackPanel IsVisible="{Binding IsSettingsAdvancedSelected}">
+                    <Border Classes="card" Name="HubLicenseNotices">
+                      <StackPanel>
+                        <TextBlock Text="À PROPOS · LICENCES" FontSize="16" />
+                        <TextBlock Text="Copyright (c) 2026 CyberAlien et contributeurs CyEngineHub." TextWrapping="Wrap" />
+                        <TextBlock Text="CyEngineHub : GPLv3 uniquement. Vous pouvez le modifier et le redistribuer selon cette licence, sans aucune garantie. Notre code des plugins natifs Unreal : licence MIT séparée. Les tiers et Epic conservent leurs propres conditions." TextWrapping="Wrap" />
+                        <Button Content="Lire la GPLv3" Command="{Binding OpenGplLicenseCommand}" />
+                        <Button Content="Fichiers locaux : LICENSE, LICENSING.md et notices" Command="{Binding OpenHubLicensesCommand}" />
+                        <Button Content="Code source CyEngineHub" Command="{Binding OpenHubSourceCommand}" />
+                      </StackPanel>
+                    </Border>
                     <Border Classes="card">
                       <StackPanel>
                         <Grid ColumnDefinitions="*,Auto">

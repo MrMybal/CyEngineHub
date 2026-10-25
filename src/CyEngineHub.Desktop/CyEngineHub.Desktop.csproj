@@ -39,6 +39,10 @@
   </ItemGroup>
   <ItemGroup><EmbeddedResource Include="ImGui/Layouts/*.xml" /></ItemGroup>
   <ItemGroup>
+    <None Include="../../LICENSE;../../LICENSING.md;../../THIRD_PARTY_NOTICES.md"
+          Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <AvaloniaResource
         Include="../../assets/branding/cyenginehub-logo.png"
         Link="Assets/Branding/cyenginehub-logo.png" />
@@ -68,6 +72,7 @@
       <UnrealVersionBridgeFiles Include="../../extensions/builtin/cyenginehub.unreal-version-bridge/**/*" Exclude="../../extensions/builtin/cyenginehub.unreal-version-bridge/**/__pycache__/**;../../extensions/builtin/cyenginehub.unreal-version-bridge/**/*.pyc" />
       <SdkLicenseFiles Include="../../LICENCES/**/*" />
       <NativeTextureAdapterFiles Include="$(NativeBridgeAdapterRoot)/**/CyHubNativeBridge.uplugin;$(NativeBridgeAdapterRoot)/**/*.dll;$(NativeBridgeAdapterRoot)/**/*.modules" Exclude="$(NativeBridgeAdapterRoot)/**/HostProject/**;$(NativeBridgeAdapterRoot)/**/Intermediate/**" />
+      <NativeAdapterDescriptors Include="$(NativeBridgeAdapterRoot)/**/CyHubNativeBridge.uplugin" Exclude="$(NativeBridgeAdapterRoot)/**/HostProject/**;$(NativeBridgeAdapterRoot)/**/Intermediate/**" />
       <UnrealRelocatedInstallFiles Include="../../extensions/builtin/cyenginehub.unreal-relocated-install/**/*" />
       <MarketplaceConnectorFiles Include="../../extensions/builtin/cyenginehub.marketplace-cosmos/**/*" />
       <MegascansFabConnectorFiles Include="../../extensions/builtin/cyenginehub.marketplace-megascans-fab/**/*" />
@@ -88,6 +93,8 @@
     <Copy SourceFiles="../../extensions/builtin/cyenginehub.unreal-version-bridge/scripts/agent-validate.py" DestinationFolder="$(OutDir)Extensions/cyenginehub.unreal-version-bridge/mcp/tools/Extensions/cyenginehub.unreal-version-bridge/scripts" />
     <Copy SourceFiles="@(SdkLicenseFiles)" DestinationFiles="@(SdkLicenseFiles->'$(OutDir)LICENCES/%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(NativeTextureAdapterFiles)" DestinationFiles="@(NativeTextureAdapterFiles->'$(OutDir)Extensions/cyenginehub.unreal-version-bridge/native-binaries/%(RecursiveDir)%(Filename)%(Extension)')" />
+    <Copy SourceFiles="../../extensions/builtin/cyenginehub.unreal-version-bridge/native-source/CyHubNativeBridge/LICENSE;../../extensions/builtin/cyenginehub.unreal-version-bridge/native-source/CyHubNativeBridge/NOTICE.md"
+          DestinationFolder="$(OutDir)Extensions/cyenginehub.unreal-version-bridge/native-binaries/%(NativeAdapterDescriptors.RecursiveDir)" Condition="'@(NativeAdapterDescriptors)' != ''" />
     <Copy
         SourceFiles="@(UnrealRelocatedInstallFiles)"
         DestinationFiles="@(UnrealRelocatedInstallFiles->'$(OutDir)Extensions/cyenginehub.unreal-relocated-install/%(RecursiveDir)%(Filename)%(Extension)')" />
