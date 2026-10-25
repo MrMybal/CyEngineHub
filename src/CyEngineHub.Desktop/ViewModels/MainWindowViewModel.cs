@@ -1231,7 +1231,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             allowConcurrentExecutions: true);
         DownloadSelectedFabVersionsCommand = _downloadSelectedFabVersionsCommand;
         InstallSelectedFabVersionsCommand = new AsyncRelayCommand(
-            InstallSelectedFabVersionsIntoTargetsAsync,
+            () => InstallSelectedFabVersionsIntoTargetsAsync(),
             () => SelectedRemoteFabAsset is not null && !IsEpicBusy,
             ShowError);
         _installSelectedFabVersionsInProjectCommand = new AsyncRelayCommand(
@@ -4984,6 +4984,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             await RefreshPackFootprintsAsync().ConfigureAwait(true);
             await LoadDownloadQueueAsync().ConfigureAwait(true);
             await LoadAiSettingsAsync().ConfigureAwait(true);
+            await LoadEditorBridgeAsync().ConfigureAwait(true);
             await RefreshCatalogAsync().ConfigureAwait(true);
             _ = RefreshMarketplacesOnStartupAsync();
             _ = CheckForUpdatesOnStartupAsync();
@@ -9183,7 +9184,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    private async Task InstallSelectedFabVersionsIntoTargetsAsync()
+    private async Task InstallSelectedFabVersionsIntoTargetsAsync(Action<HubTaskHandle>? onQueued = null, bool editorSafe = false)
     {
         var asset = SelectedRemoteFabAsset
             ?? throw new InvalidOperationException("Sélectionnez d’abord un asset Fab.");
@@ -9297,7 +9298,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                                         materialized,
                                         target,
                                         context,
-                                        cancellationToken)
+                                        cancellationToken, editorSafe)
                                     .ConfigureAwait(false);
                                 if (pendingAgent is null) completedInstallations++;
                                 else pendingAgentWorkspaces.Add(pendingAgent);
@@ -9335,7 +9336,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                                 result.DestinationDirectory,
                                 target,
                                 context,
-                                cancellationToken)
+                                cancellationToken, editorSafe)
                             .ConfigureAwait(false);
                         if (pendingAgent is null) completedInstallations++;
                         else pendingAgentWorkspaces.Add(pendingAgent);
@@ -9365,6 +9366,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     $"{pendingAgentWorkspaces.Count} tâche(s) en attente d’un agent IA ; aucune installation pour ces tâches.");
             }));
 
+        onQueued?.Invoke(handle);
         var completed = await handle.Completion.ConfigureAwait(true);
         IsEpicBusy = false;
         IsFabDownloadActive = false;
@@ -9394,7 +9396,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         string sourceDirectory,
         FabInstallTargetOptionViewModel target,
         HubTaskContext taskContext,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool editorSafe = false)
     {
         var selectedScript = target.SelectedInstallationScript
             ?? throw new InvalidOperationException(
@@ -9402,6 +9404,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var script = _fabInstallationScripts.Find(selectedScript.Id)
             ?? throw new InvalidOperationException(
                 $"Le script {selectedScript.DisplayName} n’est plus disponible.");
+        if (editorSafe && script.Descriptor.Id is not (UnrealContentPackInstallationScript.ScriptId or UnrealProjectPluginInstallationScript.ScriptId))
+            throw new InvalidOperationException("Script modifié après confirmation : installation éditeur refusée.");
         var targetKind = target.IsProject
             ? FabInstallationTargetKind.Project
             : FabInstallationTargetKind.Engine;
@@ -9434,7 +9438,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     target.ContentKind,
                     sourceDirectory,
                     scriptTarget,
-                    target.GetInstallationConfiguration()),
+                    editorSafe ? new Dictionary<string, string>(target.GetInstallationConfiguration()) { ["conflictPolicy"] = "fail", ["targetPlatform"] = "Win64" } : target.GetInstallationConfiguration()),
                 progress,
                 cancellationToken)
             .ConfigureAwait(false);

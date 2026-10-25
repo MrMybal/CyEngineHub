@@ -8,9 +8,9 @@
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <Deterministic>true</Deterministic>
-    <Version>2.0.0-alpha.33</Version>
+    <Version>2.0.0-alpha.34</Version>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.33</FileVersion>
+    <FileVersion>2.0.0.34</FileVersion>
     <RepositoryUrl>https://github.com/MrMybal/CyEngineHub</RepositoryUrl>
     <NativeBridgeAdapterRoot Condition="'$(NativeBridgeAdapterRoot)' == ''">$(MSBuildThisFileDirectory)artifacts/native-texture-adapters</NativeBridgeAdapterRoot>
   </PropertyGroup>

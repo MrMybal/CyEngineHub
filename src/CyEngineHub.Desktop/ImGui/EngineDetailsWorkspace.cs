@@ -146,6 +146,15 @@ internal sealed partial class ImGuiWorkspace
                 }
                 DetailActions((vm, "Plugins du moteur", "ShowSelectedEnginePluginsCommand", false),
                     (vm, "Outils / prérequis", "ShowToolchainsCommand", false));
+                Gui.Separator(); Gui.TextUnformatted("CYENGINEHUB DANS UNREAL · ALPHA");
+                Gui.TextWrapped(vm.EditorBridgeStatus);
+                DetailActions((vm, vm.EditorBridgeEnabled ? "Désactiver la connexion éditeur" : "Activer la connexion éditeur", "ToggleEditorBridgeCommand", false),
+                    (vm, "Installer le plugin éditeur…", "PrepareEditorPluginCommand", false));
+                if (vm.InstallEditorPluginConfirmed)
+                {
+                    Gui.TextWrapped("Fermez les éditeurs utilisant ce moteur. Compiler et installer dans « " + unreal.Path + "/Engine/Plugins/Marketplace/CyEngineHub » ? Visual Studio C++ requis. Activation par défaut en éditeur, aucun module runtime. Les sources et temporaires ne sont pas des copies du moteur.");
+                    DetailActions((vm, "Confirmer l’installation du plugin", "InstallEditorPluginCommand", false), (vm, "Annuler", "CancelEditorPluginCommand", false));
+                }
                 if (unreal.CanRegister) ActionButton(unreal, "Enregistrer le moteur", "RegisterCommand");
                 if (unreal.IsRegistered) ActionButton(unreal, "Désenregistrer…", "RequestUnregisterCommand");
                 if (unreal.IsUnregisterConfirmationVisible)

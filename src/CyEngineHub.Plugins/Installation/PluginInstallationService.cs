@@ -182,6 +182,7 @@ public sealed class PluginInstallationService : IPluginInstallationService
             cancellationToken.ThrowIfCancellationRequested();
             if (Directory.Exists(destination))
             {
+                if (!plan.AllowReplacement) throw new PluginOperationException("Un plugin existe déjà à cette destination ; import éditeur arrêté.", "Install", plan.Plugin.DescriptorPath, destination);
                 var backupRoot = Path.Combine(pluginsDirectory, ".cyenginehub-backups");
                 Directory.CreateDirectory(backupRoot);
                 EnsureRealDirectory(

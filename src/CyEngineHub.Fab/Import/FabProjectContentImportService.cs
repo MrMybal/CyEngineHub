@@ -125,7 +125,7 @@ public sealed class FabProjectContentImportService : IFabProjectContentImportSer
                 var destination = CombineContained(targetContent, file.RelativePath);
                 EnsureNoExistingReparsePoint(targetRoot, destination);
                 var exists = File.Exists(destination);
-                if (exists && !file.WillReplaceExisting)
+                if (exists && (!file.WillReplaceExisting || !plan.AllowReplacement))
                 {
                     throw new FabContentOperationException(
                         $"Un nouveau conflit est apparu : {file.RelativePath}",
@@ -154,15 +154,22 @@ public sealed class FabProjectContentImportService : IFabProjectContentImportSer
                     backedUpCount++;
                 }
 
-                writtenDestinations.Add((destination, exists));
                 var staged = CombineContained(stagingRoot, file.RelativePath);
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-                var importedSha256 = await CopyFileWithSha256Async(
-                        staged,
-                        destination,
-                        overwrite: true,
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                string importedSha256;
+                if (!plan.AllowReplacement)
+                {
+                    importedSha256 = await ComputeSha256Async(staged, cancellationToken).ConfigureAwait(false);
+                    // Staging lives on the project volume. A non-replacing move is atomic;
+                    // never mark an unowned concurrent file for rollback deletion.
+                    File.Move(staged, destination, overwrite: false);
+                    writtenDestinations.Add((destination, false));
+                }
+                else
+                {
+                    writtenDestinations.Add((destination, exists));
+                    importedSha256 = await CopyFileWithSha256Async(staged, destination, overwrite: true, cancellationToken).ConfigureAwait(false);
+                }
                 File.SetLastWriteTimeUtc(destination, file.LastWriteTimeUtc.UtcDateTime);
                 var importedInfo = new FileInfo(destination);
                 receiptFiles.Add(new FabImportedFileReceipt(

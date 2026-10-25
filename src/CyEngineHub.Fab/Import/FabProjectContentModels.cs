@@ -22,6 +22,7 @@ public sealed record FabProjectImportPlan(
     DateTimeOffset CreatedAt,
     DateTimeOffset ExpiresAt)
 {
+    public bool AllowReplacement { get; init; } = true;
     public int ConflictCount => Files.Count(file => file.WillReplaceExisting);
 }
 

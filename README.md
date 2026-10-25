@@ -5,10 +5,10 @@
 A local-first, multi-engine development hub for Windows. Unreal Engine has the deepest
 integration; Unity, Godot and CRYENGINE have local providers.
 
-**Published version: `2.0.0-alpha.33`.** Back up projects before trying installation,
+**Published version: `2.0.0-alpha.34`.** Back up projects before trying installation,
 move or asset-conversion operations.
 
-Recent changes are summarized in the [release notes](docs/releases/v2.0.0-alpha.33.md).
+Recent changes are summarized in the [release notes](docs/releases/v2.0.0-alpha.34.md).
 
 Alpha.33 fixes Unreal patch component selection and temporary-space planning,
 adds verified local-block reuse and bounded chunk caching, and improves C++ project
@@ -16,6 +16,12 @@ creation, plugin templates, build navigation and Fab descriptions/image gallerie
 The optional CyToolsCore MCP repair workflow still requires separate consent for
 agent code execution and target validation before installation.
 See the [MCP setup and limitations](extensions/builtin/cyenginehub.unreal-version-bridge/mcp/README.md).
+
+Alpha.34 includes the **CyEngineHub Unreal Editor plugin · Alpha**:
+owned-library search, additive installation into the open project, and task progress.
+See [setup and limits](docs/unreal-editor-plugin.md) and the
+[compatibility validation](docs/unreal-editor-plugin-validation.md). Precompiled
+plugin ZIPs are separate release assets; exact engine-build compatibility is required.
 
 This preview adds reusable pack groups, per-pack script chains, Cosmos project
 destinations, reorganized settings and engine identity/Git controls. Native Unreal

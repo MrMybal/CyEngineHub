@@ -363,6 +363,7 @@ public sealed partial class App : Application, IDisposable
             catch (Exception exception) { Debug.WriteLine("Marketplace settings not saved: " + exception.Message); }
         }
         (_mainWindow?.DataContext as MainWindowViewModel)?.StopMcp();
+        (_mainWindow?.DataContext as MainWindowViewModel)?.StopEditorBridge();
         _isExplicitShutdown = true;
         var trayIcons = TrayIcon.GetIcons(this);
         if (trayIcons is not null)

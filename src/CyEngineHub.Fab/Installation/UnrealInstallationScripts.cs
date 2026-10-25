@@ -47,6 +47,7 @@ public sealed class UnrealContentPackInstallationScript(
                 cancellationToken)
             .ConfigureAwait(false);
         var conflictPolicy = context.Configuration.GetValueOrDefault("conflictPolicy", "backup-replace");
+        if (conflictPolicy.Equals("fail", StringComparison.OrdinalIgnoreCase)) plan = plan with { AllowReplacement = false };
         if (plan.ConflictCount > 0 && conflictPolicy.Equals("fail", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
@@ -145,6 +146,9 @@ public sealed class UnrealPluginInstallationScript(
             progress?.Report(new FabInstallationScriptProgress(
                 value.TotalFiles == 0 ? null : (double)value.CompletedFiles / value.TotalFiles,
                 value.Message)));
+        if (plan.WillReplaceExisting && context.Configuration.GetValueOrDefault("conflictPolicy") == "fail")
+            throw new InvalidOperationException("Plugin déjà présent : fermez l’éditeur et mettez-le à jour depuis CyEngineHub.");
+        if (context.Configuration.GetValueOrDefault("conflictPolicy") == "fail") plan = plan with { AllowReplacement = false };
         var result = await pluginInstallation.InstallAsync(plan, pluginProgress, cancellationToken)
             .ConfigureAwait(false);
         return new FabInstallationScriptResult(

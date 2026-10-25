@@ -50,6 +50,8 @@
     </ItemGroup>
   </Target>
   <Target Name="CopyBuiltInHubExtensions" AfterTargets="Build" Condition="'$(SkipBuiltInExtensionCopy)' != 'true'">
+    <ItemGroup><EditorPluginSources Include="../../extensions/unreal/CyEngineHub/**/*" /></ItemGroup>
+    <Copy SourceFiles="@(EditorPluginSources)" DestinationFiles="@(EditorPluginSources->'$(OutDir)UnrealPlugin/CyEngineHub/%(RecursiveDir)%(Filename)%(Extension)')" />
     <ItemGroup><HubMcpFiles Include="../CyEngineHub.Mcp/bin/$(Configuration)/net8.0/*" /></ItemGroup>
     <Copy SourceFiles="@(HubMcpFiles)" DestinationFolder="$(OutDir)Mcp" />
     <RemoveDir Directories="$(OutDir)Extensions/cyenginehub.unreal-asset-downgrader" />

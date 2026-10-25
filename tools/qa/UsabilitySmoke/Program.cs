@@ -58,6 +58,7 @@ sealed class RecordingLauncher : IPlatformLauncher
 }
 sealed class FixtureFab : IDirectFabClient
 {
+    public string? EditorFixtureSource { get; set; }
     public bool FailProductDetails { get; set; }
     public RemoteFabProductDetails? ProductDetails { get; set; }
     public IReadOnlyList<RemoteFabAsset> Library { get; set; } = [];
@@ -75,7 +76,8 @@ sealed class FixtureFab : IDirectFabClient
     public Task<RemoteFabProductDetails> GetProductDetailsAsync(RemoteFabAsset asset, CancellationToken cancellationToken = default) =>
         FailProductDetails ? Task.FromException<RemoteFabProductDetails>(new DirectFabException("Fixture: product detail unavailable")) : Task.FromResult(ProductDetails ?? new RemoteFabProductDetails("Fixture", []));
     public Task<DirectFabDownloadResult> DownloadAsync(RemoteFabAsset asset, string root, IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    public Task<DirectFabDownloadResult> DownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version, string root, IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    public Task<DirectFabDownloadResult> DownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version, string root, IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken cancellationToken = default) => EditorFixtureSource is { } source
+        ? Task.FromResult(new DirectFabDownloadResult(asset.AssetId, asset.Title, source, 1, 100, DateTimeOffset.UtcNow, PackageKind: "ContentPack")) : throw new NotSupportedException();
 }
 sealed class FixtureQuixel : IQuixelMegascansClient
 {
@@ -135,6 +137,7 @@ static partial class Program
     static bool ProjectBuildOnly;
     static bool FabTextOnly;
     static bool FabGalleryOnly;
+    static bool EditorBridgeOnly;
     static readonly ProjectBuildFixtureRunner ProjectBuildRunner = new();
     static readonly FixtureEngineBackend EngineBackend = new();
     const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
@@ -166,6 +169,7 @@ static partial class Program
         ProjectBuildOnly = args.Contains("--project-build-only");
         FabTextOnly = args.Contains("--fab-text-only");
         FabGalleryOnly = args.Contains("--fab-gallery-only");
+        EditorBridgeOnly = args.Contains("--editor-bridge-only");
         Directory.CreateDirectory(Output);
         AppBuilder.Configure<FixtureApp>().UsePlatformDetect().SetupWithoutStarting();
         using var stop = new CancellationTokenSource(args.Contains("--interactive") ? TimeSpan.FromMinutes(20) : TimeSpan.FromSeconds(240));
@@ -243,7 +247,8 @@ static partial class Program
         window.Show();
         if (ImGuiDiagnostics.IsHosted(window))
         {
-            if (FabGalleryOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestFabGallery(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            if (EditorBridgeOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestEditorBridge(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (FabGalleryOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestFabGallery(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (FabTextOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestFabText(window, vm, launcher); Console.WriteLine("OUTPUT " + Output); }
             else if (ProjectBuildOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestProjectBuild(window, vm, engine); Console.WriteLine("OUTPUT " + Output); }
             else if (ProjectCreationFormOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestProjectCreationForm(window, vm); Console.WriteLine("OUTPUT " + Output); }

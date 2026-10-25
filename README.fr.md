@@ -5,11 +5,11 @@
 Hub de développement multi-moteur, local-first, pour Windows. Unreal Engine est
 le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers locaux.
 
-**Version publiée : `2.0.0-alpha.33`.** Sauvegardez vos projets avant d'essayer les
+**Version publiée : `2.0.0-alpha.34`.** Sauvegardez vos projets avant d'essayer les
 opérations d'installation, de déplacement ou de conversion d'assets.
 
 Les changements récents sont récapitulés dans les
-[notes de version](docs/releases/v2.0.0-alpha.33.md).
+[notes de version](docs/releases/v2.0.0-alpha.34.md).
 
 L’alpha.33 corrige la sélection des composants et l’espace temporaire des patchs
 Unreal, réutilise les blocs locaux vérifiés et borne le cache des chunks. Elle
@@ -17,6 +17,13 @@ améliore aussi la création C++, les modèles de plugins, la navigation des bui
 et les descriptions/galeries Fab. Le recours IA / MCP via CyToolsCore conserve
 ses consentements distincts et sa validation cible obligatoire. Voir le
 [guide MCP et ses limites](extensions/builtin/cyenginehub.unreal-version-bridge/mcp/README.md).
+
+L’alpha.34 comprend le **plugin éditeur Unreal CyEngineHub · Alpha** :
+recherche dans la bibliothèque, installation additive dans le projet ouvert et suivi
+des tâches. Voir le [guide](docs/unreal-editor-plugin.md) et les
+[validations de compatibilité](docs/unreal-editor-plugin-validation.md).
+Les ZIP de plugin précompilés sont des fichiers séparés de la release ; le build
+du moteur doit correspondre exactement.
 
 Cette préversion ajoute les groupes de packs, chaînes de scripts, destinations
 Cosmos par projet, paramètres réorganisés et contrôles d’identité/Git des moteurs.

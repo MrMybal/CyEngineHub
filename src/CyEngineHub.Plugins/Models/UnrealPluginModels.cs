@@ -84,7 +84,10 @@ public sealed record PluginInstallPlan(
     long FileCount,
     long TotalBytes,
     int SkippedReparsePoints,
-    PluginCompatibility Compatibility);
+    PluginCompatibility Compatibility)
+{
+    public bool AllowReplacement { get; init; } = true;
+}
 
 public sealed record PluginInstallProgress(long CompletedFiles, long TotalFiles, string Message);
 

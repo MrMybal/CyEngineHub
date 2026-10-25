@@ -6,6 +6,21 @@ namespace CyEngineHub.Epic.Tests;
 public sealed class FabProjectContentImportServiceTests
 {
     [Fact]
+    public async Task LiveEditorStrictImportNeverReplacesNewConflict()
+    {
+        using var temporary = new TemporaryDirectory();
+        var source = Directory.CreateDirectory(Path.Combine(temporary.Path, "Pack/Content"));
+        await File.WriteAllTextAsync(Path.Combine(source.FullName, "Asset.uasset"), "pack");
+        var project = Path.Combine(temporary.Path, "Project/Project.uproject"); Directory.CreateDirectory(Path.GetDirectoryName(project)!);
+        await File.WriteAllTextAsync(project, "{}");
+        var service = new FabProjectContentImportService();
+        var plan = (await service.PrepareAsync(source.FullName, project)) with { AllowReplacement = false };
+        var destination = Path.Combine(Path.GetDirectoryName(project)!, "Content/Asset.uasset"); Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        await File.WriteAllTextAsync(destination, "editor-created");
+        await Assert.ThrowsAsync<FabContentOperationException>(() => service.ExecuteAsync(plan));
+        Assert.Equal("editor-created", await File.ReadAllTextAsync(destination));
+    }
+    [Fact]
     public async Task ImportPreservesContentLayoutAndBacksUpConflicts()
     {
         using var temporary = new TemporaryDirectory();

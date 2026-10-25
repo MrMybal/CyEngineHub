@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory = $true)][string]$InnoCompiler,
     [string]$OutputRoot,
     [Parameter(Mandatory = $true)][string]$NativeAdapterRoot,
+    [string]$EditorPluginRoot,
     [switch]$SkipTests
 )
 
@@ -66,6 +67,8 @@ try {
         New-Item -ItemType Directory -Path (Split-Path $destination) -Force | Out-Null
         Copy-Item -LiteralPath $file.FullName -Destination $destination
     }
+    New-Item -ItemType Directory -Path (Join-Path $appStage 'UnrealPlugin') -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'extensions/unreal/CyEngineHub') -Destination (Join-Path $appStage 'UnrealPlugin/CyEngineHub') -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot 'README.md'), (Join-Path $repoRoot 'THIRD_PARTY_NOTICES.md') -Destination $appStage
     Copy-Item -LiteralPath (Join-Path $repoRoot 'LICENCES') -Destination $appStage -Recurse
     # Only audited runtime files, never native build projects, intermediates or symbols.
@@ -120,7 +123,7 @@ try {
         }
     }
 
-    $required = @('CyEngineHub.Desktop.exe', 'coreclr.dll', 'Updater\CyEngineHub.Updater.exe',
+    $required = @('CyEngineHub.Desktop.exe', 'coreclr.dll', 'Updater\CyEngineHub.Updater.exe', 'UnrealPlugin\CyEngineHub\CyEngineHub.uplugin',
         'Mcp\CyEngineHub.Mcp.exe', 'Mcp\coreclr.dll',
         'Updater\coreclr.dll', 'Extensions\cyenginehub.asset-bridge\tools\CyEngineHub.AssetBridge.Tool.exe',
         'Extensions\cyenginehub.unreal-version-bridge\mcp\tools\CyEngineHub.VersionBridge.Tool.exe',
@@ -155,6 +158,15 @@ try {
     [IO.Compression.ZipFile]::CreateFromDirectory($appStage, $archive, [IO.Compression.CompressionLevel]::Optimal, $false)
     & python (Join-Path $repoRoot 'scripts/check-release-privacy.py') --zip $archive
     if ($LASTEXITCODE -ne 0) { throw 'Release archive privacy check failed.' }
+    if ($EditorPluginRoot) {
+        foreach ($editorVersion in @('4.27', '5.2', '5.3', '5.4', '5.5', '5.6', '5.7', '5.8')) {
+            $editorArchive = Join-Path $EditorPluginRoot "CyEngineHub-Editor-UE_$editorVersion-alpha.zip"
+            if (-not (Test-Path -LiteralPath $editorArchive -PathType Leaf)) { throw "Missing precompiled editor plugin: UE $editorVersion" }
+            & python (Join-Path $repoRoot 'scripts/check-release-privacy.py') --zip $editorArchive
+            if ($LASTEXITCODE -ne 0) { throw 'Editor plugin archive privacy check failed.' }
+            Copy-Item -LiteralPath $editorArchive -Destination $assets
+        }
+    }
     $hashes = @(Get-ChildItem -LiteralPath $assets -File | Sort-Object Name | ForEach-Object {
         "$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)"
     })

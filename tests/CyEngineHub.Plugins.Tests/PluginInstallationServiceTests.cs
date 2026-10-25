@@ -7,6 +7,21 @@ namespace CyEngineHub.Plugins.Tests;
 
 public sealed class PluginInstallationServiceTests : IDisposable
 {
+    [Fact]
+    public async Task LiveEditorStrictInstallNeverReplacesConcurrentPlugin()
+    {
+        var source = Path.Combine(_testDirectory, "Source/CyPlugin"); Directory.CreateDirectory(source);
+        var descriptor = Path.Combine(source, "CyPlugin.uplugin"); await File.WriteAllTextAsync(descriptor, "{\"FileVersion\":3,\"CanContainContent\":true}");
+        var parser = new UpluginDescriptorParser();
+        var plugin = await parser.ParseAsync(new PluginCandidate(descriptor, PluginSourceKind.LocalLibrary, "QA"));
+        var plugins = Path.Combine(_testDirectory, "Project/Plugins");
+        var service = new PluginInstallationService(new PluginCompatibilityService(), parser);
+        var plan = (await service.PlanAsync(plugin, new("project", "QA", PluginInstallTargetKind.Project, plugins, PluginTestData.CreateEngine(Path.Combine(_testDirectory, "Engine"))))) with { AllowReplacement = false };
+        var destination = Directory.CreateDirectory(plan.DestinationDirectory); await File.WriteAllTextAsync(Path.Combine(destination.FullName, "keep.txt"), "existing");
+        await Assert.ThrowsAsync<PluginOperationException>(() => service.InstallAsync(plan));
+        Assert.Equal("existing", await File.ReadAllTextAsync(Path.Combine(destination.FullName, "keep.txt")));
+        Assert.False(File.Exists(Path.Combine(destination.FullName, "CyPlugin.uplugin")));
+    }
     private readonly string _testDirectory = Path.Combine(
         Path.GetTempPath(),
         "CyEngineHub.Tests",

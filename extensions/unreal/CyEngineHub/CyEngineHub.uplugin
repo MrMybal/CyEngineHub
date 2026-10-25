@@ -1,0 +1,14 @@
+{
+  "FileVersion": 3,
+  "Version": 1,
+  "VersionName": "0.1.0-alpha",
+  "FriendlyName": "CyEngineHub · Alpha",
+  "Description": "Owned CyEngineHub library and additive pack installation in the open project. Requires the Windows desktop hub.",
+  "Category": "Editor",
+  "CreatedBy": "CyEngineHub",
+  "EnabledByDefault": true,
+  "CanContainContent": false,
+  "SupportedTargetPlatforms": ["Win64"],
+  "IsBetaVersion": true,
+  "Modules": [ { "Name": "CyEngineHub", "Type": "Editor", "LoadingPhase": "PostEngineInit" } ]
+}

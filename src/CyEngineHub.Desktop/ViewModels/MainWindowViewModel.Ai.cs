@@ -210,8 +210,9 @@ public sealed partial class MainWindowViewModel
         StatusMessage = "Proposition IA préparée. Vérifiez la variante, le stockage et le script, puis confirmez dans le popup.";
     }
 
-    private sealed class DesktopAiBackend(MainWindowViewModel owner) : IHubAiBackend
+    private sealed class DesktopAiBackend(MainWindowViewModel owner, bool editor = false) : IHubAiBackend
     {
+        private bool CanRead => editor ? owner.EditorBridgeEnabled : owner.McpEnabled;
         private IReadOnlyList<HubAiAsset>? _cachedAssets;
         private DateTimeOffset _cacheExpires;
         private string? _cachedAvailability;
@@ -221,7 +222,7 @@ public sealed partial class MainWindowViewModel
             var asset = await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!owner.McpEnabled || !owner.IsMarketplaceAvailable(source)) throw new InvalidOperationException("MCP ou marketplace désactivé.");
+                if (!CanRead || !owner.IsMarketplaceAvailable(source)) throw new InvalidOperationException("Connexion ou marketplace désactivée.");
                 return owner._remoteFabCatalog.FirstOrDefault(item => item.AssetId == assetId && NormalizeAssetSource(item).Equals(source, StringComparison.OrdinalIgnoreCase));
             });
             var version = asset?.ProjectVersions.FirstOrDefault(item => item.ArtifactId == variantId);
@@ -240,7 +241,7 @@ public sealed partial class MainWindowViewModel
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!owner.McpEnabled) throw new InvalidOperationException("MCP disabled.");
+                if (!CanRead) throw new InvalidOperationException("Connection disabled.");
                 return owner._mcpOptions;
             });
         public async Task<IReadOnlyList<HubAiAsset>> GetAssetsAsync(CancellationToken cancellationToken)
@@ -250,7 +251,7 @@ public sealed partial class MainWindowViewModel
             var cached = await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!owner.McpEnabled) throw new InvalidOperationException("MCP disabled.");
+                if (!CanRead) throw new InvalidOperationException("Connection disabled.");
                 var availability = owner.IsMarketplaceAvailable("Fab") + ":" + owner.IsMarketplaceAvailable("Quixel") + ":"
                     + string.Join(",", owner.MarketplaceConnectors.Where(item => item.IsEnabled).Select(item => item.Id));
                 return (Assets: _cachedAvailability == availability && DateTimeOffset.UtcNow < _cacheExpires ? _cachedAssets : null,
@@ -260,7 +261,7 @@ public sealed partial class MainWindowViewModel
             var snapshot = await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (!owner.McpEnabled) throw new InvalidOperationException("MCP disabled.");
+                if (!CanRead) throw new InvalidOperationException("Connection disabled.");
                 return (Assets: owner._remoteFabCatalog.ToArray(), Downloads: owner._fabStoredDownloads.ToArray(),
                     Collections: owner._fabCollections.ToDictionary(pair => pair.Key, pair => pair.Value),
                     Fab: owner.IsMarketplaceAvailable("Fab"), Quixel: owner.IsMarketplaceAvailable("Quixel"),
