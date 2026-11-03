@@ -10,6 +10,24 @@ content retain their own terms. See [licensing and scope](LICENSING.md) and the
 A local-first, multi-engine development hub for Windows. Unreal Engine has the deepest
 integration; Unity, Godot and CRYENGINE have local providers.
 
+## Screenshots
+
+Development preview (`2.0.0-alpha.41`), captured from the real application with
+fictional demo data and no connected accounts. These screens may differ from
+the currently published release. Click an image to view it at full size.
+
+**Engines — installed versions, source forks and common actions**
+
+![CyEngineHub engine catalog with three demo Unreal installations](docs/screenshots/engines.png)
+
+**Project creation — engine, Blueprint/C++, profiles and destination folder**
+
+![CyEngineHub project creation dialog with named fields and a folder picker](docs/screenshots/project-creation.png)
+
+**Pack conversion — local derivatives and optional target-engine import**
+
+![CyEngineHub Blender conversion options with optional Unreal UAsset conversion](docs/screenshots/source-conversion.png)
+
 **Published version: `2.0.0-alpha.34`.** Back up projects before trying installation,
 move or asset-conversion operations.
 

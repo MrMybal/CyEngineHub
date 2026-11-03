@@ -10,6 +10,24 @@ le contenu Epic conservent leurs propres conditions. Voir le
 Hub de développement multi-moteur, local-first, pour Windows. Unreal Engine est
 le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers locaux.
 
+## Captures d’écran
+
+Aperçu de développement (`2.0.0-alpha.41`), capturé dans la vraie application avec
+des données de démonstration fictives et aucun compte connecté. Ces écrans peuvent
+différer de la version actuellement publiée. Cliquez sur une image pour l’agrandir.
+
+**Moteurs — versions installées, forks sources et actions courantes**
+
+![Catalogue CyEngineHub avec trois installations Unreal de démonstration](docs/screenshots/engines.png)
+
+**Création de projet — moteur, Blueprint/C++, profils et dossier de destination**
+
+![Fenêtre de création de projet avec champs nommés et sélection de dossier](docs/screenshots/project-creation.png)
+
+**Conversion de packs — dérivés locaux et import optionnel avec le moteur cible**
+
+![Options de conversion Blender avec conversion UAsset Unreal optionnelle](docs/screenshots/source-conversion.png)
+
 **Version publiée : `2.0.0-alpha.34`.** Sauvegardez vos projets avant d'essayer les
 opérations d'installation, de déplacement ou de conversion d'assets.
 
