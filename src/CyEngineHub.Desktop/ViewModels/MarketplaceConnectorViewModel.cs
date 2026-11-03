@@ -43,6 +43,9 @@ public sealed class MarketplaceConnectorViewModel : ObservableObject
         Name = extension.Manifest.DisplayName;
         Description = extension.Manifest.Description;
         InventoryUrl = extension.Manifest.Marketplace!.InventoryUrl;
+        HasPackageStorage = extension.Manifest.Marketplace.PackageStorage || Id is "cyenginehub.marketplace-cosmos" or "cyenginehub.marketplace-kitbash3d";
+        AcquisitionLabel = extension.Manifest.Marketplace.AcquisitionLabel ?? "Télécharger depuis mon inventaire web";
+        WorkflowNotice = extension.Manifest.Marketplace.WorkflowNotice;
         _isEnabled = enabled;
         _downloadDirectory = downloadDirectory;
         _save = save;
@@ -60,11 +63,14 @@ public sealed class MarketplaceConnectorViewModel : ObservableObject
     }
 
     public string Id { get; }
-    public bool HasPackageStorage => Id == "cyenginehub.marketplace-cosmos";
+    public bool IsKitBash => Id == "cyenginehub.marketplace-kitbash3d";
+    public bool HasPackageStorage { get; }
+    public string AcquisitionLabel { get; }
+    public string? WorkflowNotice { get; }
     public string Name { get; }
-    public string SettingsHeading => HasPackageStorage ? "COSMOS" : Name.ToUpperInvariant();
-    public string SettingsSubtitle => HasPackageStorage ? "Mes assets · inventaire web et bibliothèque locale" : "Connecteur · inventaire web";
-    public string SettingsSaveLabel => HasPackageStorage ? "Enregistrer Cosmos" : "Enregistrer " + Name;
+    public string SettingsHeading => IsKitBash ? "KITBASH3D · CARGO · ALPHA" : Id == "cyenginehub.marketplace-cosmos" ? "COSMOS" : Name.ToUpperInvariant() + " · ALPHA";
+    public string SettingsSubtitle => IsKitBash ? "Mes kits · My Assets officiel et bibliothèque locale · session gérée par le site" : HasPackageStorage ? "Bibliothèque web et fichiers locaux · session gérée par le site" : "Connecteur · inventaire web";
+    public string SettingsSaveLabel => IsKitBash ? "Enregistrer KitBash3D" : Id == "cyenginehub.marketplace-cosmos" ? "Enregistrer Cosmos" : "Enregistrer " + Name;
     public string LibrarySubtitle => Id == "cyenginehub.marketplace-megascans-fab" ? "Fiches natives · Fab / MCP" : "Mes assets téléchargés";
     public string Description { get; }
     public string InventoryUrl { get; }

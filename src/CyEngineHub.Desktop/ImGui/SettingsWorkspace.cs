@@ -1,10 +1,10 @@
 using CyEngineHub.Desktop.ViewModels;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     private string _settingsMarket = "Fab";
     private string _settingsUnreal = "profiles";
@@ -64,6 +64,10 @@ internal sealed partial class ImGuiWorkspace
             Gui.SetNextItemWidth(220 * UiScale);
             if (Gui.Combo("Densité de l’interface", ref density, "Compact\0Confort\0")) Set(vm, "{Binding UseCompactInterface}", density == 0);
             Record("interface-density");
+            var languages = MainWindowViewModel.InterfaceLanguages.ToArray(); var language = Array.IndexOf(languages, vm.InterfaceLanguage);
+            Gui.SetNextItemWidth(CyUiNative.Dp(220));
+            if (Gui.Combo("Langue des composants CyUI", ref language, languages, languages.Length)) Set(vm, "{Binding InterfaceLanguage}", languages[language]);
+            Record("field/InterfaceLanguage");
             ActionButton(vm, "Enregistrer l’apparence", "SaveAppearanceSettingsCommand", true);
             Gui.TextWrapped(vm.AppearanceStatus);
             return true;

@@ -70,7 +70,7 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $appStage 'UnrealPlugin') -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $repoRoot 'extensions/unreal/CyEngineHub') -Destination (Join-Path $appStage 'UnrealPlugin/CyEngineHub') -Recurse
     Copy-Item -LiteralPath (Join-Path $repoRoot 'README.md'), (Join-Path $repoRoot 'LICENSE'), (Join-Path $repoRoot 'LICENSING.md'), (Join-Path $repoRoot 'THIRD_PARTY_NOTICES.md') -Destination $appStage
-    Copy-Item -LiteralPath (Join-Path $repoRoot 'LICENCES') -Destination $appStage -Recurse
+    Copy-Item -LiteralPath (Join-Path $repoRoot 'LICENCES') -Destination $appStage -Recurse -Force
     # Only audited runtime files, never native build projects, intermediates or symbols.
     foreach ($nativeVersion in @('5.3', '5.5', '5.6', '5.7')) {
         $nativeDestination = Join-Path $appStage "Extensions/cyenginehub.unreal-version-bridge/native-binaries/UE_$nativeVersion"
@@ -129,6 +129,9 @@ try {
     }
 
     $required = @('LICENSE', 'LICENSING.md', 'THIRD_PARTY_NOTICES.md',
+        'cimgui.dll', 'Hexa.NET.ImGui.dll', 'LICENCES/CyUI/LICENSE',
+        'LICENCES/CyUI/Lexilla.txt', 'LICENCES/DearImGui/LICENSE.txt',
+        'LICENCES/cimgui/LICENSE', 'LICENCES/Hexa.NET.ImGui/LICENSE.txt',
         'UnrealPlugin\CyEngineHub\LICENSE', 'UnrealPlugin\CyEngineHub\NOTICE.md',
         'Extensions\cyenginehub.unreal-version-bridge\native-source\CyHubNativeBridge\LICENSE',
         'CyEngineHub.Desktop.exe', 'coreclr.dll', 'Updater\CyEngineHub.Updater.exe', 'UnrealPlugin\CyEngineHub\CyEngineHub.uplugin',
@@ -142,7 +145,18 @@ try {
         'Extensions\cyenginehub.unreal-version-bridge\mcp\vendor\cytools_core-0.10.1-py3-none-any.whl',
         'LICENCES\CyToolsCore-MIT.txt', 'LICENCES\SOURCES.txt',
         'Extensions\cyenginehub.unreal-version-bridge\scripts\source-export.py',
-        'Extensions\cyenginehub.unreal-relocated-install\scripts\relocate-pack.py')
+        'Extensions\cyenginehub.unreal-relocated-install\scripts\relocate-pack.py',
+        'Extensions\cyenginehub.marketplace-kitbash3d\extension.json',
+        'Extensions\cyenginehub.marketplace-itchio\extension.json',
+        'Extensions\cyenginehub.marketplace-blendkit\extension.json',
+        'Extensions\cyenginehub.marketplace-artstation\extension.json',
+        'Extensions\cyenginehub.marketplace-gumroad\extension.json',
+        'Extensions\cyenginehub.marketplace-cgtrader\extension.json',
+        'Extensions\cyenginehub.source-converters\extension.json',
+        'Extensions\cyenginehub.source-converters\scripts\blender-convert.py',
+        'docs\source-converters.md',
+        'docs\application-updates.md',
+        'docs\releases\v2.0.0-alpha.42.md')
     foreach ($relative in $required) {
         if (-not (Test-Path -LiteralPath (Join-Path $appStage $relative) -PathType Leaf)) { throw "Missing packaged file: $relative" }
     }

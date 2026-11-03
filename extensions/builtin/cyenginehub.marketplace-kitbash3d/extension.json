@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "cyenginehub.marketplace-kitbash3d",
+  "displayName": "KitBash3D · Cargo",
+  "version": "0.1.0",
+  "publisher": "CyEngineHub · connecteur non officiel",
+  "description": "Alpha : kits possédés via My Assets officiel, téléchargements web et import de kits locaux (ZIP ou dossier). Packages JSON, compression et bibliothèques ordonnées avec quotas. Les originaux sont conservés. Les modèles USD Cargo restent importés par le connecteur Cargo officiel ; aucun compte connecté ni synchronisation d’inventaire n’est supposé.",
+  "kind": "Marketplace",
+  "executionKind": "WebLink",
+  "capabilities": "OwnedInventory",
+  "supportedEngines": [ "Unreal", "Unity", "Custom" ],
+  "website": "https://cargo-app.kitbash3d.com/account/my-assets",
+  "marketplace": { "inventoryUrl": "https://cargo-app.kitbash3d.com/account/my-assets", "packageStorage": true }
+}

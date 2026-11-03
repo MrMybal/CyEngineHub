@@ -1,9 +1,9 @@
 using CyEngineHub.Desktop.ViewModels;
-using Gui = ImGuiNET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     private UiMultiSelection _itemSelection = new();
     private readonly Dictionary<string, UiMultiSelection> _itemSelections = new(StringComparer.Ordinal);

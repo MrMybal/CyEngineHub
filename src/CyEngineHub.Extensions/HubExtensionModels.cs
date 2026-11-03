@@ -112,6 +112,13 @@ public sealed class HubExtensionManifest
 public sealed class HubMarketplaceDescriptor
 {
     public string InventoryUrl { get; init; } = string.Empty;
+
+    /// <summary>Opt in to host-owned local packaging, storage and installation configuration.</summary>
+    public bool PackageStorage { get; init; }
+
+    public string? AcquisitionLabel { get; init; }
+
+    public string? WorkflowNotice { get; init; }
 }
 
 public sealed record HubExtensionSnapshot(

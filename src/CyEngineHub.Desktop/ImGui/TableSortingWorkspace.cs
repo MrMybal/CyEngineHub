@@ -1,11 +1,11 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     private readonly Dictionary<string, (int Column, bool Descending)> _tableSorts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, TableSortCache> _tableSortCache = new(StringComparer.Ordinal);

@@ -1,12 +1,12 @@
 using CyEngineHub.Desktop.ViewModels;
 using CyEngineHub.Toolchains.Detection;
 using CyEngineHub.Toolchains.Models;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     private string _toolsQuery = "";
     private ToolchainInstallationCardViewModel? _selectedToolchainInstallation;
@@ -99,7 +99,7 @@ internal sealed partial class ImGuiWorkspace
         Gui.TableSetupColumn("Détails", ImGuiTableColumnFlags.WidthStretch, 1.5f);
         Gui.TableNextColumn();
         if (Gui.BeginTable("unreal-tools-list", 3, ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable,
-            new(0, Math.Max(120, Gui.GetContentRegionAvail().Y - 5))))
+            new System.Numerics.Vector2(0, Math.Max(120, Gui.GetContentRegionAvail().Y - 5))))
         {
             Gui.TableSetupColumn("Outil", ImGuiTableColumnFlags.WidthStretch, 2);
             Gui.TableSetupColumn("État", ImGuiTableColumnFlags.WidthStretch, 1.4f);
@@ -142,7 +142,7 @@ internal sealed partial class ImGuiWorkspace
         Gui.TableSetupColumn("Détails", ImGuiTableColumnFlags.WidthStretch, 1.4f);
         Gui.TableNextColumn();
         if (Gui.BeginTable("toolchain-list", 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable,
-            new(0, Math.Max(120, Gui.GetContentRegionAvail().Y - 5))))
+            new System.Numerics.Vector2(0, Math.Max(120, Gui.GetContentRegionAvail().Y - 5))))
         {
             foreach (var title in new[] { "Composant", "Version", "État", "Emplacement", "Source" }) Gui.TableSetupColumn(title);
             Gui.TableSetupScrollFreeze(0, 1); SortableHeaders("toolchain-list", ["Composant", "Version", "État", "Emplacement", "Source"]);

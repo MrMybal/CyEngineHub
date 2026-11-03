@@ -1,16 +1,16 @@
 using CyEngineHub.Desktop.ViewModels;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     private string? _remoteRowsSortValue;
     private void DrawRemoteAssetRows(MainWindowViewModel vm, string binding)
     {
         if (!Gui.BeginTable("library-assets", 6, ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY | ImGuiTableFlags.BordersInnerH,
-            new(0, System.Math.Max(120, Gui.GetContentRegionAvail().Y - 4)))) return;
+            new System.Numerics.Vector2(0, System.Math.Max(120, Gui.GetContentRegionAvail().Y - 4)))) return;
         Gui.TableSetupColumn("Nom", ImGuiTableColumnFlags.WidthStretch, 3);
         Gui.TableSetupColumn("Catégorie", ImGuiTableColumnFlags.WidthStretch, 1.2f);
         Gui.TableSetupColumn("Versions", ImGuiTableColumnFlags.WidthStretch, 1.4f);
@@ -103,7 +103,7 @@ internal sealed partial class ImGuiWorkspace
     {
         var id = "library-local/" + binding;
         if (!Gui.BeginTable(id, 2, ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable | ImGuiTableFlags.ScrollY,
-            new(0, System.Math.Max(120, Gui.GetContentRegionAvail().Y - 4)))) return;
+            new System.Numerics.Vector2(0, System.Math.Max(120, Gui.GetContentRegionAvail().Y - 4)))) return;
         Gui.TableSetupColumn("Nom", ImGuiTableColumnFlags.WidthStretch, 3);
         Gui.TableSetupColumn("Catégorie / format", ImGuiTableColumnFlags.WidthStretch, 2);
         Gui.TableSetupScrollFreeze(0, 1); SortableHeaders(id, ["Nom", "Catégorie / format"]);

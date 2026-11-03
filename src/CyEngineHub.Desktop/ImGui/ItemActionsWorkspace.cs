@@ -1,12 +1,12 @@
 using System.Numerics;
 using System.Windows.Input;
 using CyEngineHub.Desktop.ViewModels;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     private object? _contextItem;
     private string _contextOpenCommand = "OpenDetailsCommand";
@@ -23,8 +23,8 @@ internal sealed partial class ImGuiWorkspace
         draw.AddRect(min + new Vector2(2), max - new Vector2(2), accent, 3, ImDrawFlags.None, 3 * UiScale);
         var badge = new Vector2(max.X - 23 * UiScale, min.Y + 7 * UiScale);
         draw.AddRectFilled(badge, badge + new Vector2(16 * UiScale), accent, 3);
-        draw.AddLine(badge + new Vector2(3, 8) * UiScale, badge + new Vector2(6, 11) * UiScale, 0xFFFFFFFF, 2);
-        draw.AddLine(badge + new Vector2(6, 11) * UiScale, badge + new Vector2(13, 4) * UiScale, 0xFFFFFFFF, 2);
+        draw.AddLine(badge + new Vector2(3, 8) * UiScale, badge + new Vector2(6, 11) * UiScale, Gui.ColorConvertFloat4ToU32(CyUiNative.Colour(CyUiRole.AccentText)), 2);
+        draw.AddLine(badge + new Vector2(6, 11) * UiScale, badge + new Vector2(13, 4) * UiScale, Gui.ColorConvertFloat4ToU32(CyUiNative.Colour(CyUiRole.AccentText)), 2);
         Elements["selection/card"] = new(min.X, min.Y, max.X, max.Y);
     }
     private static void DrawFavoriteMarker(Vector2 center)

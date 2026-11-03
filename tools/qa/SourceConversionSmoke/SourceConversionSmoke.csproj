@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><EnableNETAnalyzers>false</EnableNETAnalyzers></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../../src/CyEngineHub.Fab/CyEngineHub.Fab.csproj" />
+    <ProjectReference Include="../../../src/CyEngineHub.Infrastructure/CyEngineHub.Infrastructure.csproj" />
+    <None Include="fixture.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="unreal-verify.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../extensions/builtin/cyenginehub.source-converters/scripts/*.py" Link="Extensions/cyenginehub.source-converters/scripts/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../extensions/builtin/cyenginehub.unreal-version-bridge/scripts/*.py" Link="Extensions/cyenginehub.unreal-version-bridge/scripts/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../../extensions/builtin/cyenginehub.unreal-version-bridge/profiles/*.json" Link="Extensions/cyenginehub.unreal-version-bridge/profiles/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

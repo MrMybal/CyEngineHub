@@ -7,7 +7,14 @@ public sealed partial class MainWindowViewModel
 {
     private string _interfaceTheme = "Gris";
     private string _appearanceStatus = "Les thèmes s’appliquent immédiatement. Enregistrez pour les retrouver au lancement.";
-    public static IReadOnlyList<string> InterfaceThemes { get; } = ["Gris", "Sombre", "Contraste"];
+    public static IReadOnlyList<string> InterfaceThemes { get; } = ["Gris", "Sombre", "Contraste", "mid-grey", "light-grey", "amber-night", "violet", "navy"];
+    private string _interfaceLanguage = "English";
+    public static IReadOnlyList<string> InterfaceLanguages { get; } = ["English", "Français"];
+    public string InterfaceLanguage
+    {
+        get => _interfaceLanguage;
+        set { if (InterfaceLanguages.Contains(value)) SetProperty(ref _interfaceLanguage, value); }
+    }
     public string InterfaceTheme
     {
         get => _interfaceTheme;
@@ -45,6 +52,7 @@ public sealed partial class MainWindowViewModel
     public ICommand SaveAppearanceSettingsCommand => _saveAppearanceSettingsCommand ??= new AsyncRelayCommand(async () =>
     {
         await _settings.SetAsync("interface.theme.v1", InterfaceTheme).ConfigureAwait(true);
+        await _settings.SetAsync("interface.language.v1", InterfaceLanguage).ConfigureAwait(true);
         await _interfaceWrite.ConfigureAwait(true);
         AppearanceStatus = "Thème et préférences d’affichage enregistrés.";
     }, onError: ShowError);

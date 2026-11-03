@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "cyenginehub.marketplace-cgtrader",
+  "displayName": "CGTrader",
+  "version": "0.1.0",
+  "publisher": "CyEngineHub · connecteur non officiel",
+  "description": "Alpha : achats CGTrader officiels, téléchargements web et dossiers locaux avec textures. Packages JSON, compression et bibliothèques ordonnées indépendantes. Les formats et licences restent ceux du vendeur ; aucune conversion universelle ni compatibilité moteur supposée.",
+  "kind": "Marketplace",
+  "executionKind": "WebLink",
+  "capabilities": "OwnedInventory",
+  "supportedEngines": [ "Unreal", "Unity", "Godot", "Custom" ],
+  "website": "https://www.cgtrader.com/profile/purchases",
+  "marketplace": {
+    "inventoryUrl": "https://www.cgtrader.com/profile/purchases",
+    "packageStorage": true,
+    "acquisitionLabel": "Ouvrir mes achats CGTrader",
+    "workflowNotice": "Alpha · Mes achats CGTrader officiels, session isolée et téléchargements web. Pour un modèle déjà présent, ajoutez son ZIP ou son dossier complet avec les textures ; chemins relatifs conservés dans le package. Configurez le script d’installation selon le format réellement fourni. Les .max, .blend, fichiers CAD et modèles d’impression ne sont pas automatiquement convertis en .uasset. Aucune synchronisation d’inventaire API."
+  }
+}

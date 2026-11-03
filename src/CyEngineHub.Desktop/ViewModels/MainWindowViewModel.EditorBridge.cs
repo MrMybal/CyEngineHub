@@ -124,7 +124,7 @@ public sealed partial class MainWindowViewModel
                 if (_requests.TryGetValue(requestId, out var previous))
                     return previous.Fingerprint == fingerprint ? previous.Result : throw new ArgumentException("requestId déjà utilisé pour une autre installation.");
                 if (_requests.Count >= 1000) throw new InvalidOperationException("Limite de session atteinte. Reconnectez le pont depuis le Hub.");
-                if (owner.IsEpicBusy || owner._aiAutomaticActionRunning) throw new InvalidOperationException("Une installation est déjà en cours. Réessayez après sa fin.");
+                if (owner.IsEpicBusy || owner._aiAutomaticActionRunning) throw new InvalidOperationException("Une actualisation ou une opération IA est en cours. Réessayez après sa fin.");
                 var asset = owner._remoteFabCatalog.FirstOrDefault(a => a.AssetId == assetId && NormalizeAssetSource(a).Equals(source, StringComparison.OrdinalIgnoreCase))
                     ?? throw new InvalidOperationException("Ce fournisseur nécessite une installation depuis le Hub.");
                 if (!owner.IsMarketplaceAvailable(source) || IsFabWebAsset(asset)) throw new InvalidOperationException("Installez ce produit depuis le Hub / son fournisseur officiel.");
@@ -146,7 +146,7 @@ public sealed partial class MainWindowViewModel
                 foreach (var item in owner.FabInstallTargets) item.IsSelected = ReferenceEquals(item, target);
                 owner.RebuildCompatibleFabInstallVersions();
                 if (!owner.CompatibleFabInstallVersions.Any(v => v.Version.ArtifactId == variantId)) throw new InvalidOperationException("Variante incompatible.");
-                foreach (var v in owner.CompatibleFabInstallVersions) v.IsSelected = v.Version.ArtifactId == variantId;
+                foreach (var v in owner.FabInstallVersions) v.IsSelected = v.Version.ArtifactId == variantId;
                 Guid? taskId = null;
                 var completion = owner.InstallSelectedFabVersionsIntoTargetsAsync(h => taskId = h.Id, editorSafe: true);
                 if (completion.IsFaulted) await completion.ConfigureAwait(true);

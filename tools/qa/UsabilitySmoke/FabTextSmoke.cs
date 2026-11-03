@@ -36,8 +36,11 @@ static partial class Program
         var namedLink = selected.DescriptionDocument.Blocks.SelectMany(block => block.Runs).Single(run => run.Link is not null);
         Check(namedLink.Text == "Documentation & FAQ" && namedLink.Bold && !namedLink.Text.Contains("https://", StringComparison.Ordinal),
             "Rich HTML keeps a bold clickable label rather than a dumped URL");
-        await ImGuiDiagnostics.ClickAsync(window, "product-description-link/0");
+        // Exercise the real CyUI TextLink hit target, not the removed local renderer's IDs.
+        selected.ApplyProductDetails(new("<p><a href='https://example.invalid/docs'>Documentation</a></p>", []));
+        await ClickFirstDocumentLink(window);
         Check(launcher.OpenedUris.Single().AbsoluteUri == "https://example.invalid/docs", "Clicking the rendered description link opens exactly its intended web address");
+        selected.ApplyProductDetails(new(html, []));
         foreach (var width in new[] { 1440, 1024 })
         {
             window.Width = width; await ImGuiDiagnostics.FramesAsync(window, 4);
@@ -54,11 +57,19 @@ static partial class Program
         Check(selected.DescriptionDocument.Blocks[0].Heading == 2 && selected.DescriptionDocument.Blocks.SelectMany(block => block.Runs).Any(run => run.Bold),
             "Actual Markdown is rendered as headings and styled text, not raw punctuation");
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "fab-markdown-rich.png"));
-        await ImGuiDiagnostics.ClickAsync(window, "product-description-link/0");
+        selected.ApplyProductDetails(new("[Support](https://example.invalid/support)", []));
+        await ClickFirstDocumentLink(window);
         Check(launcher.OpenedUris.Last().AbsoluteUri == "https://example.invalid/support" && launcher.OpenedUris.Count == 2, "Markdown link labels are clickable too");
         selected.ApplyProductDetails(new("<p><a href='javascript:alert(1)'>Unsafe link</a></p><p><a href='file:///C:/private'>Local file</a></p>", []));
         await ImGuiDiagnostics.FramesAsync(window, 4);
         Check(!ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("product-description-link/", StringComparison.Ordinal)) && launcher.OpenedUris.Count == 2,
             "Executable and local-file addresses never become clickable description links");
+    }
+
+    static async Task ClickFirstDocumentLink(Window window)
+    {
+        await ImGuiDiagnostics.FramesAsync(window, 4);
+        var bounds = ImGuiDiagnostics.ElementBounds(window, "product-description");
+        await ImGuiDiagnostics.ClickAsync(window, "product-description", horizontal: 24 / (bounds.Z - bounds.X), vertical: 9 / (bounds.W - bounds.Y));
     }
 }

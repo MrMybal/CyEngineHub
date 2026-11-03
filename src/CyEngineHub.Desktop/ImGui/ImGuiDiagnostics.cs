@@ -50,7 +50,7 @@ public static class ImGuiDiagnostics
         if (!ReferenceEquals(host.InputHitTest(position), host))
             throw new InvalidOperationException("The GPU host does not receive pointer hit tests.");
         host.Focus();
-        host.Surface.Input(io => { io.AddKeyEvent(ImGuiNET.ImGuiKey.ModCtrl, modifiers.HasFlag(KeyModifiers.Control)); io.AddKeyEvent(ImGuiNET.ImGuiKey.ModShift, modifiers.HasFlag(KeyModifiers.Shift)); });
+        host.Surface.Input(io => { io.AddKeyEvent(Hexa.NET.ImGui.ImGuiKey.ModCtrl, modifiers.HasFlag(KeyModifiers.Control)); io.AddKeyEvent(Hexa.NET.ImGui.ImGuiKey.ModShift, modifiers.HasFlag(KeyModifiers.Shift)); });
         // Let hover/overlap ownership settle after a modal or grid reflow, as with a real pointer move.
         host.Surface.Input(io => io.AddMousePosEvent((float)position.X, (float)position.Y));
         await FramesAsync(window, 2).ConfigureAwait(true);
@@ -62,7 +62,7 @@ public static class ImGuiDiagnostics
             host.Surface.Input(io => io.AddMouseButtonEvent(rightButton ? 1 : 0, false));
             await FramesAsync(window, clicks > 1 ? 1 : 3).ConfigureAwait(true);
         }
-        host.Surface.Input(io => { io.AddKeyEvent(ImGuiNET.ImGuiKey.ModCtrl, false); io.AddKeyEvent(ImGuiNET.ImGuiKey.ModShift, false); });
+        host.Surface.Input(io => { io.AddKeyEvent(Hexa.NET.ImGui.ImGuiKey.ModCtrl, false); io.AddKeyEvent(Hexa.NET.ImGui.ImGuiKey.ModShift, false); });
         await FramesAsync(window).ConfigureAwait(true);
     }
     public static async Task TextAsync(Window window, string text, KeyModifiers modifiers = KeyModifiers.None)
@@ -87,16 +87,16 @@ public static class ImGuiDiagnostics
     }
     public static async Task EscapeAsync(Window window)
     {
-        Host(window).Surface.Input(io => io.AddKeyEvent(ImGuiNET.ImGuiKey.Escape, true));
+        Host(window).Surface.Input(io => io.AddKeyEvent(Hexa.NET.ImGui.ImGuiKey.Escape, true));
         await FramesAsync(window).ConfigureAwait(true);
-        Host(window).Surface.Input(io => io.AddKeyEvent(ImGuiNET.ImGuiKey.Escape, false));
+        Host(window).Surface.Input(io => io.AddKeyEvent(Hexa.NET.ImGui.ImGuiKey.Escape, false));
         await FramesAsync(window).ConfigureAwait(true);
     }
-    public static async Task PointerGestureAsync(Window window, string element, float wheel = 0, Vector2 drag = default)
+    public static async Task PointerGestureAsync(Window window, string element, float wheel = 0, Vector2 drag = default, float horizontal = .5f, float vertical = .5f)
     {
         var surface = Host(window).Surface;
         var rect = ElementBounds(window, element);
-        var center = new Vector2((rect.X + rect.Z) / 2, (rect.Y + rect.W) / 2);
+        var center = new Vector2(rect.X + (rect.Z - rect.X) * horizontal, rect.Y + (rect.W - rect.Y) * vertical);
         surface.Input(io => io.AddMousePosEvent(center.X, center.Y));
         await FramesAsync(window, 2).ConfigureAwait(true);
         if (wheel != 0)

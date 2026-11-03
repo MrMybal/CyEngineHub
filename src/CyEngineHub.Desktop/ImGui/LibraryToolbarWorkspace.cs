@@ -1,10 +1,10 @@
 using CyEngineHub.Desktop.ViewModels;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     private static float ButtonWidth(string label) => Gui.CalcTextSize(label).X + Gui.GetStyle().FramePadding.X * 2;
     private static void ToolbarItem(ref bool first, float right, float width)

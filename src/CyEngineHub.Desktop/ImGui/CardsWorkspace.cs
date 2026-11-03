@@ -1,12 +1,12 @@
 using System.Numerics;
 using Avalonia.Media.Imaging;
 using CyEngineHub.Desktop.ViewModels;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     private const float UiScale = UiCardGrid.InterfaceScale;
     private RemoteFabAssetRowViewModel[] _catalogRows = [];
@@ -205,7 +205,7 @@ internal sealed partial class ImGuiWorkspace
             var imageSize = new Vector2(bitmap.PixelSize.Width, bitmap.PixelSize.Height) * scale;
             var min = position + (size - imageSize) / 2;
             var texture = _image(bitmap);
-            if (texture != 0) draw.AddImage(texture, min, min + imageSize);
+            if (texture != 0) draw.AddImage(new ImTextureRef { TexID = new ImTextureID((ulong)texture) }, min, min + imageSize);
         }
         else draw.AddText(position + (size - Gui.CalcTextSize(placeholder)) / 2,
             Gui.ColorConvertFloat4ToU32(ImGuiTheme.Muted), placeholder);
@@ -251,7 +251,7 @@ internal sealed partial class ImGuiWorkspace
             var imageSize = new Vector2(bitmap.PixelSize.Width, bitmap.PixelSize.Height) * factor;
             var min = start + (new Vector2(size) - imageSize) / 2;
             var texture = _image(bitmap);
-            if (texture != 0) draw.AddImage(texture, min, min + imageSize);
+            if (texture != 0) draw.AddImage(new ImTextureRef { TexID = new ImTextureID((ulong)texture) }, min, min + imageSize);
         }
         draw.AddText(start + new Vector2(size + 8 * UiScale, Math.Max(0, (size - Gui.GetTextLineHeight()) / 2)),
             Gui.GetColorU32(ImGuiCol.Text), Elide(label, Math.Max(1, width - size - 8 * UiScale)));

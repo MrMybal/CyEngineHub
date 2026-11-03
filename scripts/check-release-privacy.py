@@ -4,6 +4,7 @@ Inno installers must ALSO be unpacked and their payload inspected with --directo
 Scanning only the compressed executable cannot validate its embedded payload.
 """
 import argparse
+import hashlib
 import importlib.util
 import pathlib
 import sys
@@ -18,9 +19,20 @@ PRIVATE_NAMES = {'cookies', 'cookies-journal', 'login data', 'local state',
                  'sessions.json', 'inventory.json', 'appsettings.local.json'}
 PRIVATE_SUFFIXES = {'.pdb', '.db', '.sqlite', '.sqlite3', '.log', '.dmp', '.pfx', '.p12', '.pyc', '.binlog'}
 
+# Immutable, public NuGet net8.0 artifact: its publisher's debug-directory path
+# is metadata, not this application's user data. This exception never applies
+# to rebuilt/modified DLLs, other files, credentials, keys or other issue types.
+# Provenance is retained in LICENCES/HexaGen.Runtime/PROVENANCE.md.
+PUBLIC_UPSTREAM_METADATA = {
+    'HexaGen.Runtime.dll': 'f9fb2181b4dfe137a3137ff4defe0cafeba45774d73d78b874ff2a7fa67fc22f',
+}
+
 def inspect(name, data):
     path = pathlib.PurePosixPath(name.replace('\\', '/'))
     issues = privacy.inspect(str(path), data)
+    if (path.name in PUBLIC_UPSTREAM_METADATA and
+            hashlib.sha256(data).hexdigest() == PUBLIC_UPSTREAM_METADATA[path.name]):
+        issues = [issue for issue in issues if issue != 'Windows user profile path']
     if path.name.lower() in PRIVATE_NAMES or path.suffix.lower() in PRIVATE_SUFFIXES:
         issues.append('private runtime data or symbols in release')
     if any(p.lower() in {'webview2', 'ebwebview', 'sessions', 'testresults', '.git'} for p in path.parts):

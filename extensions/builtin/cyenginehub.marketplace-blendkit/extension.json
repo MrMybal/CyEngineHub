@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "cyenginehub.marketplace-blendkit",
+  "displayName": "BlenderKit / Blendkit",
+  "version": "0.1.0",
+  "publisher": "CyEngineHub · connecteur non officiel",
+  "description": "Alpha : un seul connecteur pour BlenderKit/Blendkit. Accès officiel, packages JSON et conversion locale optionnelle via le plugin Convertisseurs de packs (Blender installé). Pas de synchronisation API. Aucun script embarqué du .blend exécuté ; conversion et pertes à confirmer.",
+  "kind": "Marketplace",
+  "executionKind": "WebLink",
+  "capabilities": "OwnedInventory",
+  "supportedEngines": [ "Unreal", "Godot", "Custom" ],
+  "website": "https://www.blendkit.com/",
+  "marketplace": {
+    "inventoryUrl": "https://www.blendkit.com/",
+    "packageStorage": true,
+    "acquisitionLabel": "Ouvrir BlenderKit / Blendkit",
+    "workflowNotice": "Alpha · BlenderKit et Blendkit sont le même service. Accès officiel et packages locaux, sans synchronisation API. Téléchargez via le client officiel lorsque nécessaire, puis ajoutez le dossier complet au hub. Depuis la fiche : Convertir en dérivé local (GLB/FBX avec Blender installé, puis UAsset optionnel avec Unreal cible), ou configurer la chaîne de conversion et installation. Originaux conservés, scripts embarqués désactivés, pertes à confirmer."
+  }
+}

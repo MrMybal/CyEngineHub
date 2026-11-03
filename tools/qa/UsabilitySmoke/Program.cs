@@ -59,6 +59,8 @@ sealed class RecordingLauncher : IPlatformLauncher
 sealed class FixtureFab : IDirectFabClient
 {
     public string? EditorFixtureSource { get; set; }
+    public bool FailNextDownload { get; set; }
+    public int DownloadCalls { get; private set; }
     public bool FailProductDetails { get; set; }
     public RemoteFabProductDetails? ProductDetails { get; set; }
     public IReadOnlyList<RemoteFabAsset> Library { get; set; } = [];
@@ -76,8 +78,13 @@ sealed class FixtureFab : IDirectFabClient
     public Task<RemoteFabProductDetails> GetProductDetailsAsync(RemoteFabAsset asset, CancellationToken cancellationToken = default) =>
         FailProductDetails ? Task.FromException<RemoteFabProductDetails>(new DirectFabException("Fixture: product detail unavailable")) : Task.FromResult(ProductDetails ?? new RemoteFabProductDetails("Fixture", []));
     public Task<DirectFabDownloadResult> DownloadAsync(RemoteFabAsset asset, string root, IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    public Task<DirectFabDownloadResult> DownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version, string root, IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken cancellationToken = default) => EditorFixtureSource is { } source
-        ? Task.FromResult(new DirectFabDownloadResult(asset.AssetId, asset.Title, source, 1, 100, DateTimeOffset.UtcNow, PackageKind: "ContentPack")) : throw new NotSupportedException();
+    public Task<DirectFabDownloadResult> DownloadAsync(RemoteFabAsset asset, RemoteFabProjectVersion version, string root, IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
+    {
+        DownloadCalls++;
+        if (FailNextDownload) { FailNextDownload = false; return Task.FromException<DirectFabDownloadResult>(new IOException("Fixture: deliberate transfer failure")); }
+        return EditorFixtureSource is { } source
+            ? Task.FromResult(new DirectFabDownloadResult(asset.AssetId, asset.Title, source, 1, 100, DateTimeOffset.UtcNow, PackageKind: "ContentPack")) : throw new NotSupportedException();
+    }
 }
 sealed class FixtureQuixel : IQuixelMegascansClient
 {
@@ -122,6 +129,8 @@ static partial class Program
 {
     static bool DownloadsOnly;
     static bool VariantsOnly;
+    static bool AssetInstallOnly;
+    static bool LocalInstallOnly;
     static bool ToolsOnly;
     static bool ActivityOnly;
     static bool AnnotationsOnly;
@@ -130,6 +139,12 @@ static partial class Program
     static bool GroupsOnly;
     static bool SettingsOnly;
     static bool CosmosSettingsOnly;
+    static bool KitBashOnly;
+    static bool MarketplacesOnly;
+    static bool SourceConversionOnly;
+    static bool ReadmeScreenshotsOnly;
+    static bool ApplicationUpdatesOnly;
+    static string SourceConversionFixture = "";
     static bool EngineIdentityOnly;
     static bool UpdatesOnly;
     static bool ProjectEnginePickerOnly;
@@ -154,6 +169,8 @@ static partial class Program
         }
         DownloadsOnly = args.Contains("--engine-downloads-only");
         VariantsOnly = args.Contains("--variants-only");
+        AssetInstallOnly = args.Contains("--asset-install-only");
+        LocalInstallOnly = args.Contains("--local-install-only");
         ToolsOnly = args.Contains("--tools-only");
         ActivityOnly = args.Contains("--activity-only");
         AnnotationsOnly = args.Contains("--annotations-only");
@@ -162,6 +179,13 @@ static partial class Program
         GroupsOnly = args.Contains("--groups-only");
         SettingsOnly = args.Contains("--settings-only");
         CosmosSettingsOnly = args.Contains("--cosmos-settings-only");
+        KitBashOnly = args.Contains("--kitbash-only");
+        MarketplacesOnly = args.Contains("--marketplaces-only");
+        SourceConversionOnly = args.Contains("--source-conversion-only");
+        ReadmeScreenshotsOnly = args.Contains("--readme-screenshots");
+        ApplicationUpdatesOnly = args.Contains("--app-updates-only");
+        var sourceFixtureIndex = Array.IndexOf(args, "--source-fixture");
+        if (sourceFixtureIndex >= 0) SourceConversionFixture = Path.GetFullPath(args[sourceFixtureIndex + 1]);
         EngineIdentityOnly = args.Contains("--engine-identity-only");
         UpdatesOnly = args.Contains("--updates-only");
         ProjectEnginePickerOnly = args.Contains("--project-engine-picker-only");
@@ -169,6 +193,7 @@ static partial class Program
         ProjectBuildOnly = args.Contains("--project-build-only");
         FabTextOnly = args.Contains("--fab-text-only");
         FabGalleryOnly = args.Contains("--fab-gallery-only");
+        CyUiOnly = args.Contains("--cyui-only");
         EditorBridgeOnly = args.Contains("--editor-bridge-only");
         Directory.CreateDirectory(Output);
         AppBuilder.Configure<FixtureApp>().UsePlatformDetect().SetupWithoutStarting();
@@ -186,16 +211,21 @@ static partial class Program
         var paths = new AppDataPaths(Output, Path.Combine(Output, "qa.db"), Path.Combine(Output, "Logs"), true);
         var store = new SqliteCatalogStore(paths.DatabasePath);
         await store.InitializeAsync();
+        var updateSettings = new ApplicationUpdateFixtureSettings(store);
+        var updateService = new ApplicationUpdateFixtureService();
         await using var scheduler = new HubTaskScheduler(1);
         var launcher = new RecordingLauncher();
         var ctor = typeof(MainWindowViewModel).GetConstructors().Single();
         var vm = (MainWindowViewModel)ctor.Invoke(ctor.GetParameters().Select(p => p.Name switch
         {
-            "database" or "settings" or "engineCatalog" => (object)store,
+            "database" or "engineCatalog" => (object)store,
+            "settings" => ApplicationUpdatesOnly ? (object)updateSettings : store,
+            "applicationUpdateService" when ApplicationUpdatesOnly => updateService,
             "engineModules" => new EngineModuleRegistry([new UnrealEngineModule()]),
             "engineRegistration" => new FixtureRegistration(), "taskScheduler" => scheduler,
             "processRunner" when EngineIdentityOnly => new CyEngineHub.Infrastructure.Processes.SystemProcessRunner(),
-            "pluginDiscovery" when ProjectCreationFormOnly || ProjectBuildOnly => new CyEngineHub.Plugins.Discovery.PluginDiscoveryService(new CyEngineHub.Plugins.Parsing.UpluginDescriptorParser()),
+            "processRunner" when SourceConversionOnly => new SourceConversionUiRunner(),
+            "pluginDiscovery" when ProjectCreationFormOnly || ProjectBuildOnly || ReadmeScreenshotsOnly => new CyEngineHub.Plugins.Discovery.PluginDiscoveryService(new CyEngineHub.Plugins.Parsing.UpluginDescriptorParser()),
             "buildExecutor" when ProjectBuildOnly => new CyEngineHub.Build.Execution.UnrealBuildExecutor(ProjectBuildRunner),
             "appData" => paths, "platformLauncher" => launcher,
             "fabProjectContentImport" => new CyEngineHub.Fab.Import.FabProjectContentImportService(),
@@ -247,7 +277,12 @@ static partial class Program
         window.Show();
         if (ImGuiDiagnostics.IsHosted(window))
         {
-            if (EditorBridgeOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestEditorBridge(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            if (ApplicationUpdatesOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestApplicationUpdates(window, vm, updateSettings, updateService, launcher); Console.WriteLine("OUTPUT " + Output); }
+            else if (ReadmeScreenshotsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await CaptureReadmeScreenshots(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (CyUiOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestCyUiMigration(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (EditorBridgeOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestEditorBridge(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (AssetInstallOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestAssetInstallChoices(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (LocalInstallOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestLocalInstallReuse(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (FabGalleryOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestFabGallery(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (FabTextOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestFabText(window, vm, launcher); Console.WriteLine("OUTPUT " + Output); }
             else if (ProjectBuildOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestProjectBuild(window, vm, engine); Console.WriteLine("OUTPUT " + Output); }
@@ -257,6 +292,9 @@ static partial class Program
             else if (EngineIdentityOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestEngineIdentity(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (SettingsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestOrganizedSettings(window, vm); await TestCosmosSettings(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (CosmosSettingsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestCosmosSettings(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (KitBashOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestKitBash(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (MarketplacesOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestNewMarketplaces(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (SourceConversionOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestSourceConversionUi(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (GroupsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestPackGroups(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (ResourceLayoutOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestResourceToolbarLayout(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (VariantsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestVariantLabels(window, vm); Console.WriteLine("OUTPUT " + Output); }
@@ -415,7 +453,9 @@ static partial class Program
         Check(ImGuiDiagnostics.ElementBounds(window, "nav/Stockage").Y > footer.Y + 150, "Bottom navigation follows window height changes");
         window.Height = 820;
         await ImGuiDiagnostics.FramesAsync(window, 3);
-        Check(!ImGuiDiagnostics.Elements(window).Contains("action/NavigateBackCommand"), "Persistent settings navigation has no redundant back button");
+        Check(ImGuiDiagnostics.Elements(window).Contains("action/NavigateBackCommand") == vm.NavigateBackCommand.CanExecute(null) &&
+            !ImGuiDiagnostics.Elements(window).Contains("action/NavigateForwardCommand"),
+            "Settings history follows the current navigation model without duplicate forward controls");
         await ImGuiDiagnostics.ClickAsync(window, "section-tab/settings/project-profiles");
         Check(vm.IsSettingsProjectProfilesSelected && ImGuiDiagnostics.Elements(window).Contains("section-selected/settings/project-profiles"), "Settings tabs share a visible selected state");
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-settings.png"));
@@ -648,7 +688,7 @@ static partial class Program
         }
         Check(vm.IsToolchainsVisible && vm.IsToolsNavigationActive && vm.HeaderTitle == "Outils", "Outils is an independent highlighted main navigation page");
         Check(launcher.Launches.Count == launches && vm.UnrealUtilities.Count(item => item.IsAvailable) == 3, "Detecting tools never launches executables or fabricates missing files");
-        Check(!ImGuiDiagnostics.Elements(window).Contains("action/NavigateBackCommand"), "The main Tools page has no redundant back arrow");
+        Check(ImGuiDiagnostics.Elements(window).Contains("action/NavigateBackCommand") == vm.NavigateBackCommand.CanExecute(null), "Tools retains the current contextual navigation contract");
         await ImGuiDiagnostics.ClickAsync(window, "table-header/unreal-tools-list/0");
         Check(ImGuiDiagnostics.ElementBounds(window, "unreal-tool/prerequisites").Y < ImGuiDiagnostics.ElementBounds(window, "unreal-tool/version-selector").Y, "Unreal utility columns sort ascending");
         await ImGuiDiagnostics.ClickAsync(window, "table-header/unreal-tools-list/0");
@@ -1215,6 +1255,7 @@ static partial class Program
         Check(!vm.IsRemoteFabProductVisible && ImGuiDiagnostics.Elements(window).Contains("card/selected/asset/card-0"), "Asset metadata selects the entire card without opening it");
         await ImGuiDiagnostics.ClickAsync(window, "card/body/asset/card-0", clicks: 2, horizontal: .9f, vertical: .67f);
         Check(vm.IsRemoteFabProductVisible && vm.SelectedRemoteFabAsset?.AssetId == "card-0", "Asset double-click follows the same details behavior");
+        await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-product-action-panel.png"));
         Check(new[] { "download", "install", "web", "collections", "visibility" }.All(id => ImGuiDiagnostics.Elements(window).Contains("product-action/" + id)) &&
             ImGuiDiagnostics.Elements(window).Contains("product-action-group/acquisition") && ImGuiDiagnostics.Elements(window).Contains("product-action-group/organization"),
             "Product actions use explicit full-width text buttons grouped by purpose");
@@ -1228,7 +1269,7 @@ static partial class Program
         await ImGuiDiagnostics.ClickAsync(window, "product-action/collections");
         Check(vm.IsFabCollectionEditorVisible, "Product collections text button opens the original collection editor");
         await ImGuiDiagnostics.ClickAsync(window, "command/CloseFabCollectionEditorCommand");
-        Check(ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("command/CloseRemoteFabProductCommand", StringComparison.Ordinal)), "Product details expose an explicit Back to library action");
+        Check(ImGuiDiagnostics.Elements(window).Contains("action/NavigateBackCommand") && vm.NavigationBackLabel == "← Retour aux assets", "The header returns from a product fiche to its asset catalog");
         Check(!ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("library-view/", StringComparison.Ordinal)), "Product details hide all catalog view controls");
         var originalHeight = window.Height;
         window.Height = 1100;
@@ -1250,7 +1291,7 @@ static partial class Program
         Check(!vm.SelectedFabStoredDownloads[0].IsDeleteConfirmationVisible, "Canceling row deletion keeps both downloaded variants");
         vm.SelectedFabStoredDownloads.Clear();
         window.Height = originalHeight;
-        await ImGuiDiagnostics.ClickAsync(window, "command/CloseRemoteFabProductCommand");
+        await ImGuiDiagnostics.ClickAsync(window, "action/NavigateBackCommand");
         Check(!vm.IsRemoteFabProductVisible && vm.IsRemoteFabCatalogVisible && ImGuiDiagnostics.Elements(window).Contains("library-view/large"),
             "Explicit Back restores the catalog and its presentation controls");
         await ImGuiDiagnostics.ClickAsync(window, "asset/image/card-0");

@@ -123,7 +123,11 @@ public sealed partial class HubExtensionManifestParser : IHubExtensionManifestPa
                 inventoryUri!.Host != websiteUri!.Host ||
                 !string.IsNullOrEmpty(inventoryUri.UserInfo) ||
                 !string.IsNullOrEmpty(inventoryUri.Query) ||
-                !string.IsNullOrEmpty(inventoryUri.Fragment))
+                !string.IsNullOrEmpty(inventoryUri.Fragment) ||
+                manifest.Marketplace.AcquisitionLabel is { } label &&
+                    (string.IsNullOrWhiteSpace(label) || label.Length > 100 || label.Any(char.IsControl)) ||
+                manifest.Marketplace.WorkflowNotice is { } notice &&
+                    (string.IsNullOrWhiteSpace(notice) || notice.Length > 1_500 || notice.Any(char.IsControl)))
                 throw InvalidManifest(manifestPath);
         }
         else if (manifest.Marketplace is not null)

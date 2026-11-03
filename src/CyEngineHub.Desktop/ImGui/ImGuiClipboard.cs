@@ -1,10 +1,10 @@
 using System.Runtime.InteropServices;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed class ImGuiClipboard : IDisposable
+internal sealed unsafe class ImGuiClipboard : IDisposable
 {
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate nint GetText(nint context);
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)] private delegate void SetText(nint context, nint text);
@@ -19,8 +19,8 @@ internal sealed class ImGuiClipboard : IDisposable
         _get = Read;
         _set = Write;
         var platform = Gui.GetPlatformIO();
-        platform.Platform_GetClipboardTextFn = Marshal.GetFunctionPointerForDelegate(_get);
-        platform.Platform_SetClipboardTextFn = Marshal.GetFunctionPointerForDelegate(_set);
+        platform.PlatformGetClipboardTextFn = (void*)Marshal.GetFunctionPointerForDelegate(_get);
+        platform.PlatformSetClipboardTextFn = (void*)Marshal.GetFunctionPointerForDelegate(_set);
     }
 
     private nint Read(nint context)

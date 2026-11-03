@@ -39,7 +39,7 @@
         <Border Grid.Row="0">
           <Grid ColumnDefinitions="300,*,300">
             <StackPanel Orientation="Horizontal">
-              <Button Classes="history" Content="←" Command="{Binding NavigateBackCommand}" ToolTip.Tip="Page précédente" />
+              <Button Classes="history" Content="←" Command="{Binding NavigateBackCommand}" ToolTip.Tip="{Binding NavigationBackLabel}" />
               <Button Classes="history" Content="→" Command="{Binding NavigateForwardCommand}" ToolTip.Tip="Page suivante" />
             </StackPanel>
             <StackPanel Grid.Column="1">
@@ -1727,7 +1727,6 @@
                     <ScrollViewer IsVisible="{Binding IsRemoteFabProductVisible}">
                       <StackPanel>
                         <Grid ColumnDefinitions="Auto,*">
-                          <Button Classes="ghost" Content="← Retour à la Bibliothèque" Command="{Binding CloseRemoteFabProductCommand}" />
                           <TextBlock Grid.Column="1" Text="{Binding LibraryProductHeading}" FontSize="10" Foreground="#65788D" />
                         </Grid>
                         <Border Classes="card">
@@ -3891,7 +3890,7 @@
         <Grid RowDefinitions="Auto,Auto,*,Auto">
           <Grid ColumnDefinitions="*,Auto">
             <StackPanel>
-              <TextBlock Text="NOUVELLE VERSION STABLE" FontSize="10" Foreground="#70A8FA" />
+              <TextBlock Text="MISE À JOUR DE CYENGINEHUB" FontSize="10" Foreground="#70A8FA" />
               <TextBlock Text="{Binding AvailableUpdateTitle}" FontSize="22" TextWrapping="Wrap" />
             </StackPanel>
             <Border Grid.Column="1">
@@ -4226,12 +4225,10 @@
           </Grid>
           <Grid Grid.Row="1" ColumnDefinitions="1.05*,1.45*" RowDefinitions="Auto,Auto">
             <StackPanel>
-              <TextBlock Text="NOM" FontSize="9" Foreground="#65788D" />
               <TextBox Classes="path" Text="{Binding ProjectProfileName, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Ex. UE5 jeu optimisé" />
               <CheckBox Content="Base minimale : plugins moteur désactivés par défaut" IsChecked="{Binding ProjectProfileDisableEnginePluginsByDefault}" IsVisible="{Binding !IsEditingProjectFeaturePack}" FontSize="10" />
             </StackPanel>
             <StackPanel Grid.Column="1">
-              <TextBlock Text="DESCRIPTION" FontSize="9" Foreground="#65788D" />
               <TextBox Classes="path" Text="{Binding ProjectProfileDescription, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="But et compromis de ce profil" />
             </StackPanel>
             <Border Grid.Row="1" Grid.ColumnSpan="2">
@@ -4504,7 +4501,7 @@
     </Grid>
     <Grid IsVisible="{Binding IsFabOptionsModalVisible}" Panel.ZIndex="2000">
       <Border />
-      <Border MaxWidth="980" MaxHeight="720" MinHeight="360">
+      <Border Name="FabOptionsDialog" MaxWidth="980" MaxHeight="720" MinHeight="360">
         <Grid>
           <Grid IsVisible="{Binding IsFabDownloadOptionsVisible}" RowDefinitions="Auto,*,Auto">
             <Grid ColumnDefinitions="*,Auto">
@@ -4557,26 +4554,28 @@
             <Border Grid.Row="3">
               <Grid RowDefinitions="Auto,*">
                 <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Text="2 · VARIANTES CORRESPONDANT AUX MOTEURS SÉLECTIONNÉS" FontSize="10" Foreground="#70A8FA" />
+                  <TextBlock Text="2 · CHOISIR LES VARIANTES · TOUTES LES VERSIONS" FontSize="10" Foreground="#70A8FA" />
                   <TextBlock Grid.Column="1" Text="{Binding FabInstallVersionResultsLabel}" FontSize="9" Foreground="#8294A8" />
                 </Grid>
-                <ScrollViewer Grid.Row="1" MaxHeight="145">
-                  <Grid>
-                    <TextBlock IsVisible="{Binding !HasSelectedFabInstallTargets}" Text="Sélectionnez d’abord un ou plusieurs projets : seules leurs versions moteur seront proposées." Foreground="#8294A8" TextWrapping="Wrap" />
-                    <TextBlock IsVisible="{Binding HasNoCompatibleFabInstallVersions}" Text="Aucune variante de ce produit ne correspond aux versions moteur des cibles sélectionnées." Foreground="#E0A04D" TextWrapping="Wrap" />
-                    <ItemsControl IsVisible="{Binding HasCompatibleFabInstallVersions}" ItemsSource="{Binding CompatibleFabInstallVersions}">
+                <ScrollViewer Grid.Row="1" MaxHeight="210">
+                  <StackPanel>
+                    <TextBlock Text="La compatibilité est indicative. Toutes les variantes restent sélectionnables ; le script choisi effectue ses propres contrôles à l’installation." Foreground="#8294A8" TextWrapping="Wrap" />
+                    <TextBlock IsVisible="{Binding HasNoCompatibleFabInstallVersions}" Text="Aucune correspondance recommandée. Vous pouvez choisir une variante manuellement ou configurer le script de conversion." Foreground="#E0A04D" TextWrapping="Wrap" />
+                    <ItemsControl ItemsSource="{Binding FabInstallVersions}" Name="FabInstallVariantChoices">
                       <ItemsControl.ItemTemplate>
                         <DataTemplate>
                           <CheckBox IsChecked="{Binding IsSelected}">
                             <StackPanel>
                               <TextBlock Text="{Binding Label}" />
                               <TextBlock Text="{Binding ArtifactLabel}" FontSize="9" Foreground="#718398" />
+                              <TextBlock Text="{Binding CompatibilityNotice}" FontSize="9" Foreground="#E0A04D" TextWrapping="Wrap" />
+                              <TextBlock Text="{Binding LocalSourceNotice}" FontSize="9" Foreground="#69C9B5" TextWrapping="Wrap" />
                             </StackPanel>
                           </CheckBox>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
-                  </Grid>
+                  </StackPanel>
                 </ScrollViewer>
               </Grid>
             </Border>
@@ -4597,7 +4596,7 @@
                 </StackPanel>
               </Grid>
             </Grid>
-            <ListBox Grid.Row="2" MinHeight="150" ItemsSource="{Binding FilteredFabInstallTargets}">
+            <ListBox Grid.Row="2" MinHeight="150" MaxHeight="160" ItemsSource="{Binding FilteredFabInstallTargets}">
               <ListBox.ItemTemplate>
                 <DataTemplate>
                   <Border IsVisible="{Binding IsVisible}">
@@ -4634,11 +4633,16 @@
                 </DataTemplate>
               </ListBox.ItemTemplate>
             </ListBox>
-            <Grid Grid.Row="4" ColumnDefinitions="*,Auto,Auto">
-              <TextBlock Text="Le script et sa configuration sont mémorisés par projet et par type d’asset. La sélection multiple est autorisée." FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
-              <Button Grid.Column="1" Classes="ghost" Content="Télécharger seulement" Command="{Binding DownloadSelectedFabVersionsCommand}" IsVisible="{Binding !HasActiveDerivedInstall}" />
-              <Button Grid.Column="2" Classes="accent" Content="Installer dans les cibles" Command="{Binding InstallSelectedFabVersionsCommand}" />
-            </Grid>
+            <StackPanel Grid.Row="4" Name="FabInstallFooter">
+              <CheckBox Content="Forcer l’installation avec la méthode choisie (ignorer les refus du Hub)" IsChecked="{Binding BypassFabInstallChecks}" />
+              <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBlock Text="Vos choix et les options des scripts sont conservés par projet." FontSize="9" Foreground="#718398" TextWrapping="Wrap" />
+                <Button Grid.Column="1" Classes="ghost" Content="Télécharger seulement" Command="{Binding DownloadSelectedFabVersionsCommand}" IsVisible="{Binding !HasActiveDerivedInstall}" />
+                <Button Grid.Column="2" Classes="accent" Content="{Binding FabInstallActionLabel}" Command="{Binding InstallSelectedFabVersionsCommand}" />
+              </Grid>
+              <TextBlock Text="{Binding FabInstallActionStatus}" FontSize="9" Foreground="#E0A04D" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding FabInstallActionError}" FontSize="10" Foreground="#F0B4B7" TextWrapping="Wrap" />
+            </StackPanel>
           </Grid>
         </Grid>
       </Border>

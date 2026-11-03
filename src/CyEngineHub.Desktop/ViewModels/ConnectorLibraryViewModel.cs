@@ -31,13 +31,37 @@ public sealed class ConnectorLibraryViewModel : ObservableObject
     private string _search = "", _status = "", _editName = "", _editNotes = "";
     private int _generation;
     private bool _isBusy;
+    private string _importDirectoryPath = "";
+    private readonly Func<Task>? _refreshIndex;
+    private readonly string? _workflowNotice;
 
     public ConnectorLibraryViewModel(string id, string name, MarketplaceDownloadCatalog catalog,
-        Func<Task> openInventory, Func<Task> importExisting, Func<string, Task> openFolder)
+        Func<Task> openInventory, Func<Task> importExisting, Func<string, Task> openFolder,
+        Func<Task>? importDirectory = null, Func<string, Task>? importDirectoryPath = null,
+        Func<MarketplaceLocalAsset, Task>? prepareInstallation = null, Func<Task>? refreshIndex = null,
+        string? workflowNotice = null, string? inventoryButtonLabel = null,
+        Func<MarketplaceLocalAsset, Task>? requestConversion = null)
     {
         _id = id; Name = name; _catalog = catalog; _openFolder = openFolder;
+        _refreshIndex = refreshIndex;
+        _workflowNotice = workflowNotice;
+        InventoryButtonLabel = inventoryButtonLabel ?? "Télécharger depuis mon inventaire web";
+        SupportsDirectoryImport = importDirectory is not null && importDirectoryPath is not null;
+        SupportsInstallation = prepareInstallation is not null;
+        SupportsConversion = requestConversion is not null;
+        RequestConversionCommand = new AsyncRelayCommand(() => requestConversion!(_selected!.Asset),
+            () => SupportsConversion && _selected?.IsAvailable == true, ReportError);
         OpenInventoryCommand = new AsyncRelayCommand(openInventory, onError: ReportError);
         ImportExistingCommand = new AsyncRelayCommand(importExisting, onError: ReportError);
+        ImportDirectoryCommand = new AsyncRelayCommand(importDirectory ?? (() => Task.CompletedTask), () => SupportsDirectoryImport, ReportError);
+        ImportDirectoryPathCommand = new AsyncRelayCommand(async () =>
+        {
+            var path = Path.GetFullPath(ImportDirectoryPath.Trim().Trim('"'));
+            if (!Directory.Exists(path)) throw new DirectoryNotFoundException("Choisissez le dossier existant d’un kit.");
+            await importDirectoryPath!(path); await LoadAsync(showList: true);
+        }, () => SupportsDirectoryImport && !string.IsNullOrWhiteSpace(ImportDirectoryPath), ReportError);
+        PrepareInstallationCommand = new AsyncRelayCommand(() => prepareInstallation!(_selected!.Asset),
+            () => SupportsInstallation && _selected?.IsAvailable == true, ReportError);
         RefreshCommand = new AsyncRelayCommand(() => LoadAsync(), onError: ReportError);
         BackCommand = new RelayCommand(() => Select(null));
         OpenFolderCommand = new AsyncRelayCommand(OpenSelectedFolderAsync, onError: ReportError);
@@ -45,6 +69,19 @@ public sealed class ConnectorLibraryViewModel : ObservableObject
     }
 
     public string Name { get; }
+    public bool SupportsDirectoryImport { get; }
+    public bool SupportsInstallation { get; }
+    public bool SupportsConversion { get; }
+    public ICommand RequestConversionCommand { get; }
+    public string ImportDirectoryPath
+    {
+        get => _importDirectoryPath;
+        set { if (SetProperty(ref _importDirectoryPath, value)) ((AsyncRelayCommand)ImportDirectoryPathCommand).NotifyCanExecuteChanged(); }
+    }
+    public string InventoryButtonLabel { get; }
+    public string WorkflowNotice => _workflowNotice ?? (_id == "cyenginehub.marketplace-kitbash3d"
+        ? "Alpha · Kits complets : My Assets officiel. Kit local : sélectionnez le dossier complet du kit pour conserver textures et dépendances. Les modèles USD Cargo utilisent le connecteur Cargo officiel ; aucun import USD automatisé ni compte connecté n’est supposé. Installation des packs Unreal / FBX via les scripts du hub, après configuration."
+        : "Catalogue local · les originaux sont conservés. Les nouveaux téléchargements passent par l’inventaire web intégré.");
     public ObservableCollection<ConnectorAssetViewModel> Assets { get; } = [];
     public ConnectorAssetViewModel? SelectedAsset => _selected;
     public bool IsProductVisible => _selected is not null;
@@ -58,6 +95,9 @@ public sealed class ConnectorLibraryViewModel : ObservableObject
     public string EditNotes { get => _editNotes; set => SetProperty(ref _editNotes, value); }
     public ICommand OpenInventoryCommand { get; }
     public ICommand ImportExistingCommand { get; }
+    public ICommand ImportDirectoryCommand { get; }
+    public ICommand ImportDirectoryPathCommand { get; }
+    public ICommand PrepareInstallationCommand { get; }
     public ICommand RefreshCommand { get; }
     public ICommand BackCommand { get; }
     public ICommand OpenFolderCommand { get; }
@@ -69,6 +109,7 @@ public sealed class ConnectorLibraryViewModel : ObservableObject
         IsBusy = true;
         try
         {
+            if (_refreshIndex is not null) await _refreshIndex();
             var entries = await Task.Run(async () => (await _catalog.LoadAsync().ConfigureAwait(false))
                 .Where(item => item.MarketplaceId.Equals(_id, StringComparison.OrdinalIgnoreCase))
                 .OrderByDescending(item => item.DownloadedAt)
@@ -103,6 +144,8 @@ public sealed class ConnectorLibraryViewModel : ObservableObject
         EditName = asset?.Name ?? "";
         EditNotes = asset?.Asset.Notes ?? "";
         OnPropertyChanged(nameof(SelectedAsset)); OnPropertyChanged(nameof(IsProductVisible)); OnPropertyChanged(nameof(IsListVisible));
+        ((AsyncRelayCommand)PrepareInstallationCommand).NotifyCanExecuteChanged();
+        ((AsyncRelayCommand)RequestConversionCommand).NotifyCanExecuteChanged();
     }
 
     private async Task OpenSelectedFolderAsync()

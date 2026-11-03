@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "cyenginehub.marketplace-gumroad",
+  "displayName": "Gumroad",
+  "version": "0.1.0",
+  "publisher": "CyEngineHub · connecteur non officiel",
+  "description": "Alpha : bibliothèque Gumroad officielle et gestion locale des fichiers acquis. Session indépendante, téléchargements web, packages JSON et compression. Aucune clé de licence ou URL de reçu privée enregistrée dans le catalogue. Pas de synchronisation d’inventaire acheteur par API.",
+  "kind": "Marketplace",
+  "executionKind": "WebLink",
+  "capabilities": "OwnedInventory",
+  "supportedEngines": [ "Unreal", "Unity", "Godot", "Custom" ],
+  "website": "https://gumroad.com/library",
+  "marketplace": {
+    "inventoryUrl": "https://gumroad.com/library",
+    "packageStorage": true,
+    "acquisitionLabel": "Ouvrir ma bibliothèque Gumroad",
+    "workflowNotice": "Alpha · Bibliothèque d’achats Gumroad officielle avec session isolée. Téléchargements web et fichiers locaux en packages JSON ; originaux conservés. Aucun reçu, clé de licence ou lien de téléchargement privé importé dans le catalogue. Pas de synchronisation API acheteur. Les ZIP multiparties doivent être réunis/extraits en dossier complet avant import ; aucun script ou exécutable reçu n’est lancé automatiquement."
+  }
+}

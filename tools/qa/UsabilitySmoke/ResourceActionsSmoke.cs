@@ -91,6 +91,10 @@ static partial class Program
         Check(vm.ResourceSizeBytes(asset) == 12345, "Pack manifest sizes appear immediately and duplicate paths are counted once");
         Call(vm, "RebuildSelectedFabStoredDownloads", asset.Asset.AssetId);
         await ImGuiDiagnostics.FramesAsync(window, 4);
+        // The precise supplier variant can be below another stored version.
+        // Exercise the outer fiche scroll instead of assuming a fixed theme/row height.
+        for (var attempt = 0; attempt < 8 && !ImGuiDiagnostics.Elements(window).Contains("stored-version-action/local-supplier/InstallCommand"); attempt++)
+            await ImGuiDiagnostics.PointerGestureAsync(window, "pane/library/content", wheel: -3, horizontal: .98f, vertical: .8f);
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "imgui-downloaded-supplier-install.png"));
         await ImGuiDiagnostics.ClickAsync(window, "stored-version-action/local-supplier/InstallCommand");
         Check(vm.IsFabInstallOptionsVisible && vm.FabInstallVersions.Count == 1 && vm.FabInstallVersions[0].Version.ArtifactId == "local-supplier", "Supplier downloaded version has an Install button scoped to its exact local artifact");

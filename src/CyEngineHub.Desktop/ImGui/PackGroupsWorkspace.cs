@@ -1,11 +1,11 @@
 using CyEngineHub.Desktop.ViewModels;
 using CyEngineHub.Fab.Installation;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     private bool _openPackGroups;
     private int _packGroupIndex, _packCandidateIndex, _packProjectIndex;
@@ -20,6 +20,14 @@ internal sealed partial class ImGuiWorkspace
     }
     private void DrawPackGroups(MainWindowViewModel vm)
     {
+        DrawSourceConversion(vm);
+        if (vm.RequestedConnectorPackGroupId is { } requested)
+        {
+            vm.RequestedConnectorPackGroupId = null;
+            _packGroupIndex = Math.Max(0, vm.PackGroups.FindIndex(group => group.Id == requested));
+            _packSelectionKeys.Clear(); _packSelectionOnly = false; _packSearch = "";
+            _openPackGroups = true;
+        }
         if (_openPackGroups) { Gui.OpenPopup("Groupes de packs · Alpha"); _openPackGroups = false; }
         Gui.SetNextWindowSize(new(Math.Min(1100, Gui.GetIO().DisplaySize.X - 50), Math.Min(760, Gui.GetIO().DisplaySize.Y - 50)), ImGuiCond.Appearing);
         if (!Gui.BeginPopupModal("Groupes de packs · Alpha", ImGuiWindowFlags.NoSavedSettings)) return;
@@ -108,7 +116,15 @@ internal sealed partial class ImGuiWorkspace
                     }
                     if (Gui.BeginCombo("Ajouter un script", "Choisir une étape…"))
                     {
-                        foreach (var script in vm.PackGroupScripts.Where(s => s.Descriptor.SupportedContentKinds.Contains(item.ContentKind) && s.Descriptor.SupportedTargetKinds.Contains(FabInstallationTargetKind.Project)))
+                        var projectedKind = item.ContentKind;
+                        foreach (var existing in steps)
+                        {
+                            var preparer = vm.PackGroupScripts.FirstOrDefault(script => script.Descriptor.Id == existing.ScriptId);
+                            if (preparer is IFabPreparationScript preparation) projectedKind = preparation.OutputContentKind;
+                            else if (existing.ScriptId == UnrealRawAssetsInstallationScript.ScriptId || existing.ScriptId == UnrealMegascansInstallationScript.ScriptId && existing.Configuration.GetValueOrDefault("importMode") == "raw")
+                                projectedKind = CyEngineHub.Fab.Packaging.LibraryPackageContentKind.ContentPack;
+                        }
+                        foreach (var script in vm.PackGroupScripts.Where(s => (s.Descriptor.SupportedContentKinds.Contains(item.ContentKind) || s.Descriptor.SupportedContentKinds.Contains(projectedKind)) && s.Descriptor.SupportedTargetKinds.Contains(FabInstallationTargetKind.Project)))
                             if (Gui.Selectable(script.Descriptor.DisplayName)) steps.Add(new(script.Descriptor.Id, script.Descriptor.Options.ToDictionary(o => o.Id, o => o.DefaultValue)));
                         Gui.EndCombo();
                     }

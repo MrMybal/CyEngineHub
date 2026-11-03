@@ -10,9 +10,16 @@ public sealed class HubExtensionServicesTests
 {
     [Theory]
     [InlineData("cyenginehub.marketplace-cosmos")]
+    [InlineData("cyenginehub.marketplace-kitbash3d")]
+    [InlineData("cyenginehub.marketplace-itchio")]
+    [InlineData("cyenginehub.marketplace-blendkit")]
+    [InlineData("cyenginehub.marketplace-artstation")]
+    [InlineData("cyenginehub.marketplace-gumroad")]
+    [InlineData("cyenginehub.marketplace-cgtrader")]
     [InlineData("cyenginehub.marketplace-megascans-fab")]
     [InlineData("cyenginehub.unreal-relocated-install")]
     [InlineData("cyenginehub.unreal-version-bridge")]
+    [InlineData("cyenginehub.source-converters")]
     public async Task BuiltInWebExtensionsHaveValidManifests(string id)
     {
         var root = Path.Combine(AppContext.BaseDirectory, "BuiltInManifests", id);
@@ -21,10 +28,19 @@ public sealed class HubExtensionServicesTests
         Assert.Equal(HubExtensionExecutionKind.WebLink, manifest.ExecutionKind);
         if (manifest.Kind == HubExtensionKind.Marketplace)
         {
-            Assert.Equal(id == "cyenginehub.marketplace-megascans-fab"
-                ? "https://www.fab.com/sellers/Quixel%20Megascans"
-                : "https://cosmos.leartesstudios.com/inventory", manifest.Marketplace!.InventoryUrl);
+            Assert.Equal(id switch
+            {
+                "cyenginehub.marketplace-megascans-fab" => "https://www.fab.com/sellers/Quixel%20Megascans",
+                "cyenginehub.marketplace-kitbash3d" => "https://cargo-app.kitbash3d.com/account/my-assets",
+                "cyenginehub.marketplace-itchio" => "https://itch.io/my-purchases",
+                "cyenginehub.marketplace-blendkit" => "https://www.blendkit.com/",
+                "cyenginehub.marketplace-artstation" => "https://www.artstation.com/marketplace/library",
+                "cyenginehub.marketplace-gumroad" => "https://gumroad.com/library",
+                "cyenginehub.marketplace-cgtrader" => "https://www.cgtrader.com/profile/purchases",
+                _ => "https://cosmos.leartesstudios.com/inventory"
+            }, manifest.Marketplace!.InventoryUrl);
             Assert.True(manifest.Capabilities.HasFlag(HubExtensionCapability.OwnedInventory));
+            if (id != "cyenginehub.marketplace-megascans-fab") Assert.True(manifest.Marketplace.PackageStorage);
         }
     }
 
@@ -45,6 +61,30 @@ public sealed class HubExtensionServicesTests
             Capabilities = HubExtensionCapability.OwnedInventory,
             SupportedEngines = [EngineFamily.Unreal], Website = "https://example.com/inventory",
             Marketplace = new HubMarketplaceDescriptor { InventoryUrl = url },
+        });
+        await Assert.ThrowsAsync<HubExtensionException>(() => new HubExtensionManifestParser().ParseAsync(temporary.Path));
+    }
+
+    [Theory]
+    [InlineData("label-empty")]
+    [InlineData("label-long")]
+    [InlineData("notice-control")]
+    [InlineData("notice-long")]
+    public async Task MarketplacePresentationMetadataIsBoundedAndValidated(string invalid)
+    {
+        using var temporary = new TemporaryDirectory();
+        WriteManifest(temporary.Path, new HubExtensionManifest
+        {
+            SchemaVersion = 1, Id = "test.marketplace", DisplayName = "Test", Version = "1.0.0",
+            Publisher = "Test", Description = "Owned assets", Kind = HubExtensionKind.Marketplace,
+            ExecutionKind = HubExtensionExecutionKind.WebLink, Capabilities = HubExtensionCapability.OwnedInventory,
+            SupportedEngines = [EngineFamily.Unreal], Website = "https://example.com/inventory",
+            Marketplace = new()
+            {
+                InventoryUrl = "https://example.com/inventory", PackageStorage = true,
+                AcquisitionLabel = invalid == "label-empty" ? " " : invalid == "label-long" ? new string('a', 101) : "Mes fichiers",
+                WorkflowNotice = invalid == "notice-control" ? "unsafe\0notice" : invalid == "notice-long" ? new string('a', 1_501) : "Alpha"
+            }
         });
         await Assert.ThrowsAsync<HubExtensionException>(() => new HubExtensionManifestParser().ParseAsync(temporary.Path));
     }

@@ -17,7 +17,7 @@ public static class ConnectorLibraryPackageService
         while (queue.TryDequeue(out var directory))
         {
             if (!visited.Add(directory)) continue;
-            if (visited.Count > 10_000 || watch.Elapsed > TimeSpan.FromSeconds(10)) throw new IOException("Indexation Cosmos limitée : relancez depuis la bibliothèque.");
+            if (visited.Count > 10_000 || watch.Elapsed > TimeSpan.FromSeconds(10)) throw new IOException("Indexation des packages limitée : relancez depuis la bibliothèque.");
             if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0) continue;
             var manifest = Path.Combine(directory, LibraryPackageService.ManifestFileName);
             if (File.Exists(manifest))
@@ -34,6 +34,51 @@ public static class ConnectorLibraryPackageService
             foreach (var child in Directory.EnumerateDirectories(directory)) queue.Enqueue(child);
         }
         return packages;
+    }
+
+    /// <summary>Copies one explicitly selected kit, preserving the entire relative dependency tree.</summary>
+    public static async Task MaterializeDirectoryAsync(string source, string destination, CancellationToken token = default)
+    {
+        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(source));
+        var target = Path.TrimEndingDirectorySeparator(Path.GetFullPath(destination));
+        var prefix = root + Path.DirectorySeparatorChar;
+        if (!Directory.Exists(root)) throw new DirectoryNotFoundException(root);
+        if (root == Path.GetPathRoot(root) || target.Equals(root, StringComparison.OrdinalIgnoreCase) ||
+            target.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("Choisissez le dossier d’un kit, pas une racine disque ni un parent du staging.");
+        if (Directory.Exists(target) && Directory.EnumerateFileSystemEntries(target).Any()) throw new IOException("Le staging doit être vide.");
+        var queue = new Queue<string>(); queue.Enqueue(root);
+        var files = new List<string>();
+        long size = 0; var entries = 0;
+        // Preflight before copying. Do not follow junctions/symlinks into another kit or user folder.
+        while (queue.TryDequeue(out var directory))
+        {
+            token.ThrowIfCancellationRequested();
+            if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Lien de dossier non autorisé dans le kit.");
+            foreach (var path in Directory.EnumerateFileSystemEntries(directory))
+            {
+                token.ThrowIfCancellationRequested();
+                if (++entries > 100_000) throw new InvalidDataException("Kit au-delà de 100 000 entrées.");
+                var attributes = File.GetAttributes(path);
+                if ((attributes & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Lien de fichier ou dossier non autorisé dans le kit.");
+                if ((attributes & FileAttributes.Directory) != 0) { queue.Enqueue(path); continue; }
+                size = checked(size + new FileInfo(path).Length);
+                if (size > 200L * 1024 * 1024 * 1024) throw new InvalidDataException("Kit au-delà de 200 Gio.");
+                files.Add(path);
+            }
+        }
+        if (files.Count == 0) throw new InvalidDataException("Le kit sélectionné est vide.");
+        Directory.CreateDirectory(target);
+        foreach (var file in files)
+        {
+            token.ThrowIfCancellationRequested();
+            if ((File.GetAttributes(file) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Le kit a changé pendant la copie.");
+            var outputPath = Path.Combine(target, Path.GetRelativePath(root, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+            await using var input = File.OpenRead(file);
+            await using var output = new FileStream(outputPath, FileMode.CreateNew);
+            await input.CopyToAsync(output, token).ConfigureAwait(false);
+        }
     }
 
     public static async Task MaterializeFileAsync(string file, string destination, CancellationToken token = default)
@@ -72,16 +117,28 @@ public static class ConnectorLibraryPackageService
     }
 
     public static async Task<DirectFabDownloadResult> ImportAsync(string file, string marketplaceId,
-        LibraryPackageStorageMode mode, MarketplaceStorageProfile storage, string scratchRoot, CancellationToken token = default)
+        LibraryPackageStorageMode mode, MarketplaceStorageProfile storage, string scratchRoot,
+        IProgress<DirectFabDownloadProgress>? progress = null, CancellationToken token = default)
     {
         var id = Guid.NewGuid().ToString("N");
-        var root = Path.Combine(scratchRoot, id);
-        await MaterializeFileAsync(file, root, token);
-        var asset = new RemoteFabAsset(id, "local", Path.GetFileNameWithoutExtension(file), "", marketplaceId, "ASSET_PACK", null, null, [], []);
-        var version = new RemoteFabProjectVersion(id, [], [], []);
-        var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(p => new FileInfo(p)).ToArray();
-        var result = await LibraryPackageService.PackageAsync(asset, version,
-            new(id, asset.Title, root, files.Length, files.Sum(f => f.Length), DateTimeOffset.UtcNow), mode, cancellationToken: token);
-        return await MarketplaceStorageRouter.PlaceAsync(result, storage, cancellationToken: token);
+        var root = Path.Combine(Path.GetFullPath(scratchRoot), id);
+        if (Directory.Exists(root)) throw new IOException("Staging déjà présent.");
+        try
+        {
+            if (Directory.Exists(file)) await MaterializeDirectoryAsync(file, root, token).ConfigureAwait(false);
+            else await MaterializeFileAsync(file, root, token).ConfigureAwait(false);
+            var title = Directory.Exists(file) ? Path.GetFileName(Path.TrimEndingDirectorySeparator(file)) : Path.GetFileNameWithoutExtension(file);
+            var asset = new RemoteFabAsset(id, "local", title, "", marketplaceId, "ASSET_PACK", null, null, [], []);
+            var version = new RemoteFabProjectVersion(id, [], [], []);
+            var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(p => new FileInfo(p)).ToArray();
+            var result = await LibraryPackageService.PackageAsync(asset, version,
+                new(id, asset.Title, root, files.Length, files.Sum(f => f.Length), DateTimeOffset.UtcNow), mode, progress, token).ConfigureAwait(false);
+            return await MarketplaceStorageRouter.PlaceAsync(result, storage, progress, token).ConfigureAwait(false);
+        }
+        finally
+        {
+            // Only the fresh, owned GUID staging; never the selected source or a library root.
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
     }
 }

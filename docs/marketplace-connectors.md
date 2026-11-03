@@ -24,11 +24,54 @@ La page officielle n’est pas modifiée : aucune lecture DOM d’inventaire, in
 
 Références consultées le 8 septembre 2026 : [inventaire](https://cosmos.leartesstudios.com/inventory), [FAQ officielle](https://cosmos.leartesstudios.com/frequently-asked-questions).
 
-## Ajouter un autre plugin
+## KitBash3D / Cargo — Alpha 0.1.0
+
+Le connecteur intégré `cyenginehub.marketplace-kitbash3d` apparaît dans **Bibliothèque → KitBash3D · Cargo** et dans son propre sous-onglet **Paramètres → Marketplaces**. L’activation du connecteur ne signifie pas que le compte est connecté : la session appartient au site officiel dans le profil WebView2 isolé de ce connecteur. Aucun jeton Cargo, cookie ou inventaire privé n’est extrait.
+
+**Télécharger depuis mon inventaire web** ouvre directement [My Assets](https://cargo-app.kitbash3d.com/account/my-assets), et non la page d’accueil commerciale. La [documentation officielle](https://help.kitbash3d.com/en/articles/7833678-how-to-access-purchased-kits) distingue les kits complets achetés, téléchargeables depuis My Assets, des modèles et matériaux individuels importés par Cargo. Ce connecteur non officiel ne remplace pas l’application Cargo ni son protocole de liaison aux DCC.
+
+Les transferts web terminés sont copiés dans le format de package commun du hub : manifeste JSON, contenu non compressé ou ZIP (Stockage/Rapide/Moyen/Élevé/Ultra), bibliothèques ordonnées et quotas. Le fichier téléchargé d’origine est conservé. Les réglages et la bibliothèque restent indépendants de Cosmos et de Fab. Aucun paramètre fictif de parallélisme Fab n’est appliqué aux transferts du navigateur.
+
+Pour un kit déjà présent, utiliser **Ajouter un fichier existant** (ZIP), ou **KIT LOCAL COMPLET** : saisir le chemin absolu du dossier d’un kit et cliquer **Ajouter ce dossier**, ou utiliser **Parcourir…** avec le sélecteur Windows. Le dossier choisi est un kit, pas la racine d’une bibliothèque Cargo entière. Tous ses fichiers sont copiés avec leurs chemins relatifs, y compris textures, matériaux et fichiers USD associés ; aucune référence n’est réécrite pendant cette copie. Les jonctions/liens symboliques, les destinations imbriquées dans la source et les archives sortant de leur dossier sont refusés. Les limites sont de 100 000 entrées et 200 Gio par kit. L’assemblage temporaire créé par le hub est supprimé après succès, échec ou annulation ; ni la source ni les packages déjà placés ne sont supprimés.
+
+Depuis une fiche locale, **Configurer l’installation dans un projet…** ouvre le gestionnaire de scripts avec la variante locale exacte préremplie. Choisir le projet, régler/ordonner les scripts, puis confirmer l’installation. Aucun téléchargement ni écriture dans un projet n’est déclenché en ouvrant ce panneau. Les kits Unreal utilisent l’import transactionnel existant ; les FBX/OBJ/textures utilisent l’import RAW Unreal existant (le script porte encore le nom historique « Importer Megascans »). Les versions moteur inconnues ne sont pas devinées.
+
+Les kits USD sont stockables et classés **Assets RAW**, pas présentés comme des `.uasset` compatibles. L’import automatique USD Cargo, ses assemblages/matériaux spécifiques et la synchronisation d’inventaire en ligne ne sont **pas implémentés** : pour eux, utiliser le connecteur Cargo officiel. Les kits en plusieurs téléchargements restent des fiches distinctes ; extraire/réunir leurs parties dans un dossier de kit complet avant l’import lorsque leurs dépendances sont réparties. Les archives RAR/7z ne sont pas extraites par ce connecteur.
+
+Validation locale Windows : tests de manifeste, réglages/activation, ZIP Unreal et USD, copie de dossier avec dépendances, compression, séparation des marketplaces, conservation des originaux, nettoyage du staging et parcours d’installation sur fixtures. La connexion à un vrai compte KitBash3D et les téléchargements sous licence ne sont pas déclarés validés sans compte de test. Aucun asset, plugin ou binaire propriétaire KitBash3D n’est redistribué.
+
+## itch.io, BlenderKit / Blendkit, ArtStation, Gumroad et CGTrader — Alpha 0.1.0
+
+Depuis l’alpha.41, les fiches proposent aussi **Convertir en dérivé local…**, et la configuration d’installation suggère des convertisseurs selon le contenu réel : Blender/USD → GLB/FBX → UAsset avec Unreal cible, ou import RAW direct. Ces conversions sont explicites, distinctes de l’accès web et non universelles. Voir [convertisseurs, options et SDK](source-converters.md).
+
+Ces cinq extensions intégrées ajoutent chacune une source de bibliothèque et un sous-onglet Marketplace. **BlenderKit et Blendkit sont le même service**, pas deux bibliothèques à dupliquer. Les identifiants et points d’entrée sont :
+
+| Extension | Site officiel ouvert par le hub |
+| --- | --- |
+| `cyenginehub.marketplace-itchio` | `https://itch.io/my-purchases` |
+| `cyenginehub.marketplace-blendkit` | `https://www.blendkit.com/` |
+| `cyenginehub.marketplace-artstation` | `https://www.artstation.com/marketplace/library` |
+| `cyenginehub.marketplace-gumroad` | `https://gumroad.com/library` |
+| `cyenginehub.marketplace-cgtrader` | `https://www.cgtrader.com/profile/purchases` |
+
+Le niveau livré est **web officiel + bibliothèque locale native**, comme Cargo : session WebView2 isolée par identifiant, destination des téléchargements, fiches, import de ZIP/dossiers complets, JSON, compression, bibliothèques ordonnées/quotas et accès aux scripts sur la variante locale exacte depuis la fiche. L’activation d’un plugin ne signifie pas que le compte est connecté. Les réglages Fab/Megascans et les cookies ne sont pas partagés implicitement. Les licences des assets restent celles de chaque produit.
+
+La **synchronisation d’inventaire par API n’est pas implémentée** dans cette version. L’[API itch.io](https://itch.io/docs/api/serverside) propose notamment les éléments possédés avec authentification ; le [client Blendkit officiel](https://github.com/BlenderKit/bk_client/blob/main/client/docs/API.md) propose recherche, connexion et téléchargement. Leur disponibilité ne signifie pas qu’ils sont déjà utilisés par ce connecteur. Aucun client OAuth factice, clé, appel d’API privé, extraction DOM ou service local arbitraire n’est ajouté. Le compte et les transferts sous licence nécessitent une validation utilisateur réelle.
+
+**Blendkit** : l’[ancien catalogue BlenderKit redirige vers Blendkit](https://www.blenderkit.com/asset-gallery). Le bouton ouvre le service officiel, pas une prétendue bibliothèque d’achats synchronisée. Les téléchargements qui exigent l’add-on restent effectués par le client officiel ; leur dossier complet peut ensuite être ajouté. Aucun script `.blend` n’est exécuté et aucune conversion Blender → Unreal automatique n’est promise. Exporter un format interopérable avec ses textures si l’import RAW Unreal est souhaité.
+
+**ArtStation / Gumroad / CGTrader** : accès aux bibliothèques officielles d’achats ([ArtStation](https://help.artstation.com/en/articles/16155211-where-can-i-download-my-digital-purchase), [Gumroad](https://gumroad.com/help/article/198-your-gumroad-library), [CGTrader](https://help.cgtrader.com/hc/en-us/articles/360015098057-Where-I-can-download-my-files-and-find-my-purchases)). Pas d’extraction de reçus, clés de licence ou URL privées dans le catalogue. Les vérifications de sécurité/connexion des sites sont respectées. Les archives multiparties doivent être réunies et extraites en dossier complet ; RAR/7z ne sont pas extraits par le hub.
+
+Les jeux itch.io, les outils et les documents restent des **fichiers**, pas des contenus Unreal. Les `.blend`, `.max`, etc. sans export interopérable ne sont pas classés RAW sur la seule présence de textures. Les types inconnus restent « format à vérifier » : aucun script d’installation n’est présélectionné ; le panneau de configuration reste accessible pour choisir un script approprié. Les versions moteur ne sont jamais devinées. L’installation d’un plugin logiciel ou l’exécution d’un outil reçu n’est jamais automatique.
+
+Validation : chaque manifeste est parsé, les réglages sont indépendants, les sessions et destinations sont distinctes, les transferts fictifs empruntent le vrai callback d’enregistrement, et l’import transactionnel est exercé sur cinq sous-dossiers d’un projet fictif. Le parcours vérifie les onglets à 1280/1024 px, les retours aux assets, l’absence de téléchargement implicite et la conservation des originaux. Connexion et téléchargement sur comptes réels non déclarés validés.
+
+## Ajouter un autre plugin (manifestes)
 
 1. Copier le dossier `extensions/builtin/cyenginehub.marketplace-cosmos` dans un nouveau dossier.
 2. Modifier `extension.json` : identifiant unique, nom, éditeur, description, URL HTTPS de l’inventaire dans `website` et `marketplace.inventoryUrl`.
 3. Garder `kind: Marketplace`, `executionKind: WebLink` et `capabilities: OwnedInventory`.
+   Pour activer le stockage commun et les imports locaux sans ajouter le nom du service dans le code du hub, déclarer `marketplace.packageStorage: true`. Les champs optionnels `marketplace.acquisitionLabel` (100 caractères maximum) et `marketplace.workflowNotice` (1 500 caractères maximum) décrivent l’action et les limites propres au service. Ces textes doivent être non vides et sans caractères de contrôle. En leur absence, les libellés communs sont conservés. L’ancien comportement Cosmos/Cargo reste compatible.
 4. Dans **Extensions Hub**, installer le dossier via le mécanisme d’installation d’extension et confirmer le plan.
 
 Le plugin apparaît dans **Paramètres → Marketplaces** et dans les sources de la **Bibliothèque**. L’interrupteur masque son accès et bloque sa commande. Utiliser **Enregistrer les marketplaces** pour conserver le choix au prochain lancement. Les fichiers locaux ne sont pas supprimés.

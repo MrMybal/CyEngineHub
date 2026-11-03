@@ -34,11 +34,22 @@ public sealed record HubTaskDefinition(
     Func<HubTaskContext, CancellationToken, Task> ExecuteAsync)
 {
     public bool IsDownload { get; init; }
+    public bool IsInstallation { get; init; }
+    public HubTaskResources Resources { get; init; } = new();
     public IReadOnlyList<HubTaskLink> Links { get; init; } = [];
 
     public HubTaskDefinition(string category, string title, IReadOnlyList<HubTaskLink> links,
         Func<HubTaskContext, CancellationToken, Task> executeAsync)
         : this(category, title, executeAsync) => Links = links.ToArray();
+}
+
+/// <summary>Declared writes and I/O destinations, independent of task titles/categories.</summary>
+public sealed record HubTaskResources
+{
+    public IReadOnlyList<string> ExclusivePaths { get; init; } = [];
+    public IReadOnlyList<string> ExclusiveKeys { get; init; } = [];
+    public IReadOnlyList<string> SharedKeys { get; init; } = [];
+    public IReadOnlyList<string> DiskPaths { get; init; } = [];
 }
 
 public sealed class HubTaskContext

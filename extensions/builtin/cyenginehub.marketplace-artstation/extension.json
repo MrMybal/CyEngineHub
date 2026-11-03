@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "cyenginehub.marketplace-artstation",
+  "displayName": "ArtStation",
+  "version": "0.1.0",
+  "publisher": "CyEngineHub · connecteur non officiel",
+  "description": "Alpha : My Library ArtStation officielle et gestion locale des achats téléchargés. Session isolée, packages JSON, compression et bibliothèques ordonnées. Aucun compte Epic/Fab réutilisé implicitement, aucune extraction d’inventaire privé.",
+  "kind": "Marketplace",
+  "executionKind": "WebLink",
+  "capabilities": "OwnedInventory",
+  "supportedEngines": [ "Unreal", "Unity", "Godot", "Custom" ],
+  "website": "https://www.artstation.com/marketplace/library",
+  "marketplace": {
+    "inventoryUrl": "https://www.artstation.com/marketplace/library",
+    "packageStorage": true,
+    "acquisitionLabel": "Ouvrir ma bibliothèque ArtStation",
+    "workflowNotice": "Alpha · My Library officielle ArtStation, dans une session distincte d’Epic et Fab. Les téléchargements terminés et les ZIP/dossiers déjà acquis utilisent les packages JSON du hub. Aucun inventaire ni galerie privée extrait automatiquement. Les formats, versions moteur et licences dépendent du produit ; les formations, documents et outils ne sont pas déclarés compatibles Unreal et ne sont jamais exécutés."
+  }
+}

@@ -181,6 +181,7 @@ public sealed class FabInstallationScriptRegistry(
 
 public sealed record ExternalFabInstallationScriptManifest
 {
+    public string? PreparedContentKind { get; init; }
     public int SchemaVersion { get; init; } = 1;
     public string Id { get; init; } = string.Empty;
     public string DisplayName { get; init; } = string.Empty;
@@ -227,7 +228,7 @@ internal sealed class ExternalProcessFabInstallationScript : IFabInstallationScr
 
     public FabInstallationScriptDescriptor Descriptor { get; }
 
-    public static ExternalProcessFabInstallationScript Create(
+    public static IFabInstallationScript Create(
         string scriptRoot,
         ExternalFabInstallationScriptManifest manifest,
         IProcessRunner processRunner)
@@ -280,7 +281,7 @@ internal sealed class ExternalProcessFabInstallationScript : IFabInstallationScr
             .GroupBy(option => option.Id, StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())
             .ToArray();
-        return new ExternalProcessFabInstallationScript(
+        var script = new ExternalProcessFabInstallationScript(
             root,
             executable,
             manifest.Arguments.Take(128).ToArray(),
@@ -294,6 +295,11 @@ internal sealed class ExternalProcessFabInstallationScript : IFabInstallationScr
                 options,
                 IsBuiltIn: false),
             processRunner);
+        if (manifest.PreparedContentKind is null) return script;
+        if (!Enum.TryParse<LibraryPackageContentKind>(manifest.PreparedContentKind, true, out var preparedKind) ||
+            !Enum.IsDefined(preparedKind) || preparedKind == LibraryPackageContentKind.Unknown)
+            throw new ArgumentException("Type de sortie de conversion invalide.");
+        return new ExternalFabPreparationScript(script, preparedKind);
     }
 
     public async Task<FabInstallationScriptResult> InstallAsync(
@@ -361,6 +367,8 @@ internal sealed class ExternalProcessFabInstallationScript : IFabInstallationScr
     private static string Expand(string template, FabInstallationScriptContext context)
     {
         var expanded = template
+            .Replace("{OutputDirectory}", context.Configuration.GetValueOrDefault("__cyhub_output", ""), StringComparison.Ordinal)
+            .Replace("{ResultFile}", context.Configuration.GetValueOrDefault("__cyhub_result", ""), StringComparison.Ordinal)
             .Replace("{SourceDirectory}", context.SourceDirectory, StringComparison.Ordinal)
             .Replace("{TargetRoot}", context.Target.RootPath, StringComparison.Ordinal)
             .Replace("{ProjectFile}", context.Target.Project?.FilePath ?? string.Empty, StringComparison.Ordinal)

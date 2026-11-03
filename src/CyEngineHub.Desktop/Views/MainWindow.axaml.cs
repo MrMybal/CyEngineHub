@@ -119,6 +119,15 @@ public sealed partial class MainWindow : Window
     {
         try
         {
+            if (args.SelectDirectory)
+            {
+                var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+                {
+                    Title = "Ajouter le dossier d’un kit · copie, originaux conservés", AllowMultiple = false
+                });
+                args.Completion.TrySetResult(folders.Select(item => item.TryGetLocalPath()).OfType<string>().ToArray());
+                return;
+            }
             var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
                 Title = "Ajouter des fichiers téléchargés · originaux conservés sur place",

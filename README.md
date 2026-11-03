@@ -28,10 +28,24 @@ the currently published release. Click an image to view it at full size.
 
 ![CyEngineHub Blender conversion options with optional Unreal UAsset conversion](docs/screenshots/source-conversion.png)
 
-**Published version: `2.0.0-alpha.34`.** Back up projects before trying installation,
+**Published version: `2.0.0-alpha.42`.** [Download the Windows release](https://github.com/MrMybal/CyEngineHub/releases/tag/v2.0.0-alpha.42). Back up projects before trying installation,
 move or asset-conversion operations.
 
-Recent changes are summarized in the [release notes](docs/releases/v2.0.0-alpha.34.md).
+Recent changes are summarized in the [release notes](docs/releases/v2.0.0-alpha.42.md).
+Alpha.42 checks application updates early during startup, independently of catalog
+loading, with a visible status, an explicit update proposal and a non-blocking offline retry.
+Alpha.41 adds [source conversion plug-ins](docs/source-converters.md): Blender/USD
+and interchange to GLB/FBX, followed by target-engine UAsset conversion, local
+derivatives, per-pack options and an external conversion SDK.
+Alpha.40 adds itch.io, BlenderKit / Blendkit (one service), ArtStation, Gumroad and
+CGTrader plugins: official website access and independent local libraries. API
+inventory synchronization is not implemented yet.
+The Alpha KitBash3D / Cargo connector adds official My Assets access, local kits,
+JSON/compressed packages and installation-script configuration from local fiches.
+See [connector scope and Cargo limitations](docs/marketplace-connectors.md).
+The default desktop frontend now uses pinned modular CyUI for themes, widgets,
+property editing, journals, descriptions and the enlarged gallery. See the
+[migration/build guide](docs/cyui-migration.md) for modules and compatibility limits.
 
 Alpha.33 fixes Unreal patch component selection and temporary-space planning,
 adds verified local-block reuse and bounded chunk caching, and improves C++ project
@@ -251,10 +265,12 @@ for this Alpha. Downloads are verified before the application closes and launche
 ## Build and test
 
 - .NET SDK 9.0.306, or a revision compatible with `global.json`.
-- .NET 8 runtime target; Dear ImGui interface hosted by Avalonia.
+- .NET 8 runtime target; modular CyUI / ImGui 1.92.1 hosted by Avalonia.
+- Git, CMake 3.21+, Visual Studio 2022 C++ tools and Windows SDK for the native UI.
 
 ```powershell
 dotnet restore .\CyEngineHub.sln
+.\tools\ui\build-cyui-native.ps1
 dotnet build .\CyEngineHub.sln -c Release
 dotnet test .\CyEngineHub.sln -c Release
 dotnet run --project .\src\CyEngineHub.Desktop\CyEngineHub.Desktop.csproj

@@ -6,6 +6,47 @@ namespace CyEngineHub.Core.Tests;
 public sealed class ImGuiInterfaceTests
 {
     [Fact]
+    public void ApplicationUpdateProposalKeepsExplicitConsentAndInstallerVerification()
+    {
+        var popup = UiDocument.Load("Main").Modals.Single(node => UiBinding.Path(node["IsVisible"]) == "IsUpdateAvailablePopupVisible");
+        var nodes = popup.Descendants().ToArray();
+        Assert.Contains(nodes, node => UiBinding.Path(node["Text"]) == "AvailableUpdateTitle");
+        Assert.Contains(nodes, node => UiBinding.Path(node["Text"]) == "AvailableUpdateVersion");
+        Assert.Contains(nodes, node => UiBinding.Path(node["Text"]) == "AvailableUpdateNotes");
+        Assert.Contains(nodes, node => UiBinding.Path(node["Command"]) == "PostponeUpdateCommand");
+        Assert.Contains(nodes, node => UiBinding.Path(node["Command"]) == "OpenAvailableUpdateReleaseCommand");
+        Assert.Contains(nodes, node => UiBinding.Path(node["Command"]) == "DownloadAndInstallUpdateCommand" &&
+            UiBinding.Path(node["IsEnabled"]) == "CanInstallAvailableUpdate");
+    }
+
+    [Fact]
+    public void ApplicationUpdateProposalDoesNotMislabelAlphaReleasesAsStable()
+    {
+        var popup = UiDocument.Load("Main").Modals.Single(node => UiBinding.Path(node["IsVisible"]) == "IsUpdateAvailablePopupVisible");
+        Assert.DoesNotContain(popup.Descendants(), node => node["Text"] == "NOUVELLE VERSION STABLE");
+        Assert.Contains(popup.Descendants(), node => node["Text"] == "MISE À JOUR DE CYENGINEHUB");
+    }
+
+    [Fact]
+    public void FabInstallHasAnExplicitBypassOptionAndInlineErrorsInTheFooter()
+    {
+        var footer = UiDocument.Load("Main").Root.Descendants().Single(node => node["Name"] == "FabInstallFooter");
+        Assert.Contains(footer.Descendants(), node => UiBinding.Path(node["IsChecked"]) == "BypassFabInstallChecks");
+        Assert.Contains(footer.Descendants(), node => UiBinding.Path(node["Command"]) == "InstallSelectedFabVersionsCommand" &&
+            UiBinding.Path(node["Content"]) == "FabInstallActionLabel");
+        Assert.Contains(footer.Descendants(), node => UiBinding.Path(node["Text"]) == "FabInstallActionError");
+    }
+    [Fact]
+    public void FabInstallVariantsAreAlwaysAvailableWithAdvisoryCompatibility()
+    {
+        var modal = UiDocument.Load("Main").Modals.Single(node => UiBinding.Path(node["IsVisible"]) == "IsFabOptionsModalVisible");
+        var choices = modal.Descendants().Single(node => node["Name"] == "FabInstallVariantChoices");
+        Assert.Equal("FabInstallVersions", UiBinding.Path(choices["ItemsSource"]));
+        Assert.Null(choices["IsVisible"]);
+        Assert.Contains(choices.Descendants(), node => UiBinding.Path(node["Text"]) == "CompatibilityNotice");
+        Assert.DoesNotContain(modal.Descendants(), node => UiBinding.Path(node["ItemsSource"]) == "CompatibleFabInstallVersions");
+    }
+    [Fact]
     public void AdvancedSettingsExposeLicensingWarrantyAndSourceNotices()
     {
         var notices = UiDocument.Load("Main").Root.Descendants().Single(node => node["Name"] == "HubLicenseNotices");
@@ -135,11 +176,14 @@ public sealed class ImGuiInterfaceTests
     }
 
     [Fact]
-    public void ProductBackIsScopedToDetailsRatherThanRootCatalogs()
+    public void ProductBackUsesTheContextualHeaderWithoutADuplicateButton()
     {
-        var product = UiDocument.Load("Main").Root.Descendants().Single(node => node.Kind == "ScrollViewer" &&
+        var document = UiDocument.Load("Main");
+        var product = document.Root.Descendants().Single(node => node.Kind == "ScrollViewer" &&
             UiBinding.Path(node["IsVisible"]) == "IsRemoteFabProductVisible");
-        Assert.Contains(product.Descendants(), node => UiBinding.Path(node["Command"]) == "CloseRemoteFabProductCommand");
+        Assert.DoesNotContain(product.Descendants(), node => UiBinding.Path(node["Command"]) == "CloseRemoteFabProductCommand");
+        Assert.Contains(document.Root.Descendants(), node => UiBinding.Path(node["Command"]) == "NavigateBackCommand" &&
+            UiBinding.Path(node["ToolTip.Tip"]) == "NavigationBackLabel");
     }
 
     [Fact]

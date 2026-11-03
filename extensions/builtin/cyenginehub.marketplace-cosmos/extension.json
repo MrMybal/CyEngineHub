@@ -10,5 +10,5 @@
   "capabilities": "OwnedInventory",
   "supportedEngines": [ "Unreal", "Unity", "Custom" ],
   "website": "https://cosmos.leartesstudios.com/inventory",
-  "marketplace": { "inventoryUrl": "https://cosmos.leartesstudios.com/inventory" }
+  "marketplace": { "inventoryUrl": "https://cosmos.leartesstudios.com/inventory", "packageStorage": true }
 }

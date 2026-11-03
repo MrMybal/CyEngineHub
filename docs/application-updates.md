@@ -6,6 +6,21 @@ L'option **Inclure les préversions Alpha / Bêta** est activée par défaut dan
 et mémorisée séparément. Sans cette option, seules les releases stables sont proposées.
 Les anciennes configurations sans dépôt sont initialisées avec le dépôt officiel.
 
+La vérification commence dès que les préférences de mise à jour sont chargées,
+sans attendre les catalogues, les connexions aux marketplaces ni la découverte des
+moteurs. Elle s’exécute une seule fois par démarrage, en arrière-plan, avec un délai
+maximum de 30 secondes. L’interface reste utilisable. Hors ligne ou en cas d’erreur
+GitHub, un état « Réessayer la mise à jour » remplace toute affirmation « à jour » ;
+aucune fenêtre d’erreur bloquante n’est ouverte au démarrage.
+
+La barre latérale indique la recherche, son résultat ou la présence d’une mise à
+jour. Une version plus récente ouvre une proposition avec notes de version,
+**Plus tard**, **Voir la release** et **Télécharger et installer**. **Plus tard**
+(ou Échap) ferme la proposition sans télécharger ; **Mise à jour disponible**
+permet de la rouvrir sans relancer la recherche. Aucun installateur n’est téléchargé
+ou exécuté sans action explicite. L’option désactivant la recherche au lancement
+reste respectée ; la recherche manuelle reste disponible.
+
 ## Contrat d’une release installable
 
 - tag de version : `vMAJOR.MINOR.PATCH` ou `vMAJOR.MINOR.PATCH-alpha.N` ;
@@ -50,7 +65,7 @@ Son dernier échec est écrit dans `%TEMP%\CyEngineHub\Updater\last-error.log`.
 3. Vérifier l'application empaquetée, committer les sources et créer le tag correspondant.
 4. Créer une release GitHub sur ce tag, joindre les trois assets et publier.
    Par défaut, cocher **pre-release** pour une Alpha/Bêta. À la demande explicite
-   du responsable, les alpha.32 et alpha.33 sont publiées comme Release courante avec le badge
+   du responsable, les alpha.32, alpha.33, alpha.34 et alpha.42 sont publiées comme Release courante avec le badge
    Latest : GitHub n’autorise pas ce badge sur une préversion. Son nom Alpha et
    ses limites restent visibles ; il ne s’agit pas d’une qualification de stabilité.
 

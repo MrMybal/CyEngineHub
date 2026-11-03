@@ -1,10 +1,10 @@
 using CyEngineHub.Desktop.ViewModels;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     private string _extensionQuery = "";
     private string _pluginQuery = "";
@@ -31,7 +31,7 @@ internal sealed partial class ImGuiWorkspace
         Gui.TableSetupColumn("Inspecteur", ImGuiTableColumnFlags.WidthStretch, 1.2f);
         Gui.TableNextColumn();
         if (Gui.BeginTable("extensions-list", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable,
-            new(0, Math.Max(120, Gui.GetContentRegionAvail().Y - 5))))
+            new System.Numerics.Vector2(0, Math.Max(120, Gui.GetContentRegionAvail().Y - 5))))
         {
             Gui.TableSetupColumn("Extension", ImGuiTableColumnFlags.WidthStretch, 3);
             Gui.TableSetupColumn("Version", ImGuiTableColumnFlags.WidthStretch, 1);
@@ -43,7 +43,8 @@ internal sealed partial class ImGuiWorkspace
             {
                 Gui.PushID(item.Id); Gui.TableNextRow(); Gui.TableNextColumn();
                 if (Gui.Selectable(Elide(item.Name, Gui.GetContentRegionAvail().X) + "###extension", ReferenceEquals(item, vm.SelectedHubExtension),
-                    ImGuiSelectableFlags.SpanAllColumns, new(0, Gui.GetFrameHeight()))) Set(vm, "{Binding SelectedHubExtension}", item);
+                    ImGuiSelectableFlags.SpanAllColumns, new(0, Gui.GetFrameHeight())) ||
+                    Gui.IsItemHovered() && Gui.IsMouseReleased(ImGuiMouseButton.Left)) Set(vm, "{Binding SelectedHubExtension}", item);
                 Record("extension-row/" + item.Id);
                 Gui.TableNextColumn(); Gui.TextUnformatted(item.Version);
                 Gui.TableNextColumn(); Gui.TextUnformatted(Elide(item.Kind, Gui.GetContentRegionAvail().X));
@@ -106,7 +107,7 @@ internal sealed partial class ImGuiWorkspace
         Gui.TableSetupColumn("Inspecteur", ImGuiTableColumnFlags.WidthStretch, 1.2f);
         Gui.TableNextColumn();
         if (Gui.BeginTable("plugins-list", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable,
-            new(0, Math.Max(120, Gui.GetContentRegionAvail().Y - 5))))
+            new System.Numerics.Vector2(0, Math.Max(120, Gui.GetContentRegionAvail().Y - 5))))
         {
             foreach (var title in new[] { "Plugin", "Version", "Moteur", "Source" }) Gui.TableSetupColumn(title);
             Gui.TableSetupScrollFreeze(0, 1); SortableHeaders("plugins-list", ["Plugin", "Version", "Moteur", "Source"]);
@@ -116,7 +117,8 @@ internal sealed partial class ImGuiWorkspace
             {
                 var item = items[index]; Gui.PushID(index); Gui.TableNextRow(ImGuiTableRowFlags.None, height); Gui.TableNextColumn();
                 if (Gui.Selectable(Elide(item.Name, Gui.GetContentRegionAvail().X) + "###plugin", ReferenceEquals(item, _selectedPlugin),
-                    ImGuiSelectableFlags.SpanAllColumns, new(0, Gui.GetFrameHeight()))) _selectedPlugin = item;
+                    ImGuiSelectableFlags.SpanAllColumns, new(0, Gui.GetFrameHeight())) ||
+                    Gui.IsItemHovered() && Gui.IsMouseReleased(ImGuiMouseButton.Left)) _selectedPlugin = item;
                 Record("plugin-row/" + item.InternalName);
                 Gui.TableNextColumn(); Gui.TextUnformatted(item.VersionLabel);
                 Gui.TableNextColumn(); Gui.TextUnformatted(item.EngineVersionLabel);

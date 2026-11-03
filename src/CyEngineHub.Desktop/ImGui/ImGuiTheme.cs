@@ -1,98 +1,69 @@
 using System.Numerics;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-// CyDAW's default Mid Grey palette: lighter neutral panels with orange selections.
-internal static class ImGuiTheme
+// Semantic adapter only: the authoritative palette, metrics and fonts are CyUI Core.
+internal static unsafe class ImGuiTheme
 {
-    public static readonly Vector4 Accent = Rgb(0xF28A2E);
-    public static readonly Vector4 Muted = Rgb(0xB4B4B4);
-    public static readonly Vector4 Primary = Rgb(0x7D4A1D);
-    public static Vector4 Selected { get; private set; } = Rgb(0x76512D);
-    public static Vector4 Panel { get; private set; } = Rgb(0x373737);
-    public static Vector4 Input { get; private set; } = Rgb(0x2E2E2E);
-    public static readonly Vector4 Success = Rgb(0x5CD26E);
-    public static readonly Vector4 OfficialRow = Rgb(0x334C3A);
-    public static readonly Vector4 Warning = Rgb(0xF5A623);
-    internal static Vector4 ProgressColor(OperationProgressTone tone) => tone switch
-    {
-        OperationProgressTone.Completed => Success,
-        OperationProgressTone.Failed => Rgb(0xF06474),
-        OperationProgressTone.Canceled => Warning,
-        _ => Rgb(0x56A8EC),
-    };
+    private static readonly Dictionary<nint, string> Applied = [];
+    private static string _theme = "mid-grey", _locale = "en";
+    private static bool _compact = true;
+    public static Vector4 Accent => CyUiNative.Colour(CyUiRole.Accent);
+    public static Vector4 Muted => CyUiNative.Colour(CyUiRole.Dim);
+    public static Vector4 Primary => CyUiNative.Colour(CyUiRole.AccentDim);
+    public static Vector4 Selected => CyUiNative.Colour(CyUiRole.Selection);
+    public static Vector4 Panel => CyUiNative.Colour(CyUiRole.Panel);
+    public static Vector4 Input => CyUiNative.Colour(CyUiRole.Field);
+    public static Vector4 Success => CyUiNative.Colour(CyUiRole.Success);
+    public static Vector4 OfficialRow => Vector4.Lerp(Panel, Success, .18f);
+    public static Vector4 Warning => CyUiNative.Colour(CyUiRole.Warning);
+    internal static Vector4 ProgressColor(OperationProgressTone tone) => CyUiNative.Colour(tone switch
+    { OperationProgressTone.Completed => CyUiRole.Success, OperationProgressTone.Failed => CyUiRole.Error,
+      OperationProgressTone.Canceled => CyUiRole.Warning, _ => CyUiRole.Info });
+    internal static CyUiVariant ActionVariant(string? command, bool primary, bool danger = false) => ActionColorPolicy.Resolve(command, primary, danger) switch
+    { ActionTone.Start => CyUiVariant.Success, ActionTone.Danger => CyUiVariant.Danger, ActionTone.Primary => CyUiVariant.Primary, _ => CyUiVariant.Secondary };
     internal static int PushActionColors(string? command, bool primary, bool danger = false)
     {
-        var tone = ActionColorPolicy.Resolve(command, primary, danger);
-        if (tone is ActionTone.Start or ActionTone.Danger)
-        {
-            Gui.PushStyleColor(ImGuiCol.Button, Rgb(tone == ActionTone.Start ? 0x287346u : 0x872D40u));
-            Gui.PushStyleColor(ImGuiCol.ButtonHovered, Rgb(tone == ActionTone.Start ? 0x348D57u : 0xA63B50u));
-            Gui.PushStyleColor(ImGuiCol.ButtonActive, Rgb(tone == ActionTone.Start ? 0x205D38u : 0x6B2232u));
-            Gui.PushStyleColor(ImGuiCol.Text, Rgb(0xFFFFFF));
-            return 4;
-        }
-        if (!primary) return 0;
-        Gui.PushStyleColor(ImGuiCol.Button, Rgb(0x315E82));
-        Gui.PushStyleColor(ImGuiCol.ButtonHovered, Rgb(0x4079A3));
-        Gui.PushStyleColor(ImGuiCol.ButtonActive, Rgb(0x254865));
-        return 3;
+        var variant = ActionVariant(command, primary, danger);
+        if (variant == CyUiVariant.Secondary) return 0;
+        var colour = CyUiNative.Colour(variant == CyUiVariant.Success ? CyUiRole.Success : variant == CyUiVariant.Danger ? CyUiRole.Error : CyUiRole.Accent);
+        Gui.PushStyleColor(ImGuiCol.Button, colour);
+        Gui.PushStyleColor(ImGuiCol.ButtonHovered, Vector4.Lerp(colour, CyUiNative.Colour(CyUiRole.Text), .15f));
+        Gui.PushStyleColor(ImGuiCol.ButtonActive, Vector4.Lerp(colour, CyUiNative.Colour(CyUiRole.Ground), .2f));
+        Gui.PushStyleColor(ImGuiCol.Text, CyUiNative.Colour(CyUiRole.AccentText));
+        return 4;
     }
-    internal static Vector4 Rgb(uint hex) => new(((hex >> 16) & 255) / 255f, ((hex >> 8) & 255) / 255f, (hex & 255) / 255f, 1);
-    internal static Vector4 Rgb(int hex) => Rgb((uint)hex);
-    public static void Apply()
+    // Compatibility for semantic color hints in existing XML/binding data. These never
+    // define a palette: convert old UI hints to a role in the selected CyUI theme.
+    internal static Vector4 Rgb(uint hint) => CyUiNative.Colour(hint switch
     {
-        var s = Gui.GetStyle();
-        s.WindowPadding = new(10, 8); s.FramePadding = new(7, 4);
-        s.ItemSpacing = new(7, 5); s.ItemInnerSpacing = new(5, 4); s.CellPadding = new(8, 6);
-        s.WindowRounding = 3; s.ChildRounding = 3; s.FrameRounding = 3;
-        s.PopupRounding = 4; s.ScrollbarRounding = 3; s.GrabRounding = 2;
-        s.ScrollbarSize = 11; s.WindowBorderSize = 1; s.ChildBorderSize = 1; s.FrameBorderSize = 0;
-        s.ScaleAllSizes(UiCardGrid.InterfaceScale);
-        ApplyPalette("Gris");
-    }
-    public static void ApplyPalette(string theme)
+        0xF28A2E or 0xF5A623 or 0xE0A04D or 0xEBC488 or 0xF0A43A => CyUiRole.Warning,
+        0x815022 or 0x976031 or 0xAA6A30 => CyUiRole.Selection,
+        0x5CD26E or 0x52D1A2 or 0x69C9B5 => CyUiRole.Success,
+        0xF06474 or 0x872D40 or 0x882F43 or 0xE58C83 or 0xE8747C => CyUiRole.Error,
+        0x246E45 => CyUiRole.Success,
+        0x77BAFF or 0x56A8EC or 0x6684A4 or 0x315E82 => CyUiRole.Info,
+        0xFFFFFF or 0xEAEFF5 or 0xE4E4E4 or 0xF5F5F5 => CyUiRole.Text,
+        0xB4B4B4 or 0xBDC8D6 or 0xD5D5D5 => CyUiRole.Dim,
+        0x565656 or 0x9A9A9A => CyUiRole.StrongLine,
+        0x414141 or 0x4B4B4B => CyUiRole.Raised,
+        0x2E2E2E or 0x181B20 or 0x080808 => CyUiRole.Field,
+        _ => CyUiRole.Dim,
+    });
+    internal static Vector4 Rgb(int hint) => Rgb((uint)hint);
+    internal static string ThemeKey(string theme) => theme switch
+    { "Gris" => "mid-grey", "Sombre" => "navy", "Contraste" => "amber-night", _ => theme };
+    internal static void Apply() => Apply(_theme, _compact, _locale);
+    internal static void Apply(string theme, bool compact, string locale)
     {
-        Gui.StyleColorsDark();
-        var s = Gui.GetStyle();
-        Panel = Rgb(theme == "Sombre" ? 0x22262B : theme == "Contraste" ? 0x151515 : 0x373737);
-        Input = Rgb(theme == "Sombre" ? 0x181B20 : theme == "Contraste" ? 0x080808 : 0x2E2E2E);
-        Selected = Rgb(theme == "Contraste" ? 0x7C4A10 : 0x76512D);
-        s.Colors[(int)ImGuiCol.WindowBg] = Rgb(0x2E2E2E);
-        s.Colors[(int)ImGuiCol.ChildBg] = Panel;
-        s.Colors[(int)ImGuiCol.PopupBg] = Rgb(0x414141);
-        s.Colors[(int)ImGuiCol.Border] = Rgb(0x565656);
-        s.Colors[(int)ImGuiCol.Text] = Rgb(0xE4E4E4); s.Colors[(int)ImGuiCol.TextDisabled] = Muted;
-        s.Colors[(int)ImGuiCol.FrameBg] = Input;
-        s.Colors[(int)ImGuiCol.FrameBgHovered] = Rgb(0x4B4B4B);
-        s.Colors[(int)ImGuiCol.FrameBgActive] = Rgb(0x565656);
-        s.Colors[(int)ImGuiCol.Button] = Rgb(0x4B4B4B);
-        s.Colors[(int)ImGuiCol.ButtonHovered] = Rgb(0x626262);
-        s.Colors[(int)ImGuiCol.ButtonActive] = Primary;
-        s.Colors[(int)ImGuiCol.Header] = Rgb(0x414141);
-        s.Colors[(int)ImGuiCol.HeaderHovered] = Rgb(0x555555);
-        s.Colors[(int)ImGuiCol.HeaderActive] = Rgb(0x626262);
-        s.Colors[(int)ImGuiCol.CheckMark] = Accent; s.Colors[(int)ImGuiCol.SliderGrab] = Accent;
-        s.Colors[(int)ImGuiCol.PlotHistogram] = Rgb(0x52D1A2);
-        s.Colors[(int)ImGuiCol.Tab] = Rgb(0x414141);
-        s.Colors[(int)ImGuiCol.TabSelected] = Selected;
-        s.Colors[(int)ImGuiCol.Separator] = Rgb(0x565656);
-        s.Colors[(int)ImGuiCol.TableHeaderBg] = Rgb(0x4B4B4B);
-        s.Colors[(int)ImGuiCol.TableRowBgAlt] = new(.7f, .7f, .7f, .045f);
-        s.Colors[(int)ImGuiCol.ModalWindowDimBg] = new(.025f, .03f, .04f, .82f);
-        if (theme != "Gris")
-        {
-            var surface = Rgb(theme == "Contraste" ? 0x292929 : 0x303740);
-            var hover = Rgb(theme == "Contraste" ? 0x484848 : 0x414D5B);
-            s.Colors[(int)ImGuiCol.WindowBg] = Input;
-            s.Colors[(int)ImGuiCol.Text] = Rgb(0xF5F5F5);
-            foreach (var color in new[] { ImGuiCol.PopupBg, ImGuiCol.Button, ImGuiCol.Header, ImGuiCol.Tab, ImGuiCol.TableHeaderBg }) s.Colors[(int)color] = surface;
-            foreach (var color in new[] { ImGuiCol.FrameBgHovered, ImGuiCol.FrameBgActive, ImGuiCol.ButtonHovered, ImGuiCol.HeaderHovered, ImGuiCol.HeaderActive }) s.Colors[(int)color] = hover;
-            s.Colors[(int)ImGuiCol.Border] = Rgb(theme == "Contraste" ? 0x9A9A9A : 0x566474);
-            s.Colors[(int)ImGuiCol.Separator] = s.Colors[(int)ImGuiCol.Border];
-            if (theme == "Contraste") s.Colors[(int)ImGuiCol.TextDisabled] = Rgb(0xD5D5D5);
-        }
+        _theme = theme; _compact = compact; _locale = locale;
+        var context = (nint)Gui.GetCurrentContext().Handle;
+        var key = ThemeKey(theme) + ":" + compact + ":" + UiCardGrid.InterfaceScale + ":" + locale;
+        if (Applied.GetValueOrDefault(context) == key) return;
+        CyUiNative.Apply(ThemeKey(theme), compact, UiCardGrid.InterfaceScale, locale);
+        Applied[context] = key;
     }
+    internal static void Release() => Applied.Remove((nint)Gui.GetCurrentContext().Handle);
 }

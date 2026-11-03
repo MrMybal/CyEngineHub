@@ -93,7 +93,7 @@ public sealed class MarketplaceDownloadCatalog(string catalogPath)
             var bytes = manifest.RootElement.GetProperty("storedBytes").GetInt64();
             if (bytes < 0) throw new InvalidDataException("Taille du package invalide.");
             var packageKind = manifest.RootElement.GetProperty("contentKind").GetString();
-            return (bytes, packageKind == "codePlugin" ? "Plugin Unreal" : packageKind == "completeProject" ? "Projet Unreal" : packageKind == "rawAsset" ? "Assets RAW" : "Pack Unreal",
+            return (bytes, packageKind == "codePlugin" ? "Plugin Unreal" : packageKind == "completeProject" ? "Projet Unreal" : packageKind == "rawAsset" ? "Assets RAW" : packageKind == "contentPack" ? "Pack Unreal" : "Fichiers locaux · format à vérifier",
                 manifest.RootElement.GetProperty("title").GetString() ?? Path.GetFileName(path));
         }
         var file = new FileInfo(path);
@@ -108,7 +108,7 @@ public sealed class MarketplaceDownloadCatalog(string catalogPath)
                 kind = extensions.Contains(".uproject") ? "Projet Unreal"
                     : extensions.Contains(".uplugin") ? "Plugin Unreal"
                     : extensions.Contains(".uasset") || extensions.Contains(".umap") ? "Pack Unreal"
-                    : extensions.Overlaps([".fbx", ".obj", ".gltf", ".glb"]) ? "Assets RAW"
+                    : extensions.Overlaps([".fbx", ".obj", ".gltf", ".glb", ".usd", ".usda", ".usdc", ".usdz"]) ? "Assets RAW"
                     : "Archive ZIP";
             }
             catch (InvalidDataException) { kind = "ZIP illisible · à vérifier"; }

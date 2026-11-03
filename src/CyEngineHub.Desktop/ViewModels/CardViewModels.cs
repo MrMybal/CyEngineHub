@@ -1429,7 +1429,16 @@ public sealed class LibraryFacetOptionViewModel : ObservableObject
 
 public sealed class FabInstallVersionOptionViewModel : ObservableObject
 {
+    private string _localSourceNotice = string.Empty;
+    public string LocalSourceNotice { get => _localSourceNotice; set => SetProperty(ref _localSourceNotice, value); }
     private bool _isSelected;
+    private string _compatibilityNotice = string.Empty;
+
+    public string CompatibilityNotice
+    {
+        get => _compatibilityNotice;
+        internal set => SetProperty(ref _compatibilityNotice, value);
+    }
 
     public FabInstallVersionOptionViewModel(RemoteFabProjectVersion version, bool isSelected)
     {
@@ -1625,7 +1634,7 @@ public sealed class FabInstallTargetOptionViewModel : ObservableObject
         : IsCompatible
         ? "Compatible"
         : CanUseVersionBridge
-            ? "Convertible"
+            ? "Conversion à vérifier"
             : "Compatibilité à vérifier";
     public ProjectCardViewModel? Project { get; }
     public EngineCardViewModel? Engine { get; }
@@ -3182,7 +3191,7 @@ public sealed partial class RemoteFabAssetCardViewModel : ObservableObject, IDis
         LibraryPackageContentKind.EnginePackage => "Installation moteur, ou plugin local dans un projet si le pack contient un .uplugin valide.",
         LibraryPackageContentKind.CompleteProject => "Projet complet : téléchargement autonome; ne sera pas injecté dans un projet existant.",
         LibraryPackageContentKind.RawAsset => "Sources RAW : import dans les projets compatibles après téléchargement.",
-        LibraryPackageContentKind.ContentPack => "Pack de contenu : installation dans les projets Unreal compatibles.",
+        LibraryPackageContentKind.ContentPack => "Pack de contenu : choisissez les projets et variantes. La correspondance de version est indicative ; un downgrade peut nécessiter une conversion.",
         _ => "Type incertain : installation limitée aux projets après validation.",
     };
 

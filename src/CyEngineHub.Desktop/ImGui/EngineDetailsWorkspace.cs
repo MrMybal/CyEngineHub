@@ -1,11 +1,11 @@
 using CyEngineHub.Desktop.ViewModels;
 using CyEngineHub.Unreal.Models;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     private void DrawEngineGit(MainWindowViewModel vm, EngineCardViewModel card)
     {

@@ -236,7 +236,11 @@ public sealed class LibraryPackageService
         {
             return LibraryPackageContentKind.CodePlugin;
         }
-        var hasRawModel = files.Any(file => file.Extension.Equals(".fbx", StringComparison.OrdinalIgnoreCase) ||
+        var hasRawModel = files.Any(file => file.Extension.Equals(".usd", StringComparison.OrdinalIgnoreCase) ||
+                                           file.Extension.Equals(".usda", StringComparison.OrdinalIgnoreCase) ||
+                                           file.Extension.Equals(".usdc", StringComparison.OrdinalIgnoreCase) ||
+                                           file.Extension.Equals(".usdz", StringComparison.OrdinalIgnoreCase) ||
+                                           file.Extension.Equals(".fbx", StringComparison.OrdinalIgnoreCase) ||
                                            file.Extension.Equals(".obj", StringComparison.OrdinalIgnoreCase) ||
                                            file.Extension.Equals(".gltf", StringComparison.OrdinalIgnoreCase) ||
                                            file.Extension.Equals(".glb", StringComparison.OrdinalIgnoreCase) ||
@@ -247,7 +251,11 @@ public sealed class LibraryPackageService
                                            file.Extension.Equals(".wav", StringComparison.OrdinalIgnoreCase));
         var hasNativeUnreal = files.Any(file => file.Extension.Equals(".uasset", StringComparison.OrdinalIgnoreCase) ||
                                                file.Extension.Equals(".umap", StringComparison.OrdinalIgnoreCase));
+        var hasSourceDcc = files.Any(file => file.Extension.ToLowerInvariant() is ".blend" or ".max" or ".c4d" or ".ma" or ".mb");
+        var hasInterchange = files.Any(file => file.Extension.ToLowerInvariant() is ".fbx" or ".obj" or ".gltf" or ".glb" or ".usd" or ".usda" or ".usdc" or ".usdz");
+        if (!hasNativeUnreal && hasSourceDcc && !hasInterchange) return LibraryPackageContentKind.Unknown;
         if (hasRawModel && !hasNativeUnreal) return LibraryPackageContentKind.RawAsset;
+        if (!hasNativeUnreal && asset.Source.StartsWith("cyenginehub.marketplace-", StringComparison.Ordinal)) return LibraryPackageContentKind.Unknown;
         return RemoteFabAssetClassifier.Classify(asset, version).Kind;
     }
 

@@ -6,12 +6,19 @@ below concern third parties and do not relicense their code under the Hub licens
 
 ## Dear ImGui user interface
 
-- Dear ImGui / cimgui, via ImGui.NET 1.91.6.1 — MIT License. https://github.com/ocornut/imgui and https://github.com/ImGuiNET/ImGui.NET
+- CyUI 1.2.0, revision `ff023e646c6a3038b3dfbfd53f6d2b4a2f5955e3` — MIT. https://github.com/MrMybal/CyUI
+- Dear ImGui 1.92.1 and cimgui — MIT. https://github.com/ocornut/imgui and https://github.com/JunaMeinhold/cimgui
+- Hexa.NET.ImGui 2.2.8.5 — MIT. https://github.com/HexaEngine/Hexa.NET.ImGui
+- Lexilla, Scintilla interface headers and SciTE language data, brought in by CyUI DocumentViews/Code — permissive Neil Hodgson licenses. No Scintilla editor is linked.
 - Silk.NET.OpenGLES 2.23.0 — MIT License. https://github.com/dotnet/Silk.NET
 
 The application uses Dear ImGui for its controls and Avalonia for native windows,
 graphics surfaces, file dialogs and WebView2 integration. Package license texts
 are included under `Licenses` in the Windows distribution.
+Native dependency notices are also retained under `LICENCES/CyUI`,
+`LICENCES/DearImGui`, `LICENCES/cimgui` and `LICENCES/Hexa.NET.ImGui`.
+The exact source/ABI revisions and selected modules are recorded in
+`native/CyEngineHub.CyUI/dependencies.lock.json`. ImGui.NET is no longer used.
 
 ## Microsoft Edge WebView2
 

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "cyenginehub.source-converters",
+  "displayName": "Convertisseurs de packs · Alpha",
+  "version": "0.1.0-alpha",
+  "publisher": "CyEngineHub",
+  "description": "Alpha · Conversion de scènes Blender/USD/interchange vers GLB ou FBX avec Blender installé, puis import RAW avec Unreal cible. Sélection selon les formats du pack, options par variante et création de dérivés locaux. Originaux conservés. Les pertes de matériaux sont signalées ; pas de convertisseur universel pour .max/CAD ou shaders procéduraux.",
+  "kind": "AssetProcessor",
+  "executionKind": "WebLink",
+  "capabilities": "AssetInspect, AssetConvert, AssetImport, DependencyValidation",
+  "supportedEngines": [ "Unreal", "Unity", "Godot", "Custom" ],
+  "supportedFileExtensions": [ ".blend", ".fbx", ".obj", ".glb", ".gltf", ".usd", ".usda", ".usdc", ".usdz" ],
+  "website": "https://docs.blender.org/manual/en/latest/files/import_export.html"
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "cyenginehub.marketplace-itchio",
+  "displayName": "itch.io",
+  "version": "0.1.0",
+  "publisher": "CyEngineHub · connecteur non officiel",
+  "description": "Alpha : bibliothèque d’achats itch.io officielle, téléchargements web et fichiers locaux. Packages JSON, compression et bibliothèques ordonnées indépendantes. Aucun inventaire API synchronisé ni compte connecté supposé. Les jeux, outils et archives ne sont jamais exécutés automatiquement.",
+  "kind": "Marketplace",
+  "executionKind": "WebLink",
+  "capabilities": "OwnedInventory",
+  "supportedEngines": [ "Unreal", "Unity", "Godot", "Custom" ],
+  "website": "https://itch.io/my-purchases",
+  "marketplace": {
+    "inventoryUrl": "https://itch.io/my-purchases",
+    "packageStorage": true,
+    "acquisitionLabel": "Ouvrir mes achats itch.io",
+    "workflowNotice": "Alpha · Achats et téléchargements sur le site itch.io officiel ; session isolée. Ajoutez un ZIP ou un dossier d’assets déjà acquis. JSON, compression et originaux conservés. Pas de synchronisation OAuth/API dans cette version. Choisissez le script adapté au contenu : un jeu ou un outil téléchargé n’est pas un pack Unreal et n’est jamais lancé automatiquement."
+  }
+}

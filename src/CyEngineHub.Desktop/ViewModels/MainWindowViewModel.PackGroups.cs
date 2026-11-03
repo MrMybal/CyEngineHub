@@ -4,6 +4,7 @@ using CyEngineHub.Fab.Installation;
 using CyEngineHub.Fab.Packaging;
 using CyEngineHub.Fab.Remote;
 using CyEngineHub.Core.Settings;
+using MarketplaceLocalAsset = CyEngineHub.Core.Marketplaces.MarketplaceLocalAsset;
 
 namespace CyEngineHub.Desktop.ViewModels;
 
@@ -15,6 +16,31 @@ public sealed partial class MainWindowViewModel
     private bool _packGroupsLoaded;
     public bool IsPackGroupBusy { get; private set; }
     public string PackGroupStatus { get; private set; } = "Alpha · seules les variantes locales sont utilisées. Aucun téléchargement implicite.";
+    public string? RequestedConnectorPackGroupId { get; set; }
+
+    private async Task PrepareConnectorInstallationAsync(MarketplaceLocalAsset asset)
+    {
+        await LoadPackGroupsAsync().ConfigureAwait(true);
+        var candidate = PackGroupCandidates.FirstOrDefault(item => item.Source == asset.MarketplaceId &&
+            item.Path.Equals(asset.FilePath, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException("Rechargez la bibliothèque locale avant de configurer l’installation.");
+        var suggestions = await Task.Run(() => CyEngineHub.Fab.Conversion.AssetSourceConversionPlanner.Suggest(
+            CyEngineHub.Fab.Conversion.AssetSourceConversionPlanner.ReadPackageExtensions(asset.FilePath))).ConfigureAwait(true);
+        var engineVersions = await Task.Run(() => CyEngineHub.Fab.Conversion.AssetSourceConversionPlanner.ReadPackageEngineVersions(asset.FilePath)).ConfigureAwait(true);
+        if (engineVersions.Count > 0) candidate = candidate with { EngineVersions = engineVersions };
+        if (suggestions.Count > 0)
+        {
+            candidate = candidate with { Steps = suggestions.Select(id =>
+            {
+                var script = _fabInstallationScripts.Find(id) ?? throw new InvalidOperationException("Plugin de conversion absent : " + id);
+                return new FabInstallationStep(id, script.Descriptor.Options.ToDictionary(option => option.Id,
+                    option => option.Id == "conflictPolicy" ? "fail" : option.DefaultValue));
+            }).ToArray() };
+        }
+        var id = "connector-install-" + asset.Id;
+        if (!PackGroups.Any(group => group.Id == id)) PackGroups.Add(new(id, asset.Name, [candidate]));
+        RequestedConnectorPackGroupId = id;
+    }
     public async Task LoadPackGroupsAsync()
     {
         try
@@ -34,7 +60,8 @@ public sealed partial class MainWindowViewModel
                 PackGroupCandidates.Add(Candidate(item.Id, item.Id, item.Name, item.MarketplaceId, item.FilePath,
                     item.AssetKind.Contains("Plugin", StringComparison.OrdinalIgnoreCase) ? LibraryPackageContentKind.CodePlugin :
                     item.AssetKind.Contains("Projet", StringComparison.OrdinalIgnoreCase) ? LibraryPackageContentKind.CompleteProject :
-                    item.AssetKind.Contains("RAW", StringComparison.OrdinalIgnoreCase) ? LibraryPackageContentKind.RawAsset : LibraryPackageContentKind.ContentPack, []));
+                    item.AssetKind.Contains("RAW", StringComparison.OrdinalIgnoreCase) ? LibraryPackageContentKind.RawAsset :
+                    item.AssetKind.Contains("Pack Unreal", StringComparison.OrdinalIgnoreCase) ? LibraryPackageContentKind.ContentPack : LibraryPackageContentKind.Unknown, []));
         }
         catch (Exception ex) { PackGroupStatus = ex.Message; ShowError(ex); }
     }
@@ -43,6 +70,7 @@ public sealed partial class MainWindowViewModel
     {
         var script = _fabInstallationScripts.Find(kind is LibraryPackageContentKind.CodePlugin or LibraryPackageContentKind.EnginePackage
             ? UnrealProjectPluginInstallationScript.ScriptId : UnrealContentPackInstallationScript.ScriptId);
+        if (kind == LibraryPackageContentKind.Unknown) script = null;
         if (source == "cyenginehub.marketplace-cosmos" && kind == LibraryPackageContentKind.ContentPack)
             script = _fabInstallationScripts.Find(UnrealRelocatedContentInstallationScript.ScriptId);
         if (source == "cyenginehub.marketplace-cosmos" && kind == LibraryPackageContentKind.RawAsset)
@@ -52,6 +80,13 @@ public sealed partial class MainWindowViewModel
             return new(asset, artifact, name, source, path, kind, versions,
                 [new(raw.Descriptor.Id, raw.Descriptor.Options.ToDictionary(o => o.Id, o => o.Id == "importMode" ? "raw" : o.DefaultValue)),
                  new(move.Descriptor.Id, move.Descriptor.Options.ToDictionary(o => o.Id, o => o.Id == "conflictPolicy" ? "fail" : o.DefaultValue))]);
+        }
+        if (MarketplaceConnectors.Any(connector => connector.Id == source && connector.HasPackageStorage) && kind == LibraryPackageContentKind.RawAsset)
+        {
+            var raw = _fabInstallationScripts.Find(UnrealMegascansInstallationScript.ScriptId)!;
+            return new(asset, artifact, name, source, path, kind, versions,
+                [new(raw.Descriptor.Id, raw.Descriptor.Options.ToDictionary(o => o.Id,
+                    o => o.Id == "importMode" ? "raw" : o.Id == "conflictPolicy" ? "fail" : o.DefaultValue))]);
         }
         return new(asset, artifact, name, source, path, kind, versions,
             script is null ? [] : [new(script.Descriptor.Id, script.Descriptor.Options.ToDictionary(o => o.Id,
@@ -134,7 +169,13 @@ public sealed partial class MainWindowViewModel
                             }
                             completedPacks++;
                         }
-                        finally { DeleteOwnedDerivedDirectory(scratch, "DerivedInstallSources"); }
+                        finally
+                        {
+                            DeleteOwnedDerivedDirectory(scratch, "DerivedInstallSources");
+                            DeleteOwnedDerivedDirectory(scratch + ".converted", "DerivedInstallSources");
+                            DeleteOwnedDerivedDirectory(scratch + ".unreal", "DerivedInstallSources");
+                            DeleteOwnedDerivedDirectory(scratch + ".external", "DerivedInstallSources");
+                        }
                     }
                 }));
             var result = await handle.Completion;

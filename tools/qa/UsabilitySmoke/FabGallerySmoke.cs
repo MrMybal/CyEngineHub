@@ -45,7 +45,7 @@ static partial class Program
         await Wait(() => selected.GalleryImages.Count == 3 && !selected.IsGalleryLoading && selected.SelectedGalleryImage is not null);
         Check(selected.GalleryStatus.Contains("catalogue", StringComparison.Ordinal), "Offline detail fallback explicitly identifies the incomplete catalogue gallery");
         Check(selected.GalleryImages.Where(entry => entry.Image is not null).All(entry => Math.Max(entry.Image!.PixelSize.Width, entry.Image.PixelSize.Height) <= 192), "Gallery thumbnails use a separate lightweight decode");
-        Check(ImGuiDiagnostics.Elements(window).Contains("gallery-thumbnail/2"), "The product fiche exposes its actual image thumbnails");
+        Check(ImGuiDiagnostics.Elements(window).Contains("gallery-thumbnail/0") && ImGuiDiagnostics.Elements(window).Contains("gallery-thumbnail/1"), "The product fiche exposes actual image thumbnails within its responsive strip");
         await ImGuiDiagnostics.ClickAsync(window, "gallery-thumbnail/1");
         await Wait(() => selected.SelectedGalleryIndex == 1 && !selected.IsGalleryLoading);
         Check(selected.SelectedGalleryImage is not null && selected.GalleryCounter == "2 / 3", "Clicking a thumbnail selects and loads its large image");
@@ -55,6 +55,7 @@ static partial class Program
         await ImGuiDiagnostics.ClickAsync(window, "gallery-next");
         await Wait(() => selected.SelectedGalleryIndex == 2 && !selected.IsGalleryLoading);
         Check(selected.PreviewImage!.PixelSize.Height > selected.PreviewImage.PixelSize.Width, "Portrait images preserve their aspect ratio");
+        Check(ImGuiDiagnostics.Elements(window).Contains("gallery-thumbnail/2"), "Navigating to a clipped thumbnail scrolls that selection into view");
         await ImGuiDiagnostics.KeyAsync(window, Key.Right);
         await Wait(() => selected.SelectedGalleryIndex == 0 && !selected.IsGalleryLoading);
         await ImGuiDiagnostics.KeyAsync(window, Key.Left);
@@ -62,12 +63,20 @@ static partial class Program
         Check(selected.GalleryCounter == "3 / 3", "Keyboard arrows wrap at both ends of the gallery");
         await ImGuiDiagnostics.ClickAsync(window, "gallery-zoom-in");
         Check(ImGuiDiagnostics.Elements(window).Contains("gallery-zoom/125"), "Enlarged images support explicit zoom");
+        var beforePan = ImGuiDiagnostics.Elements(window).Single(key => key.StartsWith("gallery-pan/", StringComparison.Ordinal));
         await ImGuiDiagnostics.PointerGestureAsync(window, "gallery-canvas", wheel: 1, drag: new(0, 30));
-        Check(ImGuiDiagnostics.Elements(window).Contains("gallery-zoom/150") && ImGuiDiagnostics.Elements(window).Any(key => key.StartsWith("gallery-pan/", StringComparison.Ordinal) && key != "gallery-pan/0/0"), "Mouse wheel zoom and dragging pan the enlarged image");
+        var zoom = ImGuiDiagnostics.Elements(window).Single(key => key.StartsWith("gallery-zoom/", StringComparison.Ordinal));
+        Check(int.Parse(zoom.Split('/')[1], System.Globalization.CultureInfo.InvariantCulture) > 125 &&
+            ImGuiDiagnostics.Elements(window).Single(key => key.StartsWith("gallery-pan/", StringComparison.Ordinal)) != beforePan,
+            "Mouse wheel zoom and dragging pan the enlarged CyUI image");
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "fab-gallery-viewer-zoom.png"));
         await ImGuiDiagnostics.ClickAsync(window, "gallery-fit");
         Check(ImGuiDiagnostics.Elements(window).Contains("gallery-zoom/100"), "Fit resets zoom and pan");
+        var fitPan = ImGuiDiagnostics.Elements(window).Single(key => key.StartsWith("gallery-pan/", StringComparison.Ordinal));
         window.Width = 1024; await ImGuiDiagnostics.FramesAsync(window, 5);
+        Check(ImGuiDiagnostics.Elements(window).Contains("gallery-zoom/100") &&
+            ImGuiDiagnostics.Elements(window).Single(key => key.StartsWith("gallery-pan/", StringComparison.Ordinal)) != fitPan,
+            "Fit recenters the native image when the viewport is resized");
         var canvasBounds = ImGuiDiagnostics.ElementBounds(window, "gallery-canvas");
         Check(canvasBounds.X > 0 && canvasBounds.Z < 1024 && canvasBounds.W > canvasBounds.Y + 100, "The enlarged viewer fits a 1024-pixel window without overflow");
         await ImGuiDiagnostics.CaptureAsync(window, Path.Combine(Output, "fab-gallery-viewer-1024.png"));

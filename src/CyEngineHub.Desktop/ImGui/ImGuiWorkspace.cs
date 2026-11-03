@@ -5,12 +5,12 @@ using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using Avalonia.Media.Imaging;
 using CyEngineHub.Desktop.ViewModels;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace : IDisposable
+internal sealed unsafe partial class ImGuiWorkspace : IDisposable
 {
     private readonly UiDocument _document;
     private readonly Dictionary<string, UiDocument> _panels = new(StringComparer.Ordinal);
@@ -63,7 +63,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
             _compact = preferences.UseCompactInterface;
             // Other ImGui hosts have their own context; keep shared palette helpers
             // consistent with this host even after opening a sign-in/tool window.
-            ImGuiTheme.ApplyPalette(preferences.InterfaceTheme);
+            ImGuiTheme.Apply(preferences.InterfaceTheme, preferences.UseCompactInterface, preferences.InterfaceLanguage == "Français" ? "fr" : "en");
         }
         VisibleRows.Clear();
         Elements.Clear();
@@ -72,9 +72,6 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         _previousCompact = _compact;
         _seen.Clear();
         _seenCollections.Clear();
-        var style = Gui.GetStyle();
-        style.ItemSpacing = (_compact ? new Vector2(7, 4) : new Vector2(9, 8)) * UiCardGrid.InterfaceScale;
-        style.FramePadding = (_compact ? new Vector2(7, 3) : new Vector2(10, 7)) * UiCardGrid.InterfaceScale;
         Gui.SetNextWindowPos(Vector2.Zero);
         Gui.SetNextWindowSize(size);
         Gui.Begin("CyEngineHub###hub", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoBringToFrontOnFocus);
@@ -132,11 +129,12 @@ internal sealed partial class ImGuiWorkspace : IDisposable
             Gui.SetNextWindowSize(new(width, Math.Min(size.Y - 64, border?.Number("MaxHeight", 700) ?? 700)), ImGuiCond.Always);
             if (Gui.BeginPopupModal(name, ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoMove))
             {
+                var editingText = Gui.GetIO().WantTextInput;
                 if (border is not null) DrawModalBody(border);
-                if (index == layers.Length - 1 && Gui.IsKeyPressed(ImGuiKey.Escape))
+                if (index == layers.Length - 1 && !editingText && Gui.IsKeyPressed(ImGuiKey.Escape))
                 {
                     var cancel = node.Descendants().Select(child => child["Command"]).LastOrDefault(command =>
-                        UiBinding.Path(command) is { } path && (path.StartsWith("Cancel", StringComparison.Ordinal) || path.StartsWith("Close", StringComparison.Ordinal)));
+                        UiBinding.Path(command) is { } path && (path.StartsWith("Cancel", StringComparison.Ordinal) || path.StartsWith("Close", StringComparison.Ordinal) || path.StartsWith("Postpone", StringComparison.Ordinal)));
                     if (cancel is not null) Execute(_root, cancel);
                 }
                 DrawModalAt(index + 1);
@@ -147,6 +145,8 @@ internal sealed partial class ImGuiWorkspace : IDisposable
 
     private void DrawModalBody(UiNode border)
     {
+        if (border["Name"] == "FabOptionsDialog")
+        { DrawFabOptionsDialog(border); return; }
         if (border["Name"] == "FabGalleryViewer" && _root is MainWindowViewModel gallery)
         { DrawFabGallery(gallery, enlarged: true); return; }
         var grid = border.Children.FirstOrDefault();
@@ -294,14 +294,13 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         text = NormalizeLabel(text);
         if (string.IsNullOrEmpty(text)) return;
         var size = node.Number("FontSize", 12);
-        if (size >= 19) Gui.SetWindowFontScale(1.18f);
         var color = Color(context, node["Foreground"], size <= 10 ? ImGuiTheme.Muted : Gui.GetStyle().Colors[(int)ImGuiCol.Text]);
         Gui.PushStyleColor(ImGuiCol.Text, color);
-        if (node["TextTrimming"] is not null) Gui.TextUnformatted(Elide(text, Gui.GetContentRegionAvail().X));
+        if (size >= 19 && node["TextWrapping"] is null) CyUiNative.Heading(text, size >= 24 ? 1 : 2);
+        else if (node["TextTrimming"] is not null) Gui.TextUnformatted(Elide(text, Gui.GetContentRegionAvail().X));
         else if (node["TextWrapping"] is not null) { Gui.PushTextWrapPos(0); Gui.TextUnformatted(text); Gui.PopTextWrapPos(); }
         else Gui.TextUnformatted(text);
         Gui.PopStyleColor();
-        if (size >= 19) Gui.SetWindowFontScale(1);
         if (Gui.BeginPopupContextItem("copy"))
         {
             if (Gui.MenuItem("Copier")) Gui.SetClipboardText(text);
@@ -325,6 +324,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
     private void DrawInput(UiNode node, object? context)
     {
         var text = Text(context, node["Text"]);
+        if (DrawCyUiInput(node, context, text)) return;
         Gui.SetNextItemWidth(-1);
         if (_focusRequests.Remove(UiBinding.Path(node["Text"]) ?? "")) Gui.SetKeyboardFocusHere();
         var flags = UiBinding.Boolean(context, node["IsReadOnly"], false) ? ImGuiInputTextFlags.ReadOnly : ImGuiInputTextFlags.None;
@@ -360,9 +360,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
                 "ShowQuixelCollectionsTabCommand" => Flag(_root, "IsQuixelCollectionsTabSelected"),
                 _ => false,
             };
-        var colorCount = ImGuiTheme.PushActionColors(UiBinding.Path(node["Command"]), accent, danger);
-        if (selected && !danger) { Gui.PushStyleColor(ImGuiCol.Button, ImGuiTheme.Selected); colorCount++; }
-        if (Gui.Button(NormalizeLabel(label) + "###button"))
+        if (CyUiNative.Button(NormalizeLabel(label) + "###button", selected && !danger ? CyUiVariant.Primary : ImGuiTheme.ActionVariant(UiBinding.Path(node["Command"]), accent, danger)))
         {
             if (node["Click"] is { } action) _actions.Enqueue(() => _nativeAction?.Invoke(action));
             else Execute(context, node["Command"]);
@@ -370,7 +368,6 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         Record("command/" + (UiBinding.Path(node["Command"]) ?? node["Click"] ?? node.Id) + "/" + node.Id);
         if (context is FabStoredDownloadViewModel stored)
             Record("stored-version-action/" + stored.ArtifactId + "/" + UiBinding.Path(node["Command"]));
-        if (colorCount > 0) Gui.PopStyleColor(colorCount);
         Gui.EndDisabled();
     }
 
@@ -470,7 +467,26 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         var requiredWidth = columns.Select((spec, column) => spec.Trim() == "Auto" ? AutoWidth(column) : float.TryParse(spec, CultureInfo.InvariantCulture, out var fixedWidth) ? Math.Min(fixedWidth, 240) : node.Number("MinStretchColumnWidth", 30)).Sum() + columns.Length * 8;
         if (Gui.GetContentRegionAvail().X < requiredWidth)
         {
-            foreach (var child in children) DrawNode(child, context);
+            if (node["Name"] == "FabProductSummary" && Gui.GetContentRegionAvail().X >= CyUiNative.Dp(420))
+            {
+                var actions = children.Single(child => child["Name"] == "ProductActionPanel");
+                DrawNode(actions, context);
+                if (Gui.BeginTable("product-summary-compact", 2, ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.NoSavedSettings))
+                {
+                    Gui.TableSetupColumn("Gallery", ImGuiTableColumnFlags.WidthFixed, CyUiNative.Dp(160));
+                    Gui.TableSetupColumn("Description", ImGuiTableColumnFlags.WidthStretch);
+                    Gui.TableNextColumn(); DrawNode(children.Single(child => child["Name"] == "FabProductGallery"), context);
+                    Gui.TableNextColumn(); DrawNode(children.Single(child => child.Number("Grid.Column", 0) == 1), context);
+                    Gui.EndTable();
+                }
+                return;
+            }
+            // A scrollable document fills the remaining height. On narrow product
+            // fiches keep acquisition/organization actions before that document.
+            var ordered = node["Name"] == "FabProductSummary"
+                ? children.OrderBy(child => child["Name"] == "ProductActionPanel" ? 0 : 1)
+                : children.AsEnumerable();
+            foreach (var child in ordered) DrawNode(child, context);
             return;
         }
         if (!Gui.BeginTable("grid", columns.Length, ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.NoSavedSettings)) return;
@@ -564,6 +580,11 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         var selected = UiBinding.Read(context, node["SelectedItem"]);
         var scroll = node.Kind == "ListBox";
         var binding = UiBinding.Path(node["ItemsSource"]) ?? node.Id;
+        if (binding is "BuildLogs" or "GitLogs" or "FilteredRawLogEntries")
+        {
+            DrawCyUiLogs(binding, values, node);
+            return;
+        }
         if (_root is MainWindowViewModel favoriteVm && binding is "FabLocalContentPacks" or "QuixelLocalAssets" or "QuixelCollectionCards")
         {
             var filtered = values.Cast<object>().Where(item => !favoriteVm.FavoritesOnly || favoriteVm.IsResourceFavorite(item));
@@ -694,7 +715,7 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         }
         var texture = _image(bitmap);
         var size = new Vector2(width, Math.Min(height, preview ? 900 : 450));
-        if (texture != 0) Gui.Image(texture, size); else Gui.Dummy(size);
+        if (texture != 0) Gui.Image(new ImTextureRef { TexID = new ImTextureID((ulong)texture) }, size); else Gui.Dummy(size);
     }
 
     internal static string NormalizeLabel(string label) => label.Replace("✕", "Fermer", StringComparison.Ordinal)
@@ -709,15 +730,18 @@ internal sealed partial class ImGuiWorkspace : IDisposable
         if (value is Avalonia.Media.ISolidColorBrush brush)
         {
             var color = brush.Color;
-            return new(color.R / 255f, color.G / 255f, color.B / 255f, color.A / 255f);
+            return ImGuiTheme.Rgb((uint)(color.R << 16 | color.G << 8 | color.B));
         }
         if (value is string { Length: 7 } text && text.StartsWith('#') && uint.TryParse(text[1..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var rgb))
-            return new(((rgb >> 16) & 255) / 255f, ((rgb >> 8) & 255) / 255f, (rgb & 255) / 255f, 1);
+            return ImGuiTheme.Rgb(rgb);
         return fallback;
     }
 
     public void Dispose()
     {
+        DisposeCyUiViews();
+        if (_cyUiDescription != 0) CyUiNative.DestroyDocument(_cyUiDescription);
+        _cyUiDescription = 0;
         foreach (var row in _realized) row.Recycle();
         _realized.Clear();
         foreach (var collection in _collections) collection.ReleaseThumbnail();

@@ -1,7 +1,7 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Avalonia.Media.Imaging;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using Silk.NET.OpenGLES;
 using SkiaSharp;
 
@@ -15,7 +15,7 @@ internal sealed unsafe class ImGuiGlRenderer : IDisposable
     private readonly uint _vertices;
     private readonly uint _indices;
     private readonly uint _vertexArray;
-    private uint _font;
+    private readonly HashSet<uint> _atlasTextures = [];
     private readonly int _projection;
     private readonly Dictionary<Bitmap, (uint Texture, long Frame, long Bytes)> _images = new(ReferenceEqualityComparer.Instance);
     private long _frame;
@@ -69,16 +69,39 @@ internal sealed unsafe class ImGuiGlRenderer : IDisposable
         gl.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 20, (void*)0);
         gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 20, (void*)8);
         gl.VertexAttribPointer(2, 4, VertexAttribPointerType.UnsignedByte, true, 20, (void*)16);
-        var io = ImGuiNET.ImGui.GetIO();
-        io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset;
-        UpdateFont();
+        var io = Hexa.NET.ImGui.ImGui.GetIO();
+        io.BackendFlags |= ImGuiBackendFlags.RendererHasVtxOffset | ImGuiBackendFlags.RendererHasTextures;
     }
-    internal void UpdateFont()
+    private void UpdateTextures()
     {
-        if (_font != 0) _gl.DeleteTexture(_font);
-        var atlas = ImGuiNET.ImGui.GetIO().Fonts;
-        atlas.GetTexDataAsRGBA32(out nint pixels, out int width, out int height);
-        _font = Upload(pixels, width, height); atlas.SetTexID((nint)_font); atlas.ClearTexData();
+        var textures = Hexa.NET.ImGui.ImGui.GetPlatformIO().Textures;
+        for (var index = 0; index < textures.Size; index++)
+        {
+            var texture = textures[index];
+            if (texture.Status == ImTextureStatus.WantCreate)
+            {
+                var id = Upload((nint)texture.Pixels, texture.Width, texture.Height);
+                _atlasTextures.Add(id); texture.SetTexID(new ImTextureID((ulong)id)); texture.SetStatus(ImTextureStatus.Ok);
+            }
+            else if (texture.Status == ImTextureStatus.WantUpdates)
+            {
+                _gl.BindTexture(TextureTarget.Texture2D, (uint)texture.TexID.Handle);
+                _gl.PixelStore(PixelStoreParameter.UnpackRowLength, texture.Width);
+                for (var update = 0; update < texture.Updates.Size; update++)
+                {
+                    var rect = texture.Updates[update];
+                    _gl.TexSubImage2D(TextureTarget.Texture2D, 0, rect.X, rect.Y, rect.W, rect.H,
+                        PixelFormat.Rgba, PixelType.UnsignedByte, texture.Pixels + (rect.Y * texture.Width + rect.X) * 4);
+                }
+                _gl.PixelStore(PixelStoreParameter.UnpackRowLength, 0); texture.SetStatus(ImTextureStatus.Ok);
+            }
+            else if (texture.Status == ImTextureStatus.WantDestroy)
+            {
+                var id = (uint)texture.TexID.Handle;
+                _gl.DeleteTexture(id); _atlasTextures.Remove(id);
+                texture.SetTexID(ImTextureID.Null); texture.SetStatus(ImTextureStatus.Destroyed);
+            }
+        }
     }
 
     private uint Compile(ShaderType type, string source)
@@ -127,9 +150,11 @@ internal sealed unsafe class ImGuiGlRenderer : IDisposable
     {
         _frame++;
         var gl = _gl;
+        UpdateTextures();
         gl.BindFramebuffer(FramebufferTarget.Framebuffer, (uint)framebuffer);
         gl.Viewport(0, 0, (uint)width, (uint)height);
-        gl.ClearColor(.035f, .048f, .065f, 1);
+        var ground = CyUiNative.Colour(CyUiRole.Ground);
+        gl.ClearColor(ground.X, ground.Y, ground.Z, ground.W);
         gl.Clear(ClearBufferMask.ColorBufferBit);
         if (width <= 0 || height <= 0) return;
         gl.Enable(EnableCap.Blend);
@@ -158,7 +183,7 @@ internal sealed unsafe class ImGuiGlRenderer : IDisposable
             for (var j = 0; j < list.CmdBuffer.Size; j++)
             {
                 var command = list.CmdBuffer[j];
-                if (command.UserCallback != 0) continue;
+                if (command.UserCallback != null) continue;
                 var clip = command.ClipRect;
                 var scale = data.FramebufferScale;
                 var x = Math.Clamp((clip.X-l)*scale.X, 0, width);
@@ -167,7 +192,7 @@ internal sealed unsafe class ImGuiGlRenderer : IDisposable
                 var bottom = Math.Clamp((clip.W-t)*scale.Y, 0, height);
                 if (right <= x || bottom <= y) continue;
                 gl.Scissor((int)x, height-(int)bottom, (uint)(right-x), (uint)(bottom-y));
-                gl.BindTexture(TextureTarget.Texture2D, (uint)command.TextureId);
+                gl.BindTexture(TextureTarget.Texture2D, (uint)command.GetTexID().Handle);
                 var vertexOffset = command.VtxOffset * 20;
                 gl.VertexAttribPointer(0, 2, VertexAttribPointerType.Float, false, 20, (void*)vertexOffset);
                 gl.VertexAttribPointer(1, 2, VertexAttribPointerType.Float, false, 20, (void*)(vertexOffset + 8));
@@ -192,7 +217,8 @@ internal sealed unsafe class ImGuiGlRenderer : IDisposable
     {
         foreach (var image in _images.Values) _gl.DeleteTexture(image.Texture);
         _images.Clear();
-        _gl.DeleteTexture(_font);
+        foreach (var texture in _atlasTextures) _gl.DeleteTexture(texture);
+        _atlasTextures.Clear();
         _gl.DeleteBuffer(_vertices);
         _gl.DeleteBuffer(_indices);
         _gl.DeleteVertexArray(_vertexArray);

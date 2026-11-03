@@ -8,3 +8,16 @@ not a copied runtime. Its Python dependencies are installed only on explicit set
 MCP Python SDK 1.30.0: https://github.com/modelcontextprotocol/python-sdk
 CyUEMCPSDK reference integration guide: https://github.com/MrMybal/CyUEMCPSDK
 No CyUEMCPSDK code or Unreal assistant runtime is embedded in this integration.
+
+Modular desktop UI:
+CyUI 1.2.0 (MIT), revision ff023e646c6a3038b3dfbfd53f6d2b4a2f5955e3
+https://github.com/MrMybal/CyUI
+cimgui (MIT), revision d61baefa0ce2a9db938ffdeb29e64f90f44cc037
+https://github.com/JunaMeinhold/cimgui
+ImGui 1.92.1 (MIT), revision 44aa9a4b3a6f27d09a4eb5770d095cbd376dfc4b
+https://github.com/ocornut/imgui
+Hexa.NET.ImGui 2.2.8.5 and HexaGen.Runtime 1.1.21 (MIT)
+https://github.com/HexaEngine/Hexa.NET.ImGui
+https://github.com/HexaEngine/HexaGen
+Lexilla/Scintilla/SciTE notices accompany the CyUI DocumentViews/Code dependency.
+The authoritative native ABI/module lock is native/CyEngineHub.CyUI/dependencies.lock.json.

@@ -437,7 +437,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _collectionEditorItemName = string.Empty;
     private Action<string[]>? _collectionEditorApply;
     private string _fabInstallTargetSearchQuery = string.Empty;
-    private bool _showOnlyCompatibleFabTargets = true;
+    private bool _showOnlyCompatibleFabTargets;
     private readonly Dictionary<string, string[]> _fabCollections = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<FabStoredDownloadRecord> _fabStoredDownloads = [];
     private readonly List<FabVersionDownloadViewModel> _fabVersionDownloads = [];
@@ -454,6 +454,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private CancellationTokenSource? _libraryPresentationCancellation;
     private CancellationTokenSource? _remoteLibraryViewCancellation;
     private int _libraryPageIndex;
+    private int _libraryProductReturnPageIndex;
+    private string? _libraryProductReturnSource;
     private string _librarySource = "Fab";
     private RemoteFabAsset[] _remoteFabCatalog = [];
     private RemoteFabAsset[] _visibleRemoteFabCatalog = [];
@@ -506,6 +508,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private bool _includePrereleaseUpdates = ResolveApplicationVersion().Contains('-');
     private string _updateStatus = "Dépôt officiel · MrMybal/CyEngineHub";
     private bool _isUpdateCheckActive;
+    private bool _startupUpdateCheckStarted;
+    private bool _hasCheckedForUpdates;
+    private bool _isUpdateCheckFailed;
     private bool _isUpdateDownloadActive;
     private bool _isUpdateAvailablePopupVisible;
     private bool _isUpdateDownloadProgressVisible;
@@ -685,6 +690,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
                     processRunner,
                     fabProjectContentImport,
                     Path.Combine(appData.RootDirectory, "Megascans", "ImportedVariants")),
+                new CyEngineHub.Fab.Installation.UnrealRawAssetsInstallationScript(processRunner, fabProjectContentImport),
+                new CyEngineHub.Fab.Installation.BlenderConversionInstallationScript(new CyEngineHub.Fab.Conversion.BlenderSourceConverter(
+                    processRunner, Path.Combine(AppContext.BaseDirectory, "Extensions", "cyenginehub.source-converters", "scripts", "blender-convert.py"))),
                 new UnrealRelocatedContentInstallationScript(
                     processRunner,
                     fabProjectContentImport,
@@ -802,7 +810,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         ShowHomeCommand = new RelayCommand(() => ShowSection(PageSection.Engines));
         NavigateBackCommand = _navigateBackCommand = new RelayCommand(
             NavigateBack,
-            () => _backNavigation.Count > 0);
+            () => HasLibraryProductBack || _backNavigation.Count > 0);
         NavigateForwardCommand = _navigateForwardCommand = new RelayCommand(
             NavigateForward,
             () => _forwardNavigation.Count > 0);
@@ -1192,8 +1200,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
         CloseFabDownloadOptionsCommand = new RelayCommand(() => IsFabDownloadOptionsVisible = false);
         OpenFabInstallOptionsCommand = new RelayCommand(() =>
         {
+            var restoreSupplier = _activeDerivedInstallArtifactId is not null || FabInstallVersions.Count == 0;
             _activeDerivedInstallArtifactId = null;
-            if (SelectedRemoteFabAssetCard is not null)
+            if (restoreSupplier && SelectedRemoteFabAssetCard is not null)
             {
                 RestoreSupplierInstallVersions(SelectedRemoteFabAssetCard);
             }
@@ -1231,9 +1240,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
             allowConcurrentExecutions: true);
         DownloadSelectedFabVersionsCommand = _downloadSelectedFabVersionsCommand;
         InstallSelectedFabVersionsCommand = new AsyncRelayCommand(
-            () => InstallSelectedFabVersionsIntoTargetsAsync(),
-            () => SelectedRemoteFabAsset is not null && !IsEpicBusy,
-            ShowError);
+            () => InstallSelectedFabVersionsIntoTargetsAsync(force: BypassFabInstallChecks),
+            () => BypassFabInstallChecks || SelectedRemoteFabAsset is not null && !IsEpicBusy,
+            ShowFabInstallActionError,
+            allowConcurrentExecutions: true);
         _installSelectedFabVersionsInProjectCommand = new AsyncRelayCommand(
             () => DownloadSelectedFabVersionsAsync(FabInstallDestination.Project),
             () => SelectedRemoteFabAsset is not null && SelectedFabInstallProject is not null && !IsEpicBusy,
@@ -1278,6 +1288,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
             () => CheckForUpdatesAsync(showUpToDateStatus: true),
             onError: ShowUpdateError);
         PostponeUpdateCommand = new RelayCommand(() => IsUpdateAvailablePopupVisible = false);
+        ShowAvailableUpdateCommand = new RelayCommand(
+            () => IsUpdateAvailablePopupVisible = true,
+            () => AvailableUpdate is not null && !IsUpdateDownloadActive);
         OpenAvailableUpdateReleaseCommand = new AsyncRelayCommand(
             OpenAvailableUpdateReleaseAsync,
             onError: ShowError);
@@ -1461,7 +1474,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         $"{FilteredFabInstallTargets.Count:N0} résultat(s)";
 
     public string FabInstallVersionResultsLabel =>
-        $"{CompatibleFabInstallVersions.Count:N0} variante(s) correspondant aux cibles";
+        $"{FabInstallVersions.Count:N0} version(s) · {CompatibleFabInstallVersions.Count:N0} recommandée(s)";
 
     public bool HasSelectedFabInstallTargets => FabInstallTargets.Any(item => item.IsSelected);
 
@@ -1702,6 +1715,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public ICommand CheckForUpdatesCommand { get; }
 
     public ICommand PostponeUpdateCommand { get; }
+    public ICommand ShowAvailableUpdateCommand { get; }
 
     public ICommand OpenAvailableUpdateReleaseCommand { get; }
     public ICommand OpenHubLicensesCommand { get; }
@@ -3016,6 +3030,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         {
             if (SetProperty(ref _isEpicBusy, value))
             {
+                OnPropertyChanged(nameof(FabInstallActionStatus));
+                (InstallSelectedFabVersionsCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
                 _refreshEpicCommand.NotifyCanExecuteChanged();
                 (OpenEmbeddedFabAuthorizationCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
                 (OpenQuixelAuthorizationCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
@@ -3777,6 +3793,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    public bool HasCheckedForUpdates
+    {
+        get => _hasCheckedForUpdates;
+        private set => SetProperty(ref _hasCheckedForUpdates, value);
+    }
+
+    public bool IsUpdateCheckFailed
+    {
+        get => _isUpdateCheckFailed;
+        private set => SetProperty(ref _isUpdateCheckFailed, value);
+    }
+
     public bool IsUpdateAvailablePopupVisible
     {
         get => _isUpdateAvailablePopupVisible;
@@ -4351,6 +4379,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             if (SetProperty(ref _isRemoteFabProductVisible, value))
             {
                 OnPropertyChanged(nameof(IsRemoteFabCatalogVisible));
+                OnPropertyChanged(nameof(NavigationBackLabel));
+                _navigateBackCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -4961,9 +4991,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         try
         {
             await _database.InitializeAsync().ConfigureAwait(true);
+            // Independent of discovery, marketplace connections and caches:
+            // slow or failed initialization must not suppress the update proposal.
+            await LoadUpdateSettingsAsync().ConfigureAwait(true);
+            _ = CheckForUpdatesOnStartupAsync();
             await LoadInterfaceAsync().ConfigureAwait(true);
             LoadWindowsStartupSettings();
-            await LoadUpdateSettingsAsync().ConfigureAwait(true);
             _workspacePreferences = await _workspacePreferencesService.LoadAsync().ConfigureAwait(true);
             await LoadProjectCreationProfilesAsync().ConfigureAwait(true);
             _fabInstallationScriptPreferences =
@@ -4995,7 +5028,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             await LoadEditorBridgeAsync().ConfigureAwait(true);
             await RefreshCatalogAsync().ConfigureAwait(true);
             _ = RefreshMarketplacesOnStartupAsync();
-            _ = CheckForUpdatesOnStartupAsync();
         }
         catch (Exception exception)
         {
@@ -5266,15 +5298,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task CheckForUpdatesOnStartupAsync()
     {
+        if (_startupUpdateCheckStarted) return;
+        _startupUpdateCheckStarted = true;
         if (!AutoCheckStableUpdates || string.IsNullOrWhiteSpace(UpdateRepository)) return;
-        await Task.Delay(1200).ConfigureAwait(true);
         try
         {
             await CheckForUpdatesAsync(showUpToDateStatus: false).ConfigureAwait(true);
         }
         catch (Exception exception)
         {
-            ShowUpdateError(exception);
+            // Offline/rate-limited startup is not a blocking application error.
+            UpdateStatus = $"Recherche de mise à jour impossible : {exception.Message} Réessayez depuis les paramètres.";
+            AppendRawLog("WARN", "Updates/Startup", UpdateStatus);
         }
     }
 
@@ -5291,16 +5326,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         if (IsUpdateCheckActive || IsUpdateDownloadActive) return;
         IsUpdateCheckActive = true;
+        IsUpdateCheckFailed = false;
         UpdateStatus = IncludePrereleaseUpdates ? "Recherche des releases, Alpha/Bêta incluses…" : "Recherche de la dernière release stable…";
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         try
         {
             var release = await _applicationUpdateService.CheckForUpdateAsync(
                 UpdateRepository,
                 ApplicationVersion,
-                IncludePrereleaseUpdates).ConfigureAwait(true);
+                IncludePrereleaseUpdates,
+                timeout.Token).ConfigureAwait(true);
+            HasCheckedForUpdates = true;
             if (release is null)
             {
                 AvailableUpdate = null;
+                IsUpdateAvailablePopupVisible = false;
                 UpdateStatus = $"CyEngineHub {ApplicationVersion} est à jour.";
                 if (showUpToDateStatus) StatusMessage = UpdateStatus;
                 return;
@@ -5314,6 +5354,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 "INFO",
                 "Updates",
                 $"Release disponible : {release.TagName} · installation automatique : {release.CanInstall}.");
+        }
+        catch (OperationCanceledException exception) when (timeout.IsCancellationRequested)
+        {
+            IsUpdateCheckFailed = true;
+            throw new ApplicationUpdateException("Le serveur de mises à jour n’a pas répondu dans les 30 secondes.", exception);
+        }
+        catch
+        {
+            IsUpdateCheckFailed = true;
+            throw;
         }
         finally
         {
@@ -7340,7 +7390,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void OpenRemoteFabProduct(RemoteFabAssetCardViewModel card)
     {
+        FabInstallActionError = string.Empty;
         var productSource = NormalizeAssetSource(card.Asset);
+        if (!IsRemoteFabProductVisible)
+        {
+            _libraryProductReturnPageIndex = _libraryPageIndex;
+            _libraryProductReturnSource = productSource;
+        }
         _libraryProductAssetIds[productSource] = card.Asset.AssetId;
         var detailCard = CreateRemoteAssetCard(card.Asset);
         detailCard.EnsureThumbnailLoaded();
@@ -7352,7 +7408,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RestoreSupplierInstallVersions(detailCard);
         SelectedFabInstallProject = Projects.FirstOrDefault();
         SelectedFabInstallEngine = Engines.FirstOrDefault();
-        ShowOnlyCompatibleFabTargets = !IsQuixelAsset(detailCard.Asset);
+        ShowOnlyCompatibleFabTargets = false;
         RebuildSelectedFabStoredDownloads(detailCard.Asset.AssetId);
         RebuildSelectedDerivedWorkspaces(detailCard.Asset.AssetId);
         RebuildSelectedFabVersionDownloads(detailCard.Asset.AssetId, productSource);
@@ -7374,12 +7430,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
     {
         PackDownloadEstimateSummary = "Estimez la sélection pour connaître le transfert et l’espace brut requis. Aucun moteur installé n’est nécessaire pour télécharger.";
         FabInstallVersions.Clear();
-        var preferred = detailCard.Asset.PreferredProjectVersion;
+        var preferred = detailCard.Asset.ProjectVersions.FirstOrDefault(version =>
+            SupportsCurrentPlatform(version) && FindLocalFabInstallSource(detailCard.Asset, version) is not null)
+            ?? detailCard.Asset.PreferredProjectVersion;
         foreach (var version in detailCard.Asset.ProjectVersions
                      .OrderByDescending(item => ParseEngineVersion(
                          item.EngineVersions.Count == 0 ? string.Empty : item.EngineVersions[0])))
         {
             var option = new FabInstallVersionOptionViewModel(version, Equals(version, preferred));
+            option.LocalSourceNotice = FindLocalFabInstallSource(detailCard.Asset, version) is { } local
+                ? $"Disponible en local · aucun téléchargement · {local.Path}"
+                : "Variante absente du stockage local · téléchargement nécessaire";
             option.PropertyChanged += (_, args) =>
             {
                 if (args.PropertyName == nameof(FabInstallVersionOptionViewModel.IsSelected))
@@ -7627,32 +7688,22 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private void RebuildCompatibleFabInstallVersions()
     {
         var selectedTargets = FabInstallTargets.Where(item => item.IsSelected).ToArray();
-        if (selectedTargets.Length == 0)
-        {
-            CompatibleFabInstallVersions.ReplaceWith([]);
-            NotifyFabInstallVersionFilterChanged();
-            return;
-        }
-
         var compatible = FabInstallVersions
             .Where(option => selectedTargets.Any(target =>
-                CanInstallFabVersionIntoTarget(option.Version, target)))
+                IsFabVersionRecommendedForTarget(option.Version, target)))
             .ToArray();
-        var compatibleSet = compatible.ToHashSet();
-        foreach (var option in FabInstallVersions.Where(option => !compatibleSet.Contains(option)))
+        // Compatibility is advisory: never hide a supplier variant or discard a manual choice.
+        foreach (var option in FabInstallVersions)
         {
-            option.IsSelected = false;
-        }
-
-        foreach (var target in selectedTargets)
-        {
-            var candidates = compatible
-                .Where(option => CanInstallFabVersionIntoTarget(option.Version, target))
-                .ToArray();
-            if (candidates.Length > 0 && !candidates.Any(option => option.IsSelected))
-            {
-                candidates[0].IsSelected = true;
-            }
+            var unmatched = selectedTargets.Where(target => !target.IgnoresEngineCompatibility &&
+                !IsFabVersionCompatibleWithTarget(option.Version, target)).Select(target => target.Name).ToArray();
+            option.CompatibilityNotice = !SupportsCurrentPlatform(option.Version)
+                ? "Autre plateforme déclarée : vérifiez le contenu. « Installer quand même » permet le choix manuel ; le script conserve ses contrôles."
+                : selectedTargets.Length == 0
+                    ? "Choix libre · sélectionnez un projet pour afficher l’indication de compatibilité."
+                    : unmatched.Length == 0
+                        ? "Correspondance déclarée avec les cibles sélectionnées."
+                        : $"Compatibilité non déclarée : {string.Join(", ", unmatched)}. Choix manuel autorisé ; un downgrade peut nécessiter le script de conversion.";
         }
 
         CompatibleFabInstallVersions.ReplaceWith(compatible);
@@ -7686,12 +7737,15 @@ public sealed partial class MainWindowViewModel : ObservableObject
             .Any(candidate => string.Equals(candidate, targetVersion, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool CanInstallFabVersionIntoTarget(
+    private static bool IsFabVersionRecommendedForTarget(
         RemoteFabProjectVersion version,
         FabInstallTargetOptionViewModel target) =>
         (target.IgnoresEngineCompatibility && SupportsCurrentPlatform(version)) ||
         IsFabVersionCompatibleWithTarget(version, target) ||
         (target.IsUsingVersionBridge && SupportsCurrentPlatform(version));
+
+    private static bool CanInstallFabVersionIntoTarget(RemoteFabProjectVersion version, FabInstallTargetOptionViewModel target) =>
+        SupportsCurrentPlatform(version) && target.SelectedInstallationScript is not null;
 
     private static bool SupportsCurrentPlatform(RemoteFabProjectVersion version)
     {
@@ -8230,6 +8284,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SelectedRemoteFabAssetCard = null;
         SelectedRemoteFabAsset = null;
         SelectedFabVersionDownloads.Clear();
+        if (forgetSelection && string.Equals(_libraryProductReturnSource, LibrarySource, StringComparison.OrdinalIgnoreCase) &&
+            _libraryPageIndex != _libraryProductReturnPageIndex)
+        {
+            _libraryPageIndex = _libraryProductReturnPageIndex;
+            RebuildRemoteFabPage();
+        }
         OnPropertyChanged(nameof(HasSelectedFabVersionDownloads));
         StatusMessage = $"Retour au catalogue {LibrarySource}.";
     }
@@ -8354,7 +8414,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
             UpdateFacetCounts(LibraryCollectionFacets, result.CollectionCounts);
             RefreshVisibleLibraryFacets();
             _visibleRemoteFabCatalog = ApplyFavoriteAssets(result.VisibleAssets);
-            _libraryPageIndex = 0;
+            _libraryPageIndex = IsRemoteFabProductVisible && string.Equals(_libraryProductReturnSource, LibrarySource, StringComparison.OrdinalIgnoreCase)
+                ? _libraryProductReturnPageIndex : 0;
             RebuildRemoteFabPresentation();
             OnPropertyChanged(nameof(HasNoRemoteFabAssets));
             OnPropertyChanged(nameof(LibraryResultsSummary));
@@ -9103,7 +9164,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
                             DownloadJournal.Upsert(durableId, durable with { Result = results[versionIndex]! with { SourceManifest = null } });
                         }
                         finally { assetGate.Release(); }
-                    }) { IsDownload = destination == FabInstallDestination.Library });
+                    })
+                    {
+                        IsDownload = destination == FabInstallDestination.Library,
+                        IsInstallation = destination != FabInstallDestination.Library,
+                        Resources = new HubTaskResources
+                        {
+                            ExclusivePaths = destination == FabInstallDestination.Project && targetProject is not null ? [targetProject.Project.RootPath] :
+                                destination == FabInstallDestination.Engine && targetEngine is not null ? [targetEngine.Path] : [],
+                            ExclusiveKeys = [FabPackResourceKey(asset)],
+                            DiskPaths = new[] { marketplaceStorage.DownloadDirectory, marketplaceStorage.CacheDirectory }
+                                .Concat(marketplaceStorage.Libraries.Where(library => library.Enabled).Select(library => library.Path))
+                                .Concat(destination == FabInstallDestination.Project && targetProject is not null ? [targetProject.Project.RootPath] :
+                                    destination == FabInstallDestination.Engine && targetEngine is not null ? [targetEngine.Path] : Array.Empty<string>()).ToArray(),
+                        },
+                    });
                 handles[index] = handle;
                 queueItem.AttachTask(handle.Id);
                 _fabVersionDownloadsByTaskId[handle.Id] = queueItem;
@@ -9192,14 +9267,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    private async Task InstallSelectedFabVersionsIntoTargetsAsync(Action<HubTaskHandle>? onQueued = null, bool editorSafe = false)
+    private async Task InstallSelectedFabVersionsIntoTargetsCoreAsync(Action<HubTaskHandle>? onQueued, bool editorSafe, bool force)
     {
         var asset = SelectedRemoteFabAsset
             ?? throw new InvalidOperationException("Sélectionnez d’abord un asset Fab.");
-        var versions = CompatibleFabInstallVersions.Where(item => item.IsSelected).ToArray();
-        var targets = FabInstallTargets.Where(item => item.IsSelected).ToArray();
+        var versions = FabInstallVersions.Where(item => item.IsSelected).ToArray();
+        var targets = FabInstallTargets.Where(item => item.IsSelected).Select(SnapshotFabInstallTarget).ToArray();
         if (versions.Length == 0) throw new InvalidOperationException("Sélectionnez au moins une version.");
         if (targets.Length == 0) throw new InvalidOperationException("Sélectionnez au moins un projet ou moteur cible.");
+        bool CanDispatch(RemoteFabProjectVersion version, FabInstallTargetOptionViewModel target) =>
+            editorSafe ? IsFabVersionRecommendedForTarget(version, target) :
+            force ? target.SelectedInstallationScript is not null :
+            CanInstallFabVersionIntoTarget(version, target) &&
+            (targets.Length == 1 || IsFabVersionCompatibleWithTarget(version, target) ||
+                !versions.Any(option => IsFabVersionCompatibleWithTarget(option.Version, target)));
         var targetsWithoutScript = targets
             .Where(target => target.SelectedInstallationScript is null)
             .Select(target => target.Name)
@@ -9218,33 +9299,33 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(_activeDerivedInstallArtifactId) &&
             (selectedDerived is null || selectedDerived.AssetId != asset.AssetId || !Directory.Exists(selectedDerived.Path)))
             throw new DirectoryNotFoundException("La version locale sélectionnée est indisponible ; aucun téléchargement de remplacement n’est lancé.");
-        if (selectedDerived is null && !IsMarketplaceAvailable(NormalizeAssetSource(asset)))
+        if (!force && selectedDerived is null && versions.Any(option => FindLocalFabInstallSource(asset, option.Version) is null) &&
+            !IsMarketplaceAvailable(NormalizeAssetSource(asset)))
             throw new InvalidOperationException("Cette marketplace est désactivée. Réactivez-la dans les paramètres pour une nouvelle installation distante.");
         var contentKind = selectedDerived is null
             ? SelectedRemoteFabAssetCard?.ContentKind ?? LibraryPackageContentKind.Unknown
             : ParseContentKind(selectedDerived.PackageKind);
-        if (contentKind == LibraryPackageContentKind.CompleteProject)
+        if (!force && contentKind == LibraryPackageContentKind.CompleteProject)
         {
             throw new InvalidOperationException(
                 "Ce produit est un projet complet. Téléchargez-le comme projet autonome au lieu de l’injecter dans un projet existant.");
         }
-        if (targets.Any(item => item.IsEngine) && contentKind is not (
+        if (!force && targets.Any(item => item.IsEngine) && contentKind is not (
                 LibraryPackageContentKind.CodePlugin or LibraryPackageContentKind.EnginePackage))
         {
             throw new InvalidOperationException("L’installation dans un moteur est réservée aux plugins Unreal.");
         }
         var uncoveredTargets = targets
             .Where(target => !versions.Any(option =>
-                CanInstallFabVersionIntoTarget(option.Version, target)))
+                CanDispatch(option.Version, target)))
             .Select(target => target.Name)
             .ToArray();
         if (uncoveredTargets.Length > 0)
         {
             throw new InvalidOperationException(
-                $"Aucune variante sélectionnée ne correspond à : {string.Join(", ", uncoveredTargets)}.");
+                $"Aucune variante sélectionnée ne prend en charge la plateforme de : {string.Join(", ", uncoveredTargets)}.");
         }
 
-        IsEpicBusy = true;
         IsFabDownloadActive = true;
         FabDownloadProgress = 0;
         FabDownloadStatus = selectedDerived is null
@@ -9253,9 +9334,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IsFabInstallOptionsVisible = false;
         var completedDownloads = new List<(FabInstallVersionOptionViewModel Option, DirectFabDownloadResult Result)>();
         var completedInstallations = 0;
+        var reusedLocalVersions = 0;
         var pendingAgentWorkspaces = new List<string>();
         var packageStorageMode = ResolveMarketplaceStorageMode(asset);
         var marketplaceStorage = ResolveMarketplaceStorageProfile(asset);
+        var installationResources = FabInstallationResources(asset, targets.Select(target => target.Path),
+            versions.Select(option => option.Version), marketplaceStorage);
         var handle = _taskScheduler.Enqueue(new HubTaskDefinition(
             "Bibliothèque · Fab",
             $"Installer {asset.Title} vers {targets.Length:N0} cible(s)",
@@ -9278,12 +9362,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
                             FabDownloadStatus = message;
                         });
                     });
-                    var localDerived = selectedDerived is not null && selectedDerived.ArtifactId == option.Version.ArtifactId ? selectedDerived : _fabStoredDownloads.LastOrDefault(item =>
-                        item.AssetId.Equals(asset.AssetId, StringComparison.OrdinalIgnoreCase) &&
-                        item.ArtifactId.Equals(option.Version.ArtifactId, StringComparison.OrdinalIgnoreCase) &&
-                        !string.IsNullOrWhiteSpace(item.SourceArtifactId));
+                    var localDerived = selectedDerived is not null && selectedDerived.ArtifactId == option.Version.ArtifactId ? selectedDerived :
+                        await Dispatcher.UIThread.InvokeAsync(() => FindLocalFabInstallSource(asset, option.Version));
                     if (localDerived is not null)
                     {
+                        reusedLocalVersions++;
+                        context.ReportIndeterminate($"{option.Label} · Réutilisation du pack local · aucun téléchargement : {localDerived.Path}");
                         var materialized = Path.Combine(
                             DataDirectory,
                             "DerivedInstallSources",
@@ -9298,7 +9382,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                                     cancellationToken)
                                 .ConfigureAwait(false);
                             foreach (var target in targets.Where(target =>
-                                         CanInstallFabVersionIntoTarget(option.Version, target)))
+                                         CanDispatch(option.Version, target)))
                             {
                                 var pendingAgent = await ExecuteSelectedFabInstallationScriptAsync(
                                         asset,
@@ -9306,7 +9390,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                                         materialized,
                                         target,
                                         context,
-                                        cancellationToken, editorSafe)
+                                        cancellationToken, editorSafe, force)
                                     .ConfigureAwait(false);
                                 if (pendingAgent is null) completedInstallations++;
                                 else pendingAgentWorkspaces.Add(pendingAgent);
@@ -9334,7 +9418,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                                 cancellationToken)
                             .ConfigureAwait(false);
                     var compatibleTargets = targets
-                        .Where(target => CanInstallFabVersionIntoTarget(option.Version, target))
+                        .Where(target => CanDispatch(option.Version, target))
                         .ToArray();
                     foreach (var target in compatibleTargets)
                     {
@@ -9344,7 +9428,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
                                 result.DestinationDirectory,
                                 target,
                                 context,
-                                cancellationToken, editorSafe)
+                                cancellationToken, editorSafe, force)
                             .ConfigureAwait(false);
                         if (pendingAgent is null) completedInstallations++;
                         else pendingAgentWorkspaces.Add(pendingAgent);
@@ -9369,30 +9453,31 @@ public sealed partial class MainWindowViewModel : ObservableObject
                             cancellationToken)
                         .ConfigureAwait(false);
                     completedDownloads.Add((option, result));
+                    // Publish the validated local source before releasing the pack's scheduler claim.
+                    // A waiting installation can then reuse it instead of starting a second transfer.
+                    Task? saveLocal = null;
+                    await Dispatcher.UIThread.InvokeAsync((Action)(() => saveLocal = SaveStoredFabDownloadAsync(asset, option, result)));
+                    await saveLocal!.ConfigureAwait(false);
                 }
                 context.Report(1, pendingAgentWorkspaces.Count == 0 ? "Toutes les installations sont terminées." :
                     $"{pendingAgentWorkspaces.Count} tâche(s) en attente d’un agent IA ; aucune installation pour ces tâches.");
-            }));
+            }) { IsInstallation = true, Resources = installationResources });
 
         onQueued?.Invoke(handle);
         var completed = await handle.Completion.ConfigureAwait(true);
-        IsEpicBusy = false;
-        IsFabDownloadActive = false;
-        foreach (var downloaded in completedDownloads)
-        {
-            await SaveStoredFabDownloadAsync(asset, downloaded.Option, downloaded.Result).ConfigureAwait(true);
-        }
         if (completed.Status != HubTaskStatus.Completed)
         {
             FabDownloadStatus = completed.Status == HubTaskStatus.Canceled
                 ? "Installation annulée; les téléchargements validés restent en cache."
                 : $"Échec : {completed.Error}";
+            FabInstallActionError = FabDownloadStatus;
+            StatusMessage = FabDownloadStatus;
             return;
         }
         FabDownloadProgress = 1;
         FabDownloadStatus = selectedDerived is null
-            ? $"{versions.Length:N0} version(s) téléchargée(s) · {completedInstallations:N0} installation(s) compatible(s) terminée(s)."
-            : $"Dérivé local installé · {completedInstallations:N0} installation(s) compatible(s) terminée(s).";
+            ? $"{reusedLocalVersions:N0} version(s) réutilisée(s) en local · {completedDownloads.Count:N0} téléchargée(s) · {completedInstallations:N0} installation(s) terminée(s)."
+            : $"Dérivé local installé · {completedInstallations:N0} installation(s) terminée(s).";
         if (pendingAgentWorkspaces.Count > 0)
             FabDownloadStatus = $"{completedInstallations:N0} installation(s) terminée(s) · {pendingAgentWorkspaces.Count:N0} tâche(s) IA à reprendre : {string.Join(" ; ", pendingAgentWorkspaces)}";
         StatusMessage = FabDownloadStatus;
@@ -9404,7 +9489,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         string sourceDirectory,
         FabInstallTargetOptionViewModel target,
         HubTaskContext taskContext,
-        CancellationToken cancellationToken, bool editorSafe = false)
+        CancellationToken cancellationToken, bool editorSafe = false, bool bypassChecks = false)
     {
         var selectedScript = target.SelectedInstallationScript
             ?? throw new InvalidOperationException(
@@ -9417,8 +9502,8 @@ public sealed partial class MainWindowViewModel : ObservableObject
         var targetKind = target.IsProject
             ? FabInstallationTargetKind.Project
             : FabInstallationTargetKind.Engine;
-        if (!script.Descriptor.SupportedContentKinds.Contains(target.ContentKind) ||
-            !script.Descriptor.SupportedTargetKinds.Contains(targetKind))
+        if (!bypassChecks && (!script.Descriptor.SupportedContentKinds.Contains(target.ContentKind) ||
+            !script.Descriptor.SupportedTargetKinds.Contains(targetKind)))
         {
             throw new InvalidOperationException(
                 $"Le script {script.Descriptor.DisplayName} ne prend pas en charge {target.Name}.");
@@ -9439,6 +9524,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             taskContext.Report(
                 value.Fraction,
                 $"{target.Name} · {script.Descriptor.DisplayName} · {value.Message}"));
+        taskContext.ReportIndeterminate($"{target.Name} · {script.Descriptor.DisplayName} · Préparation de l’installation…");
         var result = await script.InstallAsync(
                 new FabInstallationScriptContext(
                     asset,
@@ -14839,6 +14925,11 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private void NavigateBack()
     {
+        if (HasLibraryProductBack)
+        {
+            CloseRemoteFabProduct();
+            return;
+        }
         if (_backNavigation.Count == 0)
         {
             return;

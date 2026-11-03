@@ -3,12 +3,12 @@ using System.Globalization;
 using System.Numerics;
 using System.Windows.Input;
 using CyEngineHub.Desktop.ViewModels;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     internal Dictionary<string, Vector4> Elements { get; } = new(StringComparer.Ordinal);
     private string _resourceQuery = "";
@@ -29,16 +29,14 @@ internal sealed partial class ImGuiWorkspace
         Gui.PushStyleColor(ImGuiCol.Text, ImGuiTheme.Muted); Gui.TextUnformatted(text); Gui.PopStyleColor();
     }
     private static void TextTooltip(string text) { Gui.BeginTooltip(); Gui.TextUnformatted(text); Gui.EndTooltip(); }
-    private void ActionButton(object? model, string label, string command, bool primary = false, float width = 0)
+    private void ActionButton(object? model, string label, string command, bool primary = false, float width = 0, CyUiVariant? variant = null)
     {
         var action = UiBinding.Read(model, "{Binding " + command + "}") as ICommand;
         Gui.PushID(command);
         Gui.BeginDisabled(action?.CanExecute(null) != true);
-        var colorCount = ImGuiTheme.PushActionColors(command, primary);
-        if (Gui.Button(label, new(width, 0))) Execute(model, "{Binding " + command + "}");
+        if (CyUiNative.Button(label, variant ?? ImGuiTheme.ActionVariant(command, primary), new(width, 0))) Execute(model, "{Binding " + command + "}");
         Record("action/" + command);
         if (command is "ToggleProjectCreatorCommand" or "ToggleEngineImporterCommand") Record("creation-action/" + command);
-        if (colorCount > 0) Gui.PopStyleColor(colorCount);
         Gui.EndDisabled(); Gui.PopID();
     }
     private void StudioNav(string label, string command, string active)
@@ -59,9 +57,30 @@ internal sealed partial class ImGuiWorkspace
         var footerHeight = (logsVisible ? 5 : 4) * (29 * UiScale + Gui.GetStyle().ItemSpacing.Y) + 20 * UiScale +
             Gui.GetTextLineHeightWithSpacing() + Gui.GetStyle().ItemSpacing.Y + 1;
         Gui.BeginChild("sidebar-main", new(0, -footerHeight), ImGuiChildFlags.None);
-        if (_logo is not null) { Gui.Image(_image(_logo), new(28)); Gui.SameLine(); }
+        if (_logo is not null) { Gui.Image(new ImTextureRef { TexID = new ImTextureID((ulong)_image(_logo)) }, new(28)); Gui.SameLine(); }
         Gui.BeginGroup(); Gui.TextUnformatted("CYENGINEHUB"); Gui.TextColored(ImGuiTheme.Accent, "STUDIO  /  V2"); Gui.EndGroup();
         Gui.TextDisabled(Value(_root, "ApplicationVersion"));
+        if (_root is MainWindowViewModel updates)
+        {
+            if (updates.IsUpdateCheckActive)
+            { Gui.TextWrapped("Recherche de mise à jour…"); Record("updates/checking"); }
+            else if (updates.IsUpdateDownloadActive)
+            { Gui.TextWrapped("Mise à jour en téléchargement…"); Record("updates/downloading"); }
+            else if (updates.AvailableUpdate is not null)
+            {
+                ActionButton(updates, "Mise à jour disponible", "ShowAvailableUpdateCommand", true);
+                Record("updates/available");
+            }
+            else if (updates.IsUpdateCheckFailed)
+            {
+                ActionButton(updates, "Réessayer la mise à jour", "CheckForUpdatesCommand");
+                Record("updates/retry");
+            }
+            else if (updates.HasCheckedForUpdates)
+            { Gui.TextDisabled("CyEngineHub est à jour"); Record("updates/current"); }
+            if ((updates.IsUpdateCheckActive || updates.AvailableUpdate is not null || updates.IsUpdateCheckFailed || updates.HasCheckedForUpdates) && Gui.IsItemHovered())
+                Gui.SetTooltip(updates.UpdateStatus);
+        }
         Gui.Spacing(); Gui.Separator(); Gui.Spacing();
         Gui.TextDisabled("ESPACE DE TRAVAIL");
         StudioNav("Moteurs", "ShowEnginesCommand", "IsEnginesNavigationActive");
@@ -107,10 +126,8 @@ internal sealed partial class ImGuiWorkspace
         foreach (var (provider, connected, label) in badges)
         {
             if (Gui.GetContentRegionAvail().X < Gui.CalcTextSize(label).X + Gui.GetStyle().FramePadding.X * 2) Gui.NewLine();
-            Gui.PushStyleColor(ImGuiCol.Text, connected ? ImGuiTheme.Success : ImGuiTheme.Warning);
-            ActionButton(_root, label, "Show" + provider + "ConnectionSettingsCommand");
+            ActionButton(_root, label, "Show" + provider + "ConnectionSettingsCommand", variant: connected ? CyUiVariant.Success : CyUiVariant.Secondary);
             Record("connection/" + provider + (connected ? "/connected" : "/disconnected"));
-            Gui.PopStyleColor();
             if (Gui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled)) Gui.SetTooltip(Value(_root, provider == "Unity" ? "UnityStoreConnectionStatus" : provider + "ConnectionStatus"));
             Gui.SameLine();
         }
@@ -230,7 +247,7 @@ internal sealed partial class ImGuiWorkspace
     {
         id += engines ? "/engines" : "/projects";
         if (!Gui.BeginTable(id, 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.Resizable |
-            ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp, new(0, height))) return;
+            ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingStretchProp, new System.Numerics.Vector2(0, height))) return;
         Gui.TableSetupColumn(engines ? "Moteur" : "Projet", ImGuiTableColumnFlags.WidthStretch, 2);
         Gui.TableSetupColumn("Version", ImGuiTableColumnFlags.WidthFixed, 85);
         Gui.TableSetupColumn("Emplacement", ImGuiTableColumnFlags.WidthStretch, 3);
@@ -259,8 +276,11 @@ internal sealed partial class ImGuiWorkspace
                 ImGuiSelectableFlags.SpanAllColumns | ImGuiSelectableFlags.AllowDoubleClick | (item is EngineDownloadCardViewModel ? ImGuiSelectableFlags.AllowOverlap : ImGuiSelectableFlags.None), new(0, rowHeight - Gui.GetStyle().CellPadding.Y * 2)))
             {
                 SelectResource(item, items, engines);
-                if (Gui.IsMouseDoubleClicked(ImGuiMouseButton.Left)) Execute(item, "{Binding OpenDetailsCommand}");
             }
+            // Keep activation separate from Selectable's press policy: selected,
+            // spanning rows can consume the press while still owning the double click.
+            if (Gui.IsItemHovered() && Gui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+            { SelectResource(item, items, engines); Execute(item, "{Binding OpenDetailsCommand}"); }
             Record("row/" + ResourceName(item));
             if (IsResourceSelected(item, engines)) Record("selection/row/" + ResourceName(item));
             if (!engines && Gui.IsItemClicked(ImGuiMouseButton.Right)) { _selectedResource = item; RequestItemContext(item); }
@@ -301,7 +321,7 @@ internal sealed partial class ImGuiWorkspace
     }
     private static unsafe void Clipped(int count, float height, Action<int> draw)
     {
-        var clipper = new ImGuiListClipperPtr(ImGuiNative.ImGuiListClipper_ImGuiListClipper());
+        var clipper = new ImGuiListClipperPtr(Gui.ImGuiListClipper());
         try { clipper.Begin(count, height); while (clipper.Step()) for (var i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) draw(i); }
         finally { clipper.Destroy(); }
     }
@@ -343,7 +363,7 @@ internal sealed partial class ImGuiWorkspace
             ActionButton(vm, "Annuler", "CancelStorageCleanupCommand");
         }
         if (Gui.BeginTable("storage-entries", 4, ImGuiTableFlags.ScrollY | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable,
-            new(0, Math.Max(120, Gui.GetContentRegionAvail().Y - 12))))
+            new System.Numerics.Vector2(0, Math.Max(120, Gui.GetContentRegionAvail().Y - 12))))
         {
             foreach (var label in new[] { "Propriétaire / type", "Taille", "Chemin", "Actions" }) Gui.TableSetupColumn(label);
             Gui.TableSetupScrollFreeze(0, 1); SortableHeaders("storage-entries", ["Propriétaire / type", "Taille", "Chemin", "Actions"], 3);
@@ -377,7 +397,7 @@ internal sealed partial class ImGuiWorkspace
         }
         Gui.TextUnformatted($"{items.Length} opération(s) · {(actions ? vm.RunningActions : vm.RunningDownloads)} en cours · {(actions ? vm.QueuedActions : vm.QueuedDownloads)} en attente · la file continue pendant la navigation");
         if (!Gui.BeginTable("task-table", 5, ImGuiTableFlags.ScrollY | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable,
-            new(0, Math.Max(100, Gui.GetContentRegionAvail().Y - 10)))) return;
+            new System.Numerics.Vector2(0, Math.Max(100, Gui.GetContentRegionAvail().Y - 10)))) return;
         Gui.TableSetupColumn("Opération", ImGuiTableColumnFlags.WidthStretch, 4);
         Gui.TableSetupColumn("État", ImGuiTableColumnFlags.WidthFixed, 90);
         Gui.TableSetupColumn("Progression", ImGuiTableColumnFlags.WidthStretch, 1);

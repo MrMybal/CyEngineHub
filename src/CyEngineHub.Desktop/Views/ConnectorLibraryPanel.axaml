@@ -6,10 +6,19 @@
       <StackPanel Spacing="10">
         <TextBlock Text="{Binding Name}" FontSize="22" FontWeight="Bold" />
         <WrapPanel>
-          <Button Classes="accent" Content="Télécharger depuis mon inventaire web" Command="{Binding OpenInventoryCommand}" Margin="0,0,8,6" />
+          <Button Classes="accent" Content="{Binding InventoryButtonLabel}" Command="{Binding OpenInventoryCommand}" Margin="0,0,8,6" />
           <Button Classes="ghost" Content="Ajouter un fichier existant" Command="{Binding ImportExistingCommand}" Margin="0,0,8,6" />
           <Button Classes="ghost" Content="Actualiser les fichiers locaux" Command="{Binding RefreshCommand}" Margin="0,0,8,6" />
         </WrapPanel>
+        <TextBlock Text="{Binding WorkflowNotice}" TextWrapping="Wrap" Foreground="#8294A8" />
+        <StackPanel IsVisible="{Binding SupportsDirectoryImport}" Spacing="6">
+          <TextBlock Text="DOSSIER LOCAL COMPLET · COPIE, ORIGINAUX CONSERVÉS" FontSize="10" Foreground="#70A8FA" />
+          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+            <TextBox Classes="path" Text="{Binding ImportDirectoryPath}" PlaceholderText="Dossier des assets (dépendances incluses)" />
+            <Button Grid.Column="1" Content="Parcourir…" Command="{Binding ImportDirectoryCommand}" />
+            <Button Grid.Column="2" Content="Ajouter ce dossier" Command="{Binding ImportDirectoryPathCommand}" />
+          </Grid>
+        </StackPanel>
         <TextBlock Text="{Binding Status}" TextWrapping="Wrap" FontSize="11" Foreground="#A4B3C2" />
         <ProgressBar IsVisible="{Binding IsBusy}" IsIndeterminate="True" Height="3" />
       </StackPanel>
@@ -52,6 +61,8 @@
             <TextBlock Text="{Binding SelectedAsset.Date}" FontSize="11" />
             <TextBlock Text="{Binding SelectedAsset.Availability}" Foreground="#A4B3C2" />
             <Button Classes="ghost" Content="Ouvrir le dossier du fichier" Command="{Binding OpenFolderCommand}" />
+            <Button Classes="accent" Content="Configurer l’installation dans un projet…" Command="{Binding PrepareInstallationCommand}" IsVisible="{Binding SupportsInstallation}" />
+            <Button Content="Convertir en dérivé local…" Command="{Binding RequestConversionCommand}" IsVisible="{Binding SupportsConversion}" />
             <TextBlock Text="Le type est déduit des fichiers de l’archive, pas du site. La version moteur et les images officielles ne sont pas récupérées automatiquement." TextWrapping="Wrap" Foreground="#8294A8" FontSize="11" />
           </StackPanel>
         </Border>

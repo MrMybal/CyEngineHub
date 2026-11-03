@@ -18,5 +18,6 @@ public sealed class MarketplaceBrowserRequestEventArgs(string id, string name, U
 
 public sealed class MarketplaceImportRequestEventArgs : EventArgs
 {
+    public bool SelectDirectory { get; init; }
     public TaskCompletionSource<IReadOnlyList<string>> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 }

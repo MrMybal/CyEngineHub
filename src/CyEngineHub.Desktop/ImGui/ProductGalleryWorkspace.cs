@@ -1,17 +1,18 @@
 using System.Numerics;
 using CyEngineHub.Desktop.ViewModels;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     private RemoteFabAssetCardViewModel? _galleryUiCard;
     private int _galleryUiIndex = -1;
     private bool _galleryViewerWasVisible;
     private float _galleryZoom = 1;
     private Vector2 _galleryPan;
+    private nint _cyUiGallery;
     private int _galleryStripIndex = -1;
     private int _galleryViewerStripIndex = -1;
 
@@ -22,6 +23,7 @@ internal sealed partial class ImGuiWorkspace
         {
             if (!ReferenceEquals(_galleryUiCard, card)) { _galleryStripIndex = -1; _galleryViewerStripIndex = -1; }
             _galleryZoom = 1; _galleryPan = Vector2.Zero;
+            if (_cyUiGallery != 0) CyUiNative.ResetImage(_cyUiGallery);
             _galleryUiCard = card; _galleryUiIndex = card.SelectedGalleryIndex;
         }
         if (enlarged) _galleryViewerWasVisible = true;
@@ -39,7 +41,7 @@ internal sealed partial class ImGuiWorkspace
             Record("gallery-zoom-out"); Gui.EndDisabled(); Gui.SameLine();
             if (Gui.Button("+###zoom-in")) ChangeGalleryZoom(_galleryZoom * 1.25f);
             Record("gallery-zoom-in"); Gui.SameLine();
-            if (Gui.Button("Ajuster")) { _galleryZoom = 1; _galleryPan = Vector2.Zero; }
+            if (Gui.Button("Ajuster")) { if (_cyUiGallery != 0) CyUiNative.ResetImage(_cyUiGallery); _galleryZoom = 1; _galleryPan = Vector2.Zero; }
             Record("gallery-fit"); Gui.SameLine(); Gui.TextUnformatted($"{_galleryZoom * 100:0} %");
             Record("gallery-zoom/" + (int)MathF.Round(_galleryZoom * 100));
             if (Gui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows) && !Gui.GetIO().WantTextInput)
@@ -56,39 +58,35 @@ internal sealed partial class ImGuiWorkspace
             ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
         var origin = Gui.GetCursorScreenPos();
         var area = Vector2.Max(new(1), Gui.GetContentRegionAvail());
-        Gui.InvisibleButton("gallery-image", area);
+        if (enlarged && card.PreviewImage is { } fullImage)
+        {
+            if (_cyUiGallery == 0) _cyUiGallery = CyUiNative.CreateImage();
+            var fullTexture = _image(fullImage);
+            CyUiNative.DrawImage(_cyUiGallery, "gallery-image", fullTexture, fullImage.PixelSize.Width, fullImage.PixelSize.Height, area);
+            _galleryZoom = CyUiNative.ImageZoom(_cyUiGallery);
+            CyUiNative.ImagePan(_cyUiGallery, out var panX, out var panY); _galleryPan = new(panX, panY);
+        }
+        else Gui.InvisibleButton("gallery-image", area);
         Record(enlarged ? "gallery-canvas" : "gallery-open");
         var hovered = Gui.IsItemHovered();
-        if (enlarged && hovered)
-        {
-            if (Gui.GetIO().MouseWheel != 0) ChangeGalleryZoom(_galleryZoom * MathF.Pow(1.2f, Gui.GetIO().MouseWheel));
-            if (_galleryZoom > 1)
-            {
-                Gui.SetMouseCursor(ImGuiMouseCursor.ResizeAll);
-                if (Gui.IsItemActive() && Gui.IsMouseDragging(ImGuiMouseButton.Left)) _galleryPan += Gui.GetIO().MouseDelta;
-            }
-            if (Gui.IsMouseDoubleClicked(ImGuiMouseButton.Left)) { _galleryZoom = 1; _galleryPan = Vector2.Zero; }
-        }
-        else if (!enlarged && Gui.IsItemClicked()) Execute(vm, "{Binding OpenFabImagePreviewCommand}");
+        if (!enlarged && Gui.IsItemClicked()) Execute(vm, "{Binding OpenFabImagePreviewCommand}");
         var draw = Gui.GetWindowDrawList();
-        draw.AddRectFilled(origin, origin + area, Gui.GetColorU32(ImGuiCol.FrameBg), 4);
+        if (!enlarged) draw.AddRectFilled(origin, origin + area, Gui.GetColorU32(ImGuiCol.FrameBg), 4);
         draw.PushClipRect(origin, origin + area, true);
-        if (card.PreviewImage is { } bitmap)
+        if (!enlarged && card.PreviewImage is { } bitmap)
         {
             var dimensions = new Vector2(bitmap.PixelSize.Width, bitmap.PixelSize.Height);
             var fit = Math.Min(area.X / Math.Max(1, dimensions.X), area.Y / Math.Max(1, dimensions.Y));
-            var imageSize = dimensions * fit * (enlarged ? _galleryZoom : 1);
-            var bounds = Vector2.Max(Vector2.Zero, (imageSize - area) / 2);
-            if (enlarged) _galleryPan = Vector2.Clamp(_galleryPan, -bounds, bounds);
-            var min = origin + (area - imageSize) / 2 + (enlarged ? _galleryPan : Vector2.Zero);
+            var imageSize = dimensions * fit;
+            var min = origin + (area - imageSize) / 2;
             var texture = _image(bitmap);
-            if (texture != 0) draw.AddImage(texture, min, min + imageSize);
+            if (texture != 0) draw.AddImage(new ImTextureRef { TexID = new ImTextureID((ulong)texture) }, min, min + imageSize);
         }
-        else draw.AddText(origin + new Vector2(12), Gui.GetColorU32(ImGuiCol.TextDisabled), card.IsGalleryLoading ? "Chargement…" : "Image indisponible");
+        else if (card.PreviewImage is null) draw.AddText(origin + new Vector2(12), Gui.GetColorU32(ImGuiCol.TextDisabled), card.IsGalleryLoading ? "Chargement…" : "Image indisponible");
         if (!enlarged)
         {
-            draw.AddRectFilled(origin + new Vector2(0, Math.Max(0, area.Y - 25)), origin + area, 0xB0000000);
-            draw.AddText(origin + new Vector2(8, Math.Max(0, area.Y - 21)), 0xFFFFFFFF, "Agrandir · " + card.GalleryCounter);
+            draw.AddRectFilled(origin + new Vector2(0, Math.Max(0, area.Y - 25)), origin + area, Gui.GetColorU32(ImGuiCol.FrameBg));
+            draw.AddText(origin + new Vector2(8, Math.Max(0, area.Y - 21)), Gui.GetColorU32(ImGuiCol.Text), "Agrandir · " + card.GalleryCounter);
             if (hovered) { Gui.SetMouseCursor(ImGuiMouseCursor.Hand); Gui.SetTooltip("Afficher la galerie en grand"); }
         }
         draw.PopClipRect(); Gui.EndChild();
@@ -139,7 +137,7 @@ internal sealed partial class ImGuiWorkspace
                     var fitted = pixels * Math.Min((thumbnailSize.X - 6) / Math.Max(1, pixels.X), (thumbnailSize.Y - 6) / Math.Max(1, pixels.Y));
                     var start = min + (thumbnailSize - fitted) / 2;
                     var texture = _image(image);
-                    if (texture != 0) draw.AddImage(texture, start, start + fitted);
+                    if (texture != 0) draw.AddImage(new ImTextureRef { TexID = new ImTextureID((ulong)texture) }, start, start + fitted);
                 }
                 else draw.AddText(min + new Vector2(8, 15), Gui.GetColorU32(ImGuiCol.TextDisabled), (index + 1).ToString(System.Globalization.CultureInfo.InvariantCulture));
                 draw.AddRect(min, min + thumbnailSize, Gui.GetColorU32(index == card.SelectedGalleryIndex ? ImGuiCol.CheckMark : ImGuiCol.Border), 3, ImDrawFlags.None, index == card.SelectedGalleryIndex ? 2 : 1);
@@ -154,8 +152,7 @@ internal sealed partial class ImGuiWorkspace
     private void ChangeGalleryZoom(float value)
     {
         var next = Math.Clamp(value, 1, 8);
-        _galleryPan *= next / _galleryZoom;
+        if (_cyUiGallery != 0) CyUiNative.ZoomImage(_cyUiGallery, next / Math.Max(.001f, _galleryZoom));
         _galleryZoom = next;
-        if (next == 1) _galleryPan = Vector2.Zero;
     }
 }

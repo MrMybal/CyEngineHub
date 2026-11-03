@@ -9,9 +9,10 @@ using Avalonia.Media;
 using Avalonia.OpenGL;
 using Avalonia.OpenGL.Controls;
 using Avalonia.Threading;
-using ImGuiNET;
+using CyEngineHub.Desktop.ViewModels;
+using Hexa.NET.ImGui;
 using Silk.NET.OpenGLES;
-using Gui = ImGuiNET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
@@ -103,7 +104,7 @@ internal sealed class ImGuiHost : Border
     internal static ImGuiKey MapKey(Key key)
     {
         if (key is >= Avalonia.Input.Key.A and <= Avalonia.Input.Key.Z) return ImGuiKey.A + (key - Avalonia.Input.Key.A);
-        if (key is >= Avalonia.Input.Key.D0 and <= Avalonia.Input.Key.D9) return ImGuiKey._0 + (key - Avalonia.Input.Key.D0);
+        if (key is >= Avalonia.Input.Key.D0 and <= Avalonia.Input.Key.D9) return ImGuiKey.Key0 + (key - Avalonia.Input.Key.D0);
         if (key is >= Avalonia.Input.Key.F1 and <= Avalonia.Input.Key.F12) return ImGuiKey.F1 + (key - Avalonia.Input.Key.F1);
         return key switch
         {
@@ -123,7 +124,7 @@ internal sealed class ImGuiHost : Border
 }
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1001", Justification = "GL resources are released with their native context in OnOpenGlDeinit.")]
-internal sealed class ImGuiSurface : OpenGlControlBase
+internal sealed unsafe class ImGuiSurface : OpenGlControlBase
 {
     private readonly string _layout;
     private readonly Action<string>? _nativeAction;
@@ -133,9 +134,8 @@ internal sealed class ImGuiSurface : OpenGlControlBase
     private ImGuiGlRenderer? _renderer;
     private ImGuiWorkspace? _workspace;
     private ImGuiClipboard? _clipboard;
-    private nint _context;
+    private ImGuiContextPtr _context;
     private double _previous;
-    private double _fontScale = 1;
     private long _lastInput;
     internal object? Model { get; set; }
     internal ImGuiWorkspace? Workspace => _workspace;
@@ -167,35 +167,15 @@ internal sealed class ImGuiSurface : OpenGlControlBase
     protected override unsafe void OnOpenGlInit(GlInterface gl)
     {
         _context = Gui.CreateContext(); Gui.SetCurrentContext(_context);
-        var io = Gui.GetIO(); io.NativePtr->IniFilename = null; io.NativePtr->LogFilename = null;
+        var io = Gui.GetIO(); io.Handle->IniFilename = null; io.Handle->LogFilename = null;
         io.ConfigFlags |= ImGuiConfigFlags.NavEnableKeyboard;
-        LoadFont(TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
+        CyUiNative.VerifyAbi();
         ImGuiTheme.Apply();
+        io.BackendFlags |= ImGuiBackendFlags.RendererHasTextures;
+        CyUiNative.LoadFonts();
         _clipboard = new ImGuiClipboard(TopLevel.GetTopLevel(this)?.TryGetPlatformHandle()?.Handle ?? 0);
         _renderer = new ImGuiGlRenderer(GL.GetApi(gl.GetProcAddress));
         if (CustomDraw is null) _workspace = new ImGuiWorkspace(_layout, _renderer.Image, _nativeAction);
-    }
-    private void LoadFont(double scale)
-    {
-        _fontScale = scale;
-        var io = Gui.GetIO(); io.Fonts.Clear(); io.FontGlobalScale = 1 / (float)scale;
-        var font = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Fonts), "segoeui.ttf");
-        if (File.Exists(font))
-        {
-            ushort[] ranges = [0x20, 0x17F, 0x2000, 0x27FF, 0];
-            var pinned = GCHandle.Alloc(ranges, GCHandleType.Pinned);
-            try
-            {
-                foreach (var name in new[] { "segoeui.ttf", "seguisb.ttf", "segoeuii.ttf", "seguisbi.ttf", "consola.ttf" })
-                {
-                    var path = Path.Combine(Path.GetDirectoryName(font)!, name);
-                    io.Fonts.AddFontFromFileTTF(File.Exists(path) ? path : font, 14 * UiCardGrid.InterfaceScale * (float)scale, default, pinned.AddrOfPinnedObject());
-                }
-                io.Fonts.Build();
-            }
-            finally { pinned.Free(); }
-        }
-        else { io.Fonts.AddFontDefault(); io.FontGlobalScale = UiCardGrid.InterfaceScale; }
     }
     protected override void OnOpenGlRender(GlInterface gl, int fb)
     {
@@ -205,11 +185,12 @@ internal sealed class ImGuiSurface : OpenGlControlBase
         var io = Gui.GetIO(); var now = _clock.Elapsed.TotalSeconds;
         io.DeltaTime = (float)Math.Clamp(now - _previous, .001, .2); _previous = now;
         var scale = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
-        if (Math.Abs(scale - _fontScale) > .01) { LoadFont(scale); _renderer.UpdateFont(); }
         io.DisplaySize = new((float)Bounds.Width, (float)Bounds.Height);
         io.DisplayFramebufferScale = new((float)scale);
         while (_input.TryDequeue(out var input)) input(io);
         _renderer.BeginFrame();
+        if (Model is MainWindowViewModel preferences) ImGuiTheme.Apply(preferences.InterfaceTheme, preferences.UseCompactInterface, preferences.InterfaceLanguage == "Français" ? "fr" : "en");
+        else ImGuiTheme.Apply();
         Gui.NewFrame();
         try
         {
@@ -226,6 +207,7 @@ internal sealed class ImGuiSurface : OpenGlControlBase
             RenderFailure = exception;
             // Keep diagnostics local; authentication payloads are never displayed here.
         }
+        CyUiNative.Notifications();
         Gui.Render();
         _renderer.Render(Gui.GetDrawData(), fb, (int)(Bounds.Width * scale), (int)(Bounds.Height * scale));
         LastImageUploads = _renderer.ImageUploadCount;
@@ -241,6 +223,7 @@ internal sealed class ImGuiSurface : OpenGlControlBase
         _renderer?.Dispose(); _renderer = null;
         _workspace?.Dispose(); _workspace = null;
         _clipboard?.Dispose(); _clipboard = null;
-        Gui.DestroyContext(_context); _context = 0;
+        ImGuiTheme.Release();
+        Gui.DestroyContext(_context); _context = default;
     }
 }

@@ -1,14 +1,17 @@
 using CyEngineHub.Desktop.ViewModels;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
-internal sealed partial class ImGuiWorkspace
+internal sealed unsafe partial class ImGuiWorkspace
 {
     private void DrawProductActions(MainWindowViewModel vm)
     {
         if (vm.SelectedRemoteFabAssetCard is not { } asset) return;
+        var columns = Gui.GetContentRegionAvail().X > CyUiNative.Dp(420) &&
+            Gui.BeginTable("product-action-groups", 2, ImGuiTableFlags.SizingStretchSame | ImGuiTableFlags.NoSavedSettings);
+        if (columns) Gui.TableNextColumn();
         Gui.BeginChild("product-acquisition", new(0, 0), ImGuiChildFlags.Borders | ImGuiChildFlags.AutoResizeY, ImGuiWindowFlags.NoScrollbar);
         Gui.TextDisabled("UTILISER CE PRODUIT");
         Gui.BeginDisabled(!asset.CanDownload);
@@ -21,6 +24,7 @@ internal sealed partial class ImGuiWorkspace
         ActionButton(vm, "Ouvrir la page web", "OpenSelectedRemoteFabListingCommand", width: -1);
         Record("product-action/web"); Gui.EndDisabled();
         Gui.EndChild(); Record("product-action-group/acquisition");
+        if (columns) Gui.TableNextColumn();
         Gui.BeginChild("product-organization", new(0, 0), ImGuiChildFlags.Borders | ImGuiChildFlags.AutoResizeY, ImGuiWindowFlags.NoScrollbar);
         Gui.TextDisabled("MA BIBLIOTHÈQUE");
         ActionButton(asset, "Collections…", "OpenCollectionsCommand", width: -1);
@@ -30,5 +34,6 @@ internal sealed partial class ImGuiWorkspace
         if (Gui.IsItemHovered()) Gui.SetTooltip(vm.SelectedFabAssetVisibilityLabel);
         Gui.TextWrapped("Masquer ne supprime aucun fichier téléchargé.");
         Gui.EndChild(); Record("product-action-group/organization");
+        if (columns) Gui.EndTable();
     }
 }

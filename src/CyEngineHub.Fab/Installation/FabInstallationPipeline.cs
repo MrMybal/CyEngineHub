@@ -29,6 +29,12 @@ public sealed class FabInstallationPipeline(IFabInstallationScriptRegistry regis
                 throw new InvalidOperationException("La dernière étape doit installer le contenu.");
             if (step.ScriptId == UnrealMegascansInstallationScript.ScriptId && step.Configuration.GetValueOrDefault("importMode") == "raw")
                 projectedKind = Packaging.LibraryPackageContentKind.ContentPack;
+            if (step.ScriptId == UnrealRawAssetsInstallationScript.ScriptId) projectedKind = Packaging.LibraryPackageContentKind.ContentPack;
+            if (script is IFabPreparationScript preparation)
+            {
+                if (index == steps.Count - 1) throw new InvalidOperationException("Ajoutez une étape d’installation après la conversion, ou utilisez Convertir en dérivé local depuis la fiche.");
+                projectedKind = preparation.OutputContentKind;
+            }
         }
     }
 
@@ -44,8 +50,8 @@ public sealed class FabInstallationPipeline(IFabInstallationScriptRegistry regis
             var step = steps[index];
             var script = registry.Find(step.ScriptId)!;
             var configuration = new Dictionary<string, string>(step.Configuration);
-            var prepares = index < steps.Count - 1 && step.ScriptId is
-                UnrealVersionBridgeInstallationScript.ScriptId or UnrealRelocatedContentInstallationScript.ScriptId or UnrealMegascansInstallationScript.ScriptId;
+            var prepares = index < steps.Count - 1 && (script is IFabPreparationScript || step.ScriptId is
+                UnrealVersionBridgeInstallationScript.ScriptId or UnrealRelocatedContentInstallationScript.ScriptId or UnrealMegascansInstallationScript.ScriptId or UnrealRawAssetsInstallationScript.ScriptId);
             configuration["prepareOnly"] = prepares ? "true" : "false";
             progress?.Report(new(null, $"Étape {index + 1}/{steps.Count} · {script.Descriptor.DisplayName}"));
             var result = await script.InstallAsync(context with { Configuration = configuration }, progress, cancellationToken).ConfigureAwait(false);
@@ -57,6 +63,7 @@ public sealed class FabInstallationPipeline(IFabInstallationScriptRegistry regis
                 if (!result.Outputs.TryGetValue("variant", out var variant)) throw new InvalidDataException("Une étape de préparation n’a pas fourni sa sortie.");
                 if (!Directory.Exists(variant)) throw new DirectoryNotFoundException("La sortie de préparation est absente.");
                 context = context with { SourceDirectory = variant };
+                if (script is IFabPreparationScript preparation) context = context with { ContentKind = preparation.OutputContentKind };
                 if (result.Outputs.GetValueOrDefault("contentKind") == "ContentPack") context = context with { ContentKind = Packaging.LibraryPackageContentKind.ContentPack };
                 if (result.Outputs.TryGetValue("sourceVersion", out var version))
                     context = context with { Version = context.Version with { EngineVersions = [version] } };

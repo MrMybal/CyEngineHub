@@ -86,7 +86,7 @@ static partial class Program
                 var taskId = install.GetProperty("result").GetProperty("taskId").GetString();
                 var replay = await Send("install", id);
                 Check(replay.GetProperty("result").GetProperty("taskId").GetString() == taskId, "Replaying a confirmed request cannot duplicate an installation");
-                for (var i = 0; i < 200 && vm.IsEpicBusy; i++) await Task.Delay(50);
+                for (var i = 0; i < 200 && vm.IsFabTargetInstallationActive; i++) await Task.Delay(50);
                 var tasks = await Send("tasks");
                 Check(tasks.GetProperty("result").EnumerateArray().Any(t => t.GetProperty("id").GetString() == taskId && t.GetProperty("status").GetString() == "Completed"), "Editor task history reports actual workflow completion");
             }

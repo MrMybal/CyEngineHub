@@ -4,8 +4,8 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using CyEngineHub.Desktop.ViewModels;
-using ImGuiNET;
-using Gui = ImGuiNET.ImGui;
+using Hexa.NET.ImGui;
+using Gui = Hexa.NET.ImGui.ImGui;
 
 namespace CyEngineHub.Desktop.ImGui;
 
@@ -47,7 +47,7 @@ internal static class ImGuiBrowserChrome
         {
             case Button button:
                 Gui.BeginDisabled(!button.IsEnabled);
-                if (Gui.Button(ImGuiWorkspace.NormalizeLabel(button.Content?.ToString() ?? "")))
+                if (CyUiNative.Button(ImGuiWorkspace.NormalizeLabel(button.Content?.ToString() ?? "")))
                     Dispatcher.UIThread.Post(() => button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)));
                 var min = Gui.GetItemRectMin(); var max = Gui.GetItemRectMax();
                 if (Gui.IsItemVisible()) surface.NativeElements["native/" + button.Content] = new(min.X, min.Y, max.X, max.Y);

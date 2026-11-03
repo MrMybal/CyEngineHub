@@ -67,6 +67,7 @@ public sealed partial class MainWindowViewModel
     private async Task LoadInterfaceAsync()
     {
         InterfaceTheme = await _settings.GetAsync("interface.theme.v1").ConfigureAwait(true) ?? "Gris";
+        InterfaceLanguage = await _settings.GetAsync("interface.language.v1").ConfigureAwait(true) ?? "English";
         var value = await _settings.GetAsync("interface.compact.v2").ConfigureAwait(true);
         _useCompactInterface = !bool.TryParse(value, out var compact) || compact;
         OnPropertyChanged(nameof(UseCompactInterface));
