@@ -2,6 +2,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <ApplicationManifest>../../../src/CyEngineHub.Desktop/app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../../../src/CyEngineHub.Desktop/CyEngineHub.Desktop.csproj" /></ItemGroup>
   <Target Name="UseWebView2CoreOnly" BeforeTargets="ResolveAssemblyReferences">

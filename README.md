@@ -2,6 +2,8 @@
 
 **English** · [Français](README.fr.md)
 
+[Documentation](https://mrmybal.github.io/CyEngineHub/#/en/welcome) · The same visual CyDoc reader as the application, in English: navigation, search, images and diagrams.
+
 CyEngineHub is licensed under **GPLv3 only**. Our native Unreal Editor plugin and
 conversion adapter are separately licensed under **MIT**; dependencies and Epic
 content retain their own terms. See [licensing and scope](LICENSING.md) and the
@@ -292,6 +294,16 @@ project files. Dependencies retain their respective licenses: see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and notices bundled in binaries.
 
 ## Documentation
+
+**[Open Documentation](https://mrmybal.github.io/CyEngineHub/#/en/welcome)** — the complete HTML reader, not the Markdown source files. Switch languages in its toolbar. The bundled offline reader remains available from Help / F1.
+
+The development build includes the **offline CyDoc Help / Documentation reader (F1)**:
+25 chapters in English (default) and French, technical references, source API,
+local search, zoomable screenshots and static SVG workflows. The entire reader
+ships under Help and opens by `file://`, without a server or CDN. Its language
+is independent of the partially translated application UI. See the
+[bundled manual](docs/manual/README.md) and [generation/integration guide](docs/cydoc-integration.md).
+This does not announce a new GitHub release.
 
 - [Epic / Fab login: automatic and manual](docs/fab-login.md)
 - [Official Megascans collections](docs/megascan-collections.md)

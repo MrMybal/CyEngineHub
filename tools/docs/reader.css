@@ -1,0 +1,12 @@
+.cydoc-viewer[data-theme="dark"] { --accent: #d9934b; }
+.cydoc-viewer[data-theme="dark"] { --accent-bg: #34291e; }
+.brand-mark { background: #8b5829; }
+.footer { flex-wrap: wrap; }
+.cydoc-viewer figure { max-width: 100%; }
+.side-nav { overflow-x: hidden; }
+.nav-group a { min-width: 0; max-width: 100%; }
+.nav-group a > span { min-width: 0; overflow-wrap: anywhere; }
+.article-header > p { display: none; }
+.prose > h1:first-child, .prose > blockquote:first-child + h1 { display: none; }
+.diagram svg text { font-size: 16px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; } }

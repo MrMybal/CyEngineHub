@@ -221,6 +221,8 @@
           <Button Classes="nav" Classes.active="{Binding IsTasksNavigationActive}" Content="Téléchargements" Command="{Binding ShowTasksCommand}" FontSize="12" />
           <Button Classes="nav" Classes.active="{Binding IsLogsNavigationActive}" Content="Logs" Command="{Binding ShowLogsCommand}" IsVisible="{Binding IsLogsNavigationVisible}" />
           <Button Classes="nav" Classes.active="{Binding IsSettingsNavigationActive}" Content="⚙  Paramètres" Command="{Binding ShowSettingsCommand}" />
+          <Button Classes="nav" Content="?  Documentation · F1" Command="{Binding ShowDocumentationCommand}" />
+          <Button Classes="nav" Content="Aide de cet écran" Command="{Binding ShowContextualDocumentationCommand}" />
         </StackPanel>
       </Grid>
     </Border>

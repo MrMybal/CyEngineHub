@@ -10,6 +10,36 @@ public sealed record AssetSourceConverterDescriptor(string Id, string DisplayNam
 public sealed record AssetSourceConversionRequest(string SourceDirectory, string WorkRoot, IReadOnlyDictionary<string, string> Options, UnrealEngineInstallation? TargetEngine = null);
 public sealed record AssetSourceConversionResult(string ConverterId, string Directory, string ReportPath, LibraryPackageContentKind ContentKind);
 
+/**
+ * @doc api-source-converter
+ * @locale en
+ * @title Asset source converter contract
+ * @section SDK API
+ * @symbol CyEngineHub.Fab.Conversion.IAssetSourceConverter
+ * Implement `Descriptor` and `ConvertAsync(request, progress, cancellationToken)`.
+ * Read `SourceDirectory` without modifying it; write only to a new owned directory
+ * under `WorkRoot`. Return the converter ID, result directory, report path and
+ * content kind. Honor cancellation and report progress. Registration uses
+ * `AssetSourceConverterRegistry.Register`; duplicate IDs are rejected.
+ * `RequiresTargetEngine` declares whether the caller must supply a target engine.
+ * This contract does not imply that every input format or Unreal version is supported.
+ * See [conversion procedures](doc:conversion) and [source converter reference](doc:reference-docs-source-converters).
+ */
+/**
+ * @doc api-source-converter
+ * @locale fr
+ * @title Contrat des convertisseurs de sources
+ * @section SDK API
+ * @symbol CyEngineHub.Fab.Conversion.IAssetSourceConverter
+ * Implémentez `Descriptor` et `ConvertAsync(request, progress, cancellationToken)`.
+ * Lisez `SourceDirectory` sans le modifier ; écrivez uniquement dans un nouveau
+ * dossier de travail possédé sous `WorkRoot`. Renvoyez l'identifiant du convertisseur,
+ * le dossier résultat, le chemin du rapport et le type de contenu. Respectez
+ * l'annulation et signalez la progression. `AssetSourceConverterRegistry.Register`
+ * refuse les identifiants dupliqués. `RequiresTargetEngine` indique si un moteur
+ * cible doit être fourni. Ce contrat ne garantit pas la prise en charge de tous les formats.
+ * Voir [la conversion](doc:conversion) et [la référence](doc:reference-docs-source-converters).
+ */
 /// <summary>Conversion plug-in contract. Inputs are immutable; only a new owned workspace may be written.</summary>
 public interface IAssetSourceConverter
 {

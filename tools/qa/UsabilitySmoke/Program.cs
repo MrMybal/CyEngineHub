@@ -105,7 +105,8 @@ sealed class FixtureEngineBackend : IEpicBinaryEngineBackend
     public Task<EpicBinaryEngineDownloadResult> UpdateAsync(EpicBinaryEngineRelease release, string destinationDirectory, IProgress<EpicBinaryEngineDownloadProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         UpdateCalls++;
-        var plan = new EpicEnginePatchPlan(12, 50L << 20, 200L << 20, 320L << 20, 10L << 20, 64L << 20);
+        var plan = new EpicEnginePatchPlan(12, 2L << 20, 32L << 20, 19L << 20, 0, 2L << 20)
+            { PreparedDeltaBytes = 16599, ChangedDataBytes = 2048 };
         progress?.Report(new(.18, plan.DisplayText, 0, plan.EstimatedDownloadBytes) { PatchPlan = plan });
         throw new IOException("Fixture update blocked; real engines are never modified by UI tests.");
     }
@@ -144,6 +145,8 @@ static partial class Program
     static bool SourceConversionOnly;
     static bool ReadmeScreenshotsOnly;
     static bool ApplicationUpdatesOnly;
+    static bool ManualOnly;
+    static bool ManualQuick;
     static string SourceConversionFixture = "";
     static bool EngineIdentityOnly;
     static bool UpdatesOnly;
@@ -184,6 +187,8 @@ static partial class Program
         SourceConversionOnly = args.Contains("--source-conversion-only");
         ReadmeScreenshotsOnly = args.Contains("--readme-screenshots");
         ApplicationUpdatesOnly = args.Contains("--app-updates-only");
+        ManualOnly = args.Contains("--manual-only");
+        ManualQuick = args.Contains("--manual-quick");
         var sourceFixtureIndex = Array.IndexOf(args, "--source-fixture");
         if (sourceFixtureIndex >= 0) SourceConversionFixture = Path.GetFullPath(args[sourceFixtureIndex + 1]);
         EngineIdentityOnly = args.Contains("--engine-identity-only");
@@ -272,12 +277,13 @@ static partial class Program
             [new(ToolchainKind.DotNet, ".NET", ToolchainHealth.Ready, "fixture", "fixture", ""),
              new(ToolchainKind.LinuxToolchain, "Linux", ToolchainHealth.Missing, "fixture", "absent", "SDK absent"),
              new(ToolchainKind.WindowsSdk, "Windows SDK", ToolchainHealth.Warning, "fixture", "fixture", "Version recommandée absente")], [])], [], [], [], DateTimeOffset.UtcNow));
-        var window = new MainWindow { DataContext = vm, Title = "CyEngineHub — Interface QA (données fictives)", Width = 1280, Height = 820,
+        var window = new MainWindow { DocumentationProfileDirectory = Path.Combine(Output, "DocumentationProfile"), DataContext = vm, Title = "CyEngineHub — Interface QA (données fictives)", Width = 1280, Height = 820,
             ShowActivated = false, ShowInTaskbar = false, Position = new PixelPoint(-3000, -3000) };
         window.Show();
         if (ImGuiDiagnostics.IsHosted(window))
         {
-            if (ApplicationUpdatesOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestApplicationUpdates(window, vm, updateSettings, updateService, launcher); Console.WriteLine("OUTPUT " + Output); }
+            if (ManualOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestManual(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            else if (ApplicationUpdatesOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestApplicationUpdates(window, vm, updateSettings, updateService, launcher); Console.WriteLine("OUTPUT " + Output); }
             else if (ReadmeScreenshotsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await CaptureReadmeScreenshots(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (CyUiOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestCyUiMigration(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (EditorBridgeOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestEditorBridge(window, vm); Console.WriteLine("OUTPUT " + Output); }

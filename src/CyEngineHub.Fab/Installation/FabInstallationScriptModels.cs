@@ -63,6 +63,34 @@ public sealed record FabInstallationScriptResult(
     string Summary,
     IReadOnlyDictionary<string, string> Outputs);
 
+/**
+ * @doc api-installation-script
+ * @locale en
+ * @title Installation script contract
+ * @section SDK API
+ * @symbol CyEngineHub.Fab.Installation.IFabInstallationScript
+ * `Descriptor` describes the script and its configurable options. `InstallAsync`
+ * receives an asset/version, its content kind, prepared source directory, target
+ * and configuration. Report progress with `FabInstallationScriptProgress`, honor
+ * cancellation and return `FabInstallationScriptResult`. Keep original packages
+ * intact and validate destination paths. A successful return is not proof of
+ * semantic compatibility in a different engine; inspect the generated reports.
+ * See [installation](doc:install) and [extension SDK](doc:extensions-sdk).
+ */
+/**
+ * @doc api-installation-script
+ * @locale fr
+ * @title Contrat des scripts d'installation
+ * @section SDK API
+ * @symbol CyEngineHub.Fab.Installation.IFabInstallationScript
+ * `Descriptor` décrit le script et ses options. `InstallAsync` reçoit l'asset,
+ * sa version, son type de contenu, les sources préparées, la cible et la configuration.
+ * Signalez la progression avec `FabInstallationScriptProgress`, respectez l'annulation
+ * et renvoyez `FabInstallationScriptResult`. Conservez les packages originaux et
+ * validez les chemins cibles. Le succès d'une copie ne prouve pas la compatibilité
+ * sémantique dans un autre moteur : consultez les rapports générés.
+ * Voir [l'installation](doc:install) et [le SDK](doc:extensions-sdk).
+ */
 public interface IFabInstallationScript
 {
     FabInstallationScriptDescriptor Descriptor { get; }

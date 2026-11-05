@@ -1,0 +1,213 @@
+{
+  "ai-mcp": {
+    "anchors": [
+      "ai-mcp-and-assisted-conversion",
+      "catalog-tools-and-batches",
+      "permissions-and-agent-repair"
+    ],
+    "frenchSourceRevision": "a2e708ae0cfc"
+  },
+  "app-updates": {
+    "anchors": [
+      "update-cyenginehub-itself",
+      "check-and-decide",
+      "missing-proposal-or-unavailable-installation"
+    ],
+    "frenchSourceRevision": "0f6da679b109"
+  },
+  "builds": {
+    "anchors": [
+      "builds-packaging-and-toolchains",
+      "build-a-project",
+      "tools-and-prerequisites",
+      "missing-solution-or-initial-build"
+    ],
+    "frenchSourceRevision": "fd0e968003c5"
+  },
+  "connectors": {
+    "anchors": [
+      "marketplace-plugins-and-local-imports",
+      "common-workflow",
+      "service-specific-limits"
+    ],
+    "frenchSourceRevision": "e764d600cdad"
+  },
+  "conversion": {
+    "anchors": [
+      "source-conversion-and-unreal-version-bridges",
+      "convert-sources-into-a-local-derivative",
+      "native-unreal-version-conversion"
+    ],
+    "frenchSourceRevision": "cc16c9f3a92a"
+  },
+  "derivatives": {
+    "anchors": [
+      "derived-packages-and-conversion-workspaces",
+      "two-creation-routes",
+      "identity-and-cleanup"
+    ],
+    "frenchSourceRevision": "214851d83cc6"
+  },
+  "downloads": {
+    "anchors": [
+      "downloads-resume-and-concurrency",
+      "configure-transfers",
+      "why-a-task-may-wait",
+      "local-reuse-and-restart-boundaries"
+    ],
+    "frenchSourceRevision": "ff9397fe0afa"
+  },
+  "editor-plugin": {
+    "anchors": [
+      "use-cyenginehub-inside-unreal-editor",
+      "install-and-connect",
+      "install-from-the-editor"
+    ],
+    "frenchSourceRevision": "010fc87e7ce6"
+  },
+  "engine-updates": {
+    "anchors": [
+      "updating-an-official-unreal-engine",
+      "apply-a-patch",
+      "understanding-disk-estimates",
+      "interruption-and-restrictions"
+    ],
+    "frenchSourceRevision": "f5f978a56e27"
+  },
+  "engines": {
+    "anchors": [
+      "engines-and-associations",
+      "managing-an-unreal-installation",
+      "source-and-alternate-providers"
+    ],
+    "frenchSourceRevision": "ba2f345e47bd"
+  },
+  "extensions-sdk": {
+    "anchors": [
+      "hub-extensions-scripts-and-conversion-sdk",
+      "declarative-hub-packages",
+      "preparation-installation-scripts",
+      "source-converter-sdk"
+    ],
+    "frenchSourceRevision": "85c896d1a39d"
+  },
+  "fab": {
+    "anchors": [
+      "epic-fab-account-and-owned-assets",
+      "sign-in",
+      "download-the-intended-variant",
+      "check-asset-updates"
+    ],
+    "frenchSourceRevision": "e6aba46d4419"
+  },
+  "git": {
+    "anchors": [
+      "git-branches-and-source-engines",
+      "inspect-and-check-updates",
+      "large-repositories-and-privacy"
+    ],
+    "frenchSourceRevision": "f7c96a589efe"
+  },
+  "glossary": {
+    "anchors": [
+      "glossary-privacy-and-licenses",
+      "terms-used-throughout-the-hub",
+      "local-data-and-privacy",
+      "project-licensing"
+    ],
+    "frenchSourceRevision": "e9ee848a3485"
+  },
+  "install": {
+    "anchors": [
+      "install-a-pack-into-projects",
+      "review-the-installation-window",
+      "scripts-and-explicit-force",
+      "verify-the-result"
+    ],
+    "frenchSourceRevision": "0f1b1f07fb1c"
+  },
+  "library": {
+    "anchors": [
+      "asset-library-and-local-packages",
+      "find-and-inspect-an-asset",
+      "what-a-local-package-contains"
+    ],
+    "frenchSourceRevision": "2fccb43de669"
+  },
+  "megascans": {
+    "anchors": [
+      "megascans-collections-and-fab-web",
+      "historical-library-and-collections",
+      "megascans-via-fab"
+    ],
+    "frenchSourceRevision": "92abc6d1c9a2"
+  },
+  "navigation": {
+    "anchors": [
+      "navigation-and-task-states",
+      "catalogs-and-detail-sheets",
+      "actions-versus-downloads"
+    ],
+    "frenchSourceRevision": "b9f4eadf63bb"
+  },
+  "plugins": {
+    "anchors": [
+      "engine-and-project-plugins",
+      "install-or-build-an-unreal-plugin",
+      "other-providers"
+    ],
+    "frenchSourceRevision": "580a1047bdc9"
+  },
+  "profiles": {
+    "anchors": [
+      "project-profiles-features-and-ini",
+      "configuration-precedence",
+      "minimal-and-specialized-profiles"
+    ],
+    "frenchSourceRevision": "bde6d34e7c74"
+  },
+  "projects": {
+    "anchors": [
+      "create-and-open-projects",
+      "required-choices",
+      "after-creation"
+    ],
+    "frenchSourceRevision": "cf004520ccd6"
+  },
+  "settings": {
+    "anchors": [
+      "settings-appearance-and-connections",
+      "appearance-and-language",
+      "connections",
+      "marketplace-and-download-settings",
+      "advanced-and-data"
+    ],
+    "frenchSourceRevision": "0499e8d014f4"
+  },
+  "storage": {
+    "anchors": [
+      "storage-quotas-and-safe-cleaning",
+      "read-the-figures-correctly",
+      "safe-clean"
+    ],
+    "frenchSourceRevision": "5bd3784b20e8"
+  },
+  "troubleshooting": {
+    "anchors": [
+      "troubleshooting-and-useful-diagnostics",
+      "common-symptoms",
+      "safe-recovery",
+      "reporting-a-bug"
+    ],
+    "frenchSourceRevision": "7789afbbbdd8"
+  },
+  "welcome": {
+    "anchors": [
+      "welcome-to-cyenginehub",
+      "first-session",
+      "how-this-manual-works",
+      "before-making-changes"
+    ],
+    "frenchSourceRevision": "0e57bceecdc9"
+  }
+}

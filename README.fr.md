@@ -2,6 +2,8 @@
 
 # CyEngineHub — Alpha
 
+[Documentation](https://mrmybal.github.io/CyEngineHub/#/fr/welcome) · Le même lecteur visuel CyDoc que dans le logiciel, en français : navigation, recherche, images et schémas.
+
 CyEngineHub est sous **GPLv3 uniquement**. Notre plugin éditeur Unreal et notre
 adaptateur de conversion natif sont séparément sous **MIT** ; les dépendances et
 le contenu Epic conservent leurs propres conditions. Voir le
@@ -11,6 +13,14 @@ Hub de développement multi-moteur, local-first, pour Windows. Unreal Engine est
 le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers locaux.
 
 ## Captures d’écran
+
+La build de développement intègre le **lecteur d’aide CyDoc hors ligne (F1)** :
+25 chapitres en anglais (par défaut) et français, références techniques, API source,
+recherche, liens, captures agrandissables et schémas SVG statiques. Le dossier Help
+est distribué avec l’application et s’ouvre en `file://`, sans serveur ni CDN.
+La langue de l'aide reste indépendante de l’interface générale. Voir le
+[manuel](docs/manual/README.md) et le [guide d’intégration](docs/cydoc-integration.md).
+Cela n’annonce pas une nouvelle publication GitHub.
 
 Aperçu de développement (`2.0.0-alpha.41`), capturé dans la vraie application avec
 des données de démonstration fictives et aucun compte connecté. Ces écrans peuvent
@@ -320,6 +330,8 @@ soumises à leurs licences respectives : voir [THIRD_PARTY_NOTICES.md](THIRD_PAR
 et les notices embarquées dans les binaires.
 
 ## Documentation
+
+**[Ouvrir la documentation](https://mrmybal.github.io/CyEngineHub/#/fr/welcome)** — le lecteur HTML complet, pas les fichiers Markdown sources. La barre du lecteur permet de changer de langue. L’aide embarquée hors ligne reste accessible par Aide / F1.
 
 - [Connexion Epic / Fab : automatique et manuelle](docs/fab-login.md)
 - [Collections officielles Megascans](docs/megascan-collections.md)

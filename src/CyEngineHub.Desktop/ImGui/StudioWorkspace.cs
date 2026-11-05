@@ -34,7 +34,10 @@ internal sealed unsafe partial class ImGuiWorkspace
         var action = UiBinding.Read(model, "{Binding " + command + "}") as ICommand;
         Gui.PushID(command);
         Gui.BeginDisabled(action?.CanExecute(null) != true);
-        if (CyUiNative.Button(label, variant ?? ImGuiTheme.ActionVariant(command, primary), new(width, 0))) Execute(model, "{Binding " + command + "}");
+        if (CyUiNative.Button(label, variant ?? ImGuiTheme.ActionVariant(command, primary), new(width, 0)))
+        {
+            Execute(model, "{Binding " + command + "}");
+        }
         Record("action/" + command);
         if (command is "ToggleProjectCreatorCommand" or "ToggleEngineImporterCommand") Record("creation-action/" + command);
         Gui.EndDisabled(); Gui.PopID();
@@ -54,7 +57,7 @@ internal sealed unsafe partial class ImGuiWorkspace
         Gui.BeginChild("studio-body", new(0, -27 * UiScale), ImGuiChildFlags.None, ImGuiWindowFlags.NoScrollbar);
         Gui.BeginChild("studio-sidebar", new(180 * UiScale, 0), ImGuiChildFlags.Borders, ImGuiWindowFlags.NoScrollbar);
         var logsVisible = Flag(_root, "IsLogsNavigationVisible");
-        var footerHeight = (logsVisible ? 5 : 4) * (29 * UiScale + Gui.GetStyle().ItemSpacing.Y) + 20 * UiScale +
+        var footerHeight = (logsVisible ? 6 : 5) * (29 * UiScale + Gui.GetStyle().ItemSpacing.Y) + 20 * UiScale +
             Gui.GetTextLineHeightWithSpacing() + Gui.GetStyle().ItemSpacing.Y + 1;
         Gui.BeginChild("sidebar-main", new(0, -footerHeight), ImGuiChildFlags.None);
         if (_logo is not null) { Gui.Image(new ImTextureRef { TexID = new ImTextureID((ulong)_image(_logo)) }, new(28)); Gui.SameLine(); }
@@ -100,6 +103,9 @@ internal sealed unsafe partial class ImGuiWorkspace
         }
         if (logsVisible) StudioNav("Journal", "ShowLogsCommand", "IsLogsNavigationActive");
         StudioNav("Paramètres", "ShowSettingsCommand", "IsSettingsNavigationActive");
+        if (Gui.Selectable(_root is MainWindowViewModel { DocumentationLanguage: "fr" } ? "Aide / Documentation" : "Help / Documentation", false, ImGuiSelectableFlags.None, new(0, 29 * UiScale)))
+            Execute(_root, "{Binding ShowDocumentationCommand}");
+        Record("help/open");
         Gui.EndChild(); Gui.SameLine();
         Gui.BeginChild("studio-workspace", new(0, 0), ImGuiChildFlags.None, ImGuiWindowFlags.NoScrollbar);
         if (!Flag(_root, "IsEngineDetailsVisible") && !Flag(_root, "IsProjectDetailsVisible") &&
@@ -112,7 +118,9 @@ internal sealed unsafe partial class ImGuiWorkspace
             var engine = Flag(_root, "IsEngineDetailsVisible");
             ActionButton(_root, engine ? "< Moteurs" : "< Projets", engine ? "ShowEnginesCommand" : "ShowProjectsCommand"); Gui.SameLine();
         }
-        Gui.TextUnformatted(Value(_root, "HeaderTitle"));
+        Gui.TextUnformatted(Value(_root, "HeaderTitle")); Gui.SameLine();
+        ActionButton(_root, "?  F1", "ShowContextualDocumentationCommand");
+        if (Gui.IsItemHovered()) Gui.SetTooltip("Open help for this screen / Aide de cet écran");
         var available = Gui.GetContentRegionAvail().X;
         var badges = ConnectionSettingsProviders.Where(provider => Flag(_root, "Is" + provider + "ConnectionEnabled")).Select(provider =>
         {

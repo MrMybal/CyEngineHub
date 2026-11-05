@@ -129,6 +129,10 @@ try {
     }
 
     $required = @('LICENSE', 'LICENSING.md', 'THIRD_PARTY_NOTICES.md',
+        'Help/index.html', 'Help/manifest.json', 'Help/data.js', 'Help/app-reader.js',
+        'Help/viewer.css', 'Help/app-reader.css', 'Help/media-image.js',
+        'Help/translation-report.json', 'Help/migration-report.json',
+        'Help/CYDOC-LICENSE.txt', 'Help/CYENGINEHUB-LICENSE.txt',
         'cimgui.dll', 'Hexa.NET.ImGui.dll', 'LICENCES/CyUI/LICENSE',
         'LICENCES/CyUI/Lexilla.txt', 'LICENCES/DearImGui/LICENSE.txt',
         'LICENCES/cimgui/LICENSE', 'LICENCES/Hexa.NET.ImGui/LICENSE.txt',
@@ -180,6 +184,7 @@ try {
     [IO.Compression.ZipFile]::CreateFromDirectory($appStage, $archive, [IO.Compression.CompressionLevel]::Optimal, $false)
     & python (Join-Path $repoRoot 'scripts/check-release-privacy.py') --zip $archive
     if ($LASTEXITCODE -ne 0) { throw 'Release archive privacy check failed.' }
+    Invoke-DotNet @('run', '--project', 'tools/qa/ManualPayloadSmoke/ManualPayloadSmoke.csproj', '-c', 'Release', '--', $archive, $repoRoot)
     if ($EditorPluginRoot) {
         foreach ($editorVersion in @('4.27', '5.2', '5.3', '5.4', '5.5', '5.6', '5.7', '5.8')) {
             $editorArchive = Join-Path $EditorPluginRoot "CyEngineHub-Editor-UE_$editorVersion-alpha.zip"

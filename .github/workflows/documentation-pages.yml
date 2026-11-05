@@ -1,0 +1,86 @@
+name: Documentation Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/documentation-pages.yml'
+      - 'tools/docs/**'
+      - 'docs/**'
+      - 'examples/**'
+      - 'extensions/**'
+      - 'src/CyEngineHub.Fab/Conversion/AssetSourceConverters.cs'
+      - 'src/CyEngineHub.Fab/Installation/FabInstallationScriptModels.cs'
+      - 'README*.md'
+      - 'LICENSE'
+      - 'LICENSING.md'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'Directory.Build.props'
+      - 'scripts/check-release-privacy.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - name: Check out application documentation sources
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Resolve locked CyDoc dependency
+        id: cydoc
+        run: node tools/docs/workflow-dependency.mjs
+      - name: Check out the locked public CyDoc library
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: MrMybal/CyDoc
+          ref: ${{ steps.cydoc.outputs.commit }}
+          path: ${{ steps.cydoc.outputs.directory }}
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ${{ steps.cydoc.outputs.directory }}/package-lock.json
+      - name: Generate the same complete offline reader as the application
+        shell: pwsh
+        run: ./tools/docs/build.ps1
+      - name: Stage only the exported reader and its declared resources
+        run: node tools/docs/prepare-pages.mjs
+      - name: Check publication privacy
+        run: python3 scripts/check-release-privacy.py --directory artifacts/pages
+      - name: Configure GitHub Pages metadata
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - name: Upload documentation only
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        with:
+          path: artifacts/pages
+          retention-days: 1
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy the generated CyDoc reader
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

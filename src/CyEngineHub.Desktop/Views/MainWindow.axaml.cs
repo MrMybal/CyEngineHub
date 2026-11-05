@@ -22,6 +22,8 @@ public sealed partial class MainWindow : Window
     private static readonly ConditionalWeakTable<Control, RealizedRemoteFabRow> RealizedRemoteFabRows = new();
     private ExtensionHubWindow? _extensionHubWindow;
     private MainWindowViewModel? _viewModel;
+    private DocumentationWindow? _documentationWindow;
+    public string DocumentationProfileDirectory { get; init; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CyEngineHub", "DocumentationWebView");
     private CancellationTokenSource? _fabAuthorizationCaptureCancellation;
     private FabAuthorizationWindow? _fabAuthorizationWindow;
     private readonly Dictionary<string, MarketplaceBrowserWindow> _marketplaceWindows = new(StringComparer.OrdinalIgnoreCase);
@@ -53,6 +55,11 @@ public sealed partial class MainWindow : Window
         }
         DataContextChanged += OnDataContextChanged;
         Closed += OnClosed;
+        AddHandler(KeyDownEvent, (_, args) =>
+        {
+            if (args.Key != Key.F1 || _viewModel is null) return;
+            args.Handled = true; _viewModel.ShowContextualDocumentationCommand.Execute(null);
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
     }
 
     private void OnDataContextChanged(object? sender, EventArgs args) =>
@@ -66,6 +73,8 @@ public sealed partial class MainWindow : Window
         if (_viewModel is not null)
         {
             _viewModel.ExtensionWindowRequested -= OnExtensionWindowRequested;
+            _viewModel.DocumentationRequested -= OnDocumentationRequested;
+            _documentationWindow?.Close(); _documentationWindow = null;
             _viewModel.FabAuthorizationCaptureRequested -= OnFabAuthorizationCaptureRequested;
             _viewModel.FabWebAuthorizationRequested -= OnFabWebAuthorizationRequested;
             _viewModel.MarketplaceBrowserRequested -= OnMarketplaceBrowserRequested;
@@ -81,6 +90,7 @@ public sealed partial class MainWindow : Window
         if (_viewModel is not null)
         {
             _viewModel.ExtensionWindowRequested += OnExtensionWindowRequested;
+            _viewModel.DocumentationRequested += OnDocumentationRequested;
             _viewModel.FabAuthorizationCaptureRequested += OnFabAuthorizationCaptureRequested;
             _viewModel.FabWebAuthorizationRequested += OnFabWebAuthorizationRequested;
             _viewModel.MarketplaceBrowserRequested += OnMarketplaceBrowserRequested;
@@ -88,6 +98,37 @@ public sealed partial class MainWindow : Window
             _viewModel.MarketplaceLibraryActivated += OnMarketplaceLibraryActivated;
             _viewModel.RawLogScrollRequested += OnRawLogScrollRequested;
         }
+    }
+
+    private void OnDocumentationRequested(object? sender, DocumentationRequest request)
+    {
+        if (_viewModel is not { } model) return;
+        try
+        {
+            if (_documentationWindow is null)
+            {
+                var location = new Documentation.DocumentationLocation(Path.Combine(AppContext.BaseDirectory, "Help"));
+                var uri = location.CreateUri(request.Page, model.DocumentationLanguage, request.Anchor, request.Media);
+                var profile = DocumentationProfileDirectory;
+                _documentationWindow = new(location, uri, profile, link => _launcherForDocumentation(link), language => model.DocumentationLanguage = language);
+                _documentationWindow.Closed += (_, _) => { _documentationWindow = null; Activate(); };
+                _documentationWindow.Show(this);
+            }
+            else
+            {
+                _documentationWindow.Navigate(request.Page, model.DocumentationLanguage, request.Anchor, request.Media);
+                if (_documentationWindow.WindowState == WindowState.Minimized) _documentationWindow.WindowState = WindowState.Normal;
+                _documentationWindow.Activate();
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or ArgumentException)
+        { model.ReportDocumentationError(); }
+    }
+
+    private static Task _launcherForDocumentation(Uri uri)
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+        return Task.CompletedTask;
     }
 
     private void OnMarketplaceBrowserRequested(object? sender, MarketplaceBrowserRequestEventArgs request)

@@ -22,6 +22,9 @@ The exact source/ABI revisions and selected modules are recorded in
 
 ## Microsoft Edge WebView2
 
+The same already referenced Core SDK also hosts the offline CyDoc help window.
+It opens local files only and has no access to marketplace authentication profiles.
+
 The Windows embedded sign-in window uses the Microsoft.Web.WebView2 SDK.
 Copyright Microsoft Corporation. The SDK and the separately installed WebView2
 Runtime are subject to Microsoft's respective license terms, not the egs-api-rs
@@ -29,6 +32,16 @@ MIT license below. SDK license metadata/text is included in packaged build notic
 
 - SDK: https://www.nuget.org/packages/Microsoft.Web.WebView2
 - Runtime and distribution: https://learn.microsoft.com/microsoft-edge/webview2/concepts/distribution
+
+## CyDoc offline documentation reader
+
+- CyDoc 0.1.0, revision `774f2a7eabf7dd181a98ffc5add115b580b67f42` — MIT.
+  https://github.com/MrMybal/CyDoc
+- The complete MIT license is distributed in `Help/CYDOC-LICENSE.txt`.
+- Host documentation retains GPL-3.0-only (`Help/CYENGINEHUB-LICENSE.txt`).
+- Only the image module is bundled. No Three.js, mesh, graph, GIF, gallery or
+  video runtime is distributed with this reader. CyDoc's compiler dependencies
+  are build tools, not part of the installed reader.
 
 ## egs-api-rs
 

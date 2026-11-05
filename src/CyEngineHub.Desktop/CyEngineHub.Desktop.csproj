@@ -42,6 +42,14 @@
     <PackageReference Include="Microsoft.Web.WebView2" />
   </ItemGroup>
   <ItemGroup><EmbeddedResource Include="ImGui/Layouts/*.xml" /></ItemGroup>
+  <Target Name="BuildLocalDocumentation" BeforeTargets="AssignTargetPaths;PrepareForBuild" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Condition="'$(OS)' == 'Windows_NT'" Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)../../tools/docs/build.ps1&quot;" />
+    <Error Condition="!Exists('$(MSBuildThisFileDirectory)../../artifacts/cydoc/help/index.html')" Text="Generate the offline CyDoc export with tools/docs/build.ps1 before building on this platform." />
+    <ItemGroup>
+      <_CyDocExport Include="$(MSBuildThisFileDirectory)../../artifacts/cydoc/help/**/*" />
+      <Content Include="@(_CyDocExport)" Link="Help/%(_CyDocExport.RecursiveDir)%(_CyDocExport.Filename)%(_CyDocExport.Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
   <!-- Marketplace capabilities live in manifests, including for future built-in connectors. -->
   <ItemGroup>
     <None Include="../../extensions/builtin/**/extension.json" Link="Extensions/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
@@ -57,6 +65,8 @@
     <None Include="../../docs/releases/v2.0.0-alpha.40.md" Link="docs/releases/v2.0.0-alpha.40.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/releases/v2.0.0-alpha.41.md" Link="docs/releases/v2.0.0-alpha.41.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/releases/v2.0.0-alpha.42.md" Link="docs/releases/v2.0.0-alpha.42.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../docs/releases/v2.0.0-alpha.43.md" Link="docs/releases/v2.0.0-alpha.43.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../docs/releases/v2.0.0-alpha.44.md" Link="docs/releases/v2.0.0-alpha.44.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/application-updates.md" Link="docs/application-updates.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/source-converters.md" Link="docs/source-converters.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/marketplace-connectors.md" Link="docs/marketplace-connectors.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
