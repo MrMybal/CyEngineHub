@@ -10,8 +10,49 @@ namespace CyEngineHub.Epic.Tests;
 
 #pragma warning disable CA5350 // Epic manifest file integrity.
 
-public sealed class EpicPatchStreamingTests
+public sealed class EpicPatchStreamingTests(Xunit.Abstractions.ITestOutputHelper output)
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LargeBinaryPatchNeedsLessFreeSpaceThanOneChangedFileAndCanRollBack(bool interruptCommit)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "CyHubLargePatch-" + Guid.NewGuid().ToString("N"));
+        var target = Path.Combine(root, "UE"); Directory.CreateDirectory(target);
+        try
+        {
+            using var fixture = new PatchFixture(target, "large");
+            using var http = new HttpClient(fixture); var session = new PatchSession();
+            using var direct = new DirectFabApiClient(http, session);
+            var backend = new OfficialEpicGamesLauncherEngineBackend(http, direct, session)
+            { PatchChunkCacheBytes = 2L << 20, PatchFreeSpace = _ => 24L << 20, ChunkRetryDelayAsync = (_, _) => Task.CompletedTask };
+            long deltaBytes = 0; EpicEnginePatchPlan? final = null;
+            var unchanged = Path.Combine(target, "Engine/Content/Unchanged.bin");
+            var timestamp = System.IO.File.GetLastWriteTimeUtc(unchanged);
+            var progress = new PatchProgress(value =>
+            {
+                if (value.PatchPlan is { IsDeltaPreparationPending: false } plan) final = plan;
+                var stage = target + ".cyenginehub-update";
+                Assert.False(Directory.Exists(Path.Combine(stage, "files")), "Never stage full changed binaries.");
+                var deltas = Path.Combine(stage, "deltas");
+                if (Directory.Exists(deltas)) deltaBytes = Math.Max(deltaBytes, Directory.GetFiles(deltas, "*.delta").Sum(path => new FileInfo(path).Length));
+                if (interruptCommit && value.Message.StartsWith("Installation ·", StringComparison.Ordinal) &&
+                    System.IO.File.ReadAllBytes(Path.Combine(target, "Engine/Binaries/Large.dll"))[5 * (1 << 20) + 17] != fixture.OriginalLargeByte)
+                    throw new IOException("Injected failure after the large binary was patched");
+            });
+            var update = backend.UpdateAsync(new("qa", "UE_QA", "5.8", "QA"), target, progress);
+            if (interruptCommit) { await Assert.ThrowsAsync<IOException>(() => update); fixture.AssertOriginalFiles(); }
+            else { var result = await update; Assert.Equal(44, result.FileCount); fixture.AssertNewFiles(); }
+            Assert.NotNull(final); Assert.True(final.AdditionalSpaceBytes < 24L << 20);
+            Assert.True(deltaBytes < 64 * 1024, $"32 MiB binary with two changed bytes should not produce a full-file copy: {deltaBytes}");
+            Assert.Equal(timestamp, System.IO.File.GetLastWriteTimeUtc(unchanged));
+            Assert.Equal(2, fixture.RequestedChunks.Count(id => id == PatchFixture.Id(205) || id == PatchFixture.Id(227)));
+            Assert.DoesNotContain(fixture.RequestedChunks, id => Enumerable.Range(100, 32).Any(index => id == PatchFixture.Id(index)));
+            output.WriteLine($"32 MiB changed DLL; free space limited to 24 MiB; staged reversible deltas for ALL changed files: {deltaBytes} bytes; peak estimate: {final.AdditionalSpaceBytes} bytes; rollback={interruptCommit}.");
+        }
+        finally { Directory.Delete(root, true); }
+    }
+
     [Theory]
     [InlineData("success")]
     [InlineData("corrupt-local")]
@@ -115,6 +156,7 @@ public sealed class EpicPatchStreamingTests
         private readonly Dictionary<string, byte[]> _next = new(StringComparer.OrdinalIgnoreCase);
         private readonly byte[] _manifest;
         public System.Collections.Concurrent.ConcurrentQueue<string> RequestedChunks { get; } = new();
+        public byte OriginalLargeByte { get; private set; }
         public static string Id(int number) => (number + 100).ToString("X32", CultureInfo.InvariantCulture);
 
         public PatchFixture(string target, string scenario)
@@ -127,10 +169,27 @@ public sealed class EpicPatchStreamingTests
             _payloads[Id(4)] = Encoding.UTF8.GetBytes("{\"MajorVersion\":5,\"MinorVersion\":8,\"PatchVersion\":3}");
             _payloads[Id(5)] = Encoding.UTF8.GetBytes("core Linux tool, NOT the Linux platform");
             _payloads[Id(6)] = [7];
-            var oldFiles = new[] { Entry("Engine/Build/Build.version", [Id(4)]), Entry("Engine/Binaries/A.dll", [Id(1), Id(3)]),
+            var oldFiles = new List<Dictionary<string, object>> { Entry("Engine/Build/Build.version", [Id(4)]), Entry("Engine/Binaries/A.dll", [Id(1), Id(3)]),
                 Entry("Engine/Binaries/DotNET/Linux.Automation.dll", [Id(5)]) };
             var newFiles = new List<Dictionary<string, object>> { Entry("Engine/Build/Build.version", [Id(0)]), Entry("Engine/Binaries/A.dll", [Id(1), Id(2)]),
                 Entry("Engine/Binaries/DotNET/Linux.Automation.dll", [Id(5)]), Entry("Engine/Content/New.bin", [Id(2)]) };
+            if (scenario == "large")
+            {
+                var random = new Random(734); var previousIds = new string[32]; var nextIds = new string[32];
+                for (var index = 0; index < 32; index++)
+                {
+                    var data = new byte[1 << 20]; random.NextBytes(data);
+                    previousIds[index] = Id(100 + index); nextIds[index] = previousIds[index]; _payloads[previousIds[index]] = data;
+                    if (index is 5 or 27)
+                    {
+                        if (index == 5) OriginalLargeByte = data[17];
+                        var changed = (byte[])data.Clone(); changed[17] ^= 1;
+                        nextIds[index] = Id(200 + index); _payloads[nextIds[index]] = changed;
+                    }
+                }
+                oldFiles.Add(Entry("Engine/Binaries/Large.dll", previousIds)); newFiles.Add(Entry("Engine/Binaries/Large.dll", nextIds));
+                var unchanged = Entry("Engine/Content/Unchanged.bin", previousIds[..8]); oldFiles.Add(unchanged); newFiles.Add(unchanged);
+            }
             for (var index = 10; index < 50; index++)
             {
                 _payloads[Id(index)] = Enumerable.Repeat((byte)index, 96).ToArray();

@@ -30,10 +30,10 @@ the currently published release. Click an image to view it at full size.
 
 ![CyEngineHub Blender conversion options with optional Unreal UAsset conversion](docs/screenshots/source-conversion.png)
 
-**Published version: `2.0.0-alpha.42`.** [Download the Windows release](https://github.com/MrMybal/CyEngineHub/releases/tag/v2.0.0-alpha.42). Back up projects before trying installation,
+**Published version: `2.0.0-alpha.45`.** [Download the Windows release](https://github.com/MrMybal/CyEngineHub/releases/tag/v2.0.0-alpha.45). Back up projects before trying installation,
 move or asset-conversion operations.
 
-Recent changes are summarized in the [release notes](docs/releases/v2.0.0-alpha.42.md).
+Recent changes are summarized in the [release notes](docs/releases/v2.0.0-alpha.45.md).
 Alpha.42 checks application updates early during startup, independently of catalog
 loading, with a visible status, an explicit update proposal and a non-blocking offline retry.
 Alpha.41 adds [source conversion plug-ins](docs/source-converters.md): Blender/USD

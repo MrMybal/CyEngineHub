@@ -140,7 +140,7 @@ internal sealed unsafe partial class ImGuiWorkspace
                     {
                         Gui.Separator(); Gui.TextDisabled("DERNIER PLAN DU PATCH");
                         Gui.TextWrapped(patch.DisplayText);
-                        Gui.TextWrapped("Le temporaire comprend les fichiers modifiés préparés, le cache borné et une marge de sécurité.");
+                        Gui.TextWrapped("Le temporaire comprend les plages nouvelles et de retour arrière, le cache borné, la croissance et une marge de sécurité. Aucun fichier moteur modifié n’est copié en entier.");
                         Record("engine-patch-plan"); Gui.Separator();
                     }
                 }

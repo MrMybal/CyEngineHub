@@ -165,27 +165,36 @@ This route also consumes only content already present on disk.
 - Official engine revisions can be applied from the engine sheet or its context menu,
   after confirming the existing installation directory. Git engines use their repository instead.
 - The updater checks SHA-1 file identities from the Epic manifest, downloads only
-  the required chunks and reconstructs changed files before touching the installation.
+  the required chunks and prepares reversible byte-range deltas before touching the installation.
   Existing optional components are retained without installing every optional platform.
 - Patch component selection uses Epic's explicit install tags from a local manifest
   whose Build.version matches the installation. A core Android header or Linux tool
   does not enable an entire optional SDK. Without tagged metadata the fallback is
   conservative about absent optional files; component installation remains explicit.
 - Verified ranges from the installed manifest and unchanged target files can supply
-  patch chunks locally. Every reconstructed file must still match the new manifest's
+  patch chunks locally. Every streamed target file must still match the new manifest's
   SHA-1; stale local data is retried from Epic before any installed file is replaced.
 - Network chunks are prefetched through a bounded 64 MiB disk window (or one larger
   chunk when required), with a separate 128 MiB decoded-memory cache. The entire
   compressed update is no longer retained alongside all prepared files.
+- Changed binaries are not staged as whole files. The delta contains changed/new
+  byte ranges and original bytes needed to undo them, including truncated tails.
+  Unchanged interiors are omitted. Target SHA-1 is verified during preparation,
+  delta SHA-256 on reuse and application, and original SHA-1 under exclusive locks.
 - The patch plan separates estimated network transfer, additional temporary headroom,
-  and final size delta. Headroom counts remaining prepared files, the bounded chunk
-  window, the new local manifest receipt, and a capped safety margin; already prepared
-  verified files and existing chunk-cache allocation are not charged a second time.
-  It is not a promise that every engine patch requires negligible temporary space:
-  changed files are still staged for verification and rollback safety.
-- Overwritten files are moved to a sibling staging backup with a recovery journal.
-  Cancellation or a commit failure restores those files; Build.version is committed last.
+  and final size delta. Before differences are known, it explicitly reports a minimum
+  reserve, not a full-file-size estimate. Free space is checked during preparation;
+  the measured plan then counts allocated delta sizes, file growth, the bounded chunk
+  window, manifest/journal metadata and a capped safety margin. Existing verified
+  deltas and chunk-cache allocation are not charged twice. Entirely new or heavily
+  changed data can still require substantial space; rollback bytes are not free.
+- On Windows, existing files are patched in place under exclusive locks, after
+  rejecting multiple hard links. Durable journals precede writes; reversible deltas
+  restore originals on cancellation or commit failure. Build.version is committed last.
+  Only the small local manifest receipt uses a rename-and-backup transaction.
   A subsequent attempt recovers an interrupted commit before doing more work.
+  Legacy full-file backup journals remain recoverable. Secure in-place patching
+  currently requires Windows; unsupported systems fail before an installed byte changes.
   Unknown files, project copies and personal plugins are not deleted.
 - Fab refresh checks supplier packages already downloaded into the library. A separate
   button and product context action can request a check. Only distribution metadata and

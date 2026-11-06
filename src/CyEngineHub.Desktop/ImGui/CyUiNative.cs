@@ -13,7 +13,7 @@ internal static partial class CyUiNative
     private const string Library = "cimgui";
     internal static void VerifyAbi()
     {
-        if (Abi() != 1 || Marshal.PtrToStringUTF8(Revision()) != "ff023e646c6a3038b3dfbfd53f6d2b4a2f5955e3" ||
+        if (Abi() != 2 || Marshal.PtrToStringUTF8(Revision()) != "ff023e646c6a3038b3dfbfd53f6d2b4a2f5955e3" ||
             Marshal.PtrToStringUTF8(ImGuiVersion()) != "1.92.1")
             throw new InvalidOperationException("CyUI/ImGui runtime does not match the application's pinned ABI. Rebuild the native dependency.");
     }
@@ -55,6 +55,7 @@ internal static partial class CyUiNative
     [LibraryImport(Library, EntryPoint = "cyhub_ui_heading", StringMarshalling = StringMarshalling.Utf8)] internal static partial void Heading(string text, int level);
     [LibraryImport(Library, EntryPoint = "cyhub_ui_tooltip", StringMarshalling = StringMarshalling.Utf8)] internal static partial void Tooltip(string text);
     [LibraryImport(Library, EntryPoint = "cyhub_document_create", StringMarshalling = StringMarshalling.Utf8)] internal static partial nint CreateDocument();
+    [LibraryImport(Library, EntryPoint = "cyhub_document_content_height")] internal static partial float DocumentContentHeight(nint handle);
     [LibraryImport(Library, EntryPoint = "cyhub_document_destroy", StringMarshalling = StringMarshalling.Utf8)] internal static partial void DestroyDocument(nint handle);
     [LibraryImport(Library, EntryPoint = "cyhub_document_set", StringMarshalling = StringMarshalling.Utf8)] internal static partial void SetDocument(nint handle, string markdown);
     [LibraryImport(Library, EntryPoint = "cyhub_document_draw", StringMarshalling = StringMarshalling.Utf8)] private static partial nint DocumentDraw(nint handle, string id, float width, float height);

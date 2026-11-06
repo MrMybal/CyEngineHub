@@ -16,7 +16,7 @@ public sealed partial class MainWindowViewModel
     internal EpicEnginePatchPlan? GetEnginePatchPlan(string path) => _enginePatchPlans.GetValueOrDefault(path);
     public bool IsEngineUpdateConfirmationVisible => _pendingEngineUpdate is not null;
     public string EngineUpdateConfirmationText => _pendingEngineUpdate is { } engine
-        ? $"Mettre à jour {engine.DisplayName} ({engine.VersionLabel}) dans {engine.Path} ? {engine.OfficialUpdateLabel}. Fermez l’éditeur et les compilations utilisant ce moteur. Seuls les fichiers modifiés sont préparés puis remplacés ; les composants installés et les fichiers personnels sont conservés."
+        ? $"Mettre à jour {engine.DisplayName} ({engine.VersionLabel}) dans {engine.Path} ? {engine.OfficialUpdateLabel}. Fermez l’éditeur et les compilations utilisant ce moteur. Seules les plages modifiées et leurs données de retour arrière sont préparées, sans copie complète des fichiers moteur ; les composants installés et les fichiers personnels sont conservés."
         : string.Empty;
     public bool CanUpdateSelectedOfficialEngine => SelectedEngineDetails is { IsOfficialEpic: true, OfficialUpdateAvailable: true, IsInstallationAvailable: true } engine && !_updatingEnginePaths.Contains(engine.Path) && IsDirectFabConnected && !IsEpicBusy && !IsEngineUninstallActive;
     public ICommand RequestOfficialEngineUpdateCommand => new RelayCommand(() => RequestOfficialEngineUpdate(SelectedEngineDetails), () => CanUpdateSelectedOfficialEngine);

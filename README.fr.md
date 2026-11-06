@@ -14,13 +14,12 @@ le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers l
 
 ## Captures d’écran
 
-La build de développement intègre le **lecteur d’aide CyDoc hors ligne (F1)** :
+L’alpha.45 intègre le **lecteur d’aide CyDoc hors ligne (F1)** :
 25 chapitres utilisateur en anglais (par défaut) et français complets, contrats SDK
 publics, recherche, galerie de captures et schémas SVG statiques. Le dossier
 `Documentation/` est distribué avec l’application : `Documentation.html` s’ouvre
 en `file://`, sans serveur ni CDN. La langue de l’aide est indépendante de l’interface.
 La maintenance est décrite dans [l’espace de génération privé](.CyDocBuild/internal/MAINTENANCE.md).
-Cela n’annonce pas une nouvelle publication GitHub.
 
 Aperçu de développement (`2.0.0-alpha.41`), capturé dans la vraie application avec
 des données de démonstration fictives et aucun compte connecté. Ces écrans peuvent
@@ -38,11 +37,11 @@ différer de la version actuellement publiée. Cliquez sur une image pour l’ag
 
 ![Options de conversion Blender avec conversion UAsset Unreal optionnelle](docs/screenshots/source-conversion.png)
 
-**Version publiée : `2.0.0-alpha.42`.** [Télécharger la release Windows](https://github.com/MrMybal/CyEngineHub/releases/tag/v2.0.0-alpha.42). Sauvegardez vos projets avant d'essayer les
+**Version publiée : `2.0.0-alpha.45`.** [Télécharger la release Windows](https://github.com/MrMybal/CyEngineHub/releases/tag/v2.0.0-alpha.45). Sauvegardez vos projets avant d'essayer les
 opérations d'installation, de déplacement ou de conversion d'assets.
 
 Les changements récents sont récapitulés dans les
-[notes de version](docs/releases/v2.0.0-alpha.42.md).
+[notes de version](docs/releases/v2.0.0-alpha.45.md).
 L’alpha.42 recherche les mises à jour dès le début du démarrage, sans attendre les
 catalogues : état visible, proposition explicite et nouvel essai non bloquant hors ligne.
 L’alpha.41 ajoute des [convertisseurs de sources](docs/source-converters.md) :

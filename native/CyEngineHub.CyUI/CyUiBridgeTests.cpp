@@ -15,10 +15,11 @@ HUB_IMPORT unsigned cyhub_ui_colour(int);
 HUB_IMPORT float cyhub_ui_dp(float);
 HUB_IMPORT const char* cyhub_ui_tr(const char*, const char*, int);
 HUB_IMPORT void* cyhub_document_create();
+HUB_IMPORT float cyhub_document_content_height(void*);
 HUB_IMPORT void cyhub_document_set(void*, const char*);
 HUB_IMPORT void cyhub_document_destroy(void*);
 int main() {
-    if (cyhub_ui_abi() != 1) return 1;
+    if (cyhub_ui_abi() != 2) return 1;
     if (std::strcmp(cyhub_ui_imgui_version(), "1.92.1") != 0) return 2;
     auto first = igCreateContext(nullptr);
     cyhub_ui_apply("mid-grey", 0, 1, "en");
@@ -42,6 +43,7 @@ int main() {
     const std::string frenchLabel = cyhub_ui_tr("Copy", "Copy", 1);
     if (englishLabel.substr(englishLabel.find("###")) != frenchLabel.substr(frenchLabel.find("###"))) return 7;
     auto document = cyhub_document_create();
+    if (cyhub_document_content_height(document) != 0) return 8;
     cyhub_document_set(document, "# Heading\n\nA **bold** [link](https://example.invalid)\n\n```cpp\nint x;\n```");
     cyhub_document_destroy(document);
     igDestroyContext(second); igDestroyContext(first);

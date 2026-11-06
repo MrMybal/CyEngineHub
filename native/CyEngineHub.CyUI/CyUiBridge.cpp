@@ -21,7 +21,7 @@ struct Logs { cyui::LogBuffer model; cyui::LogState view; };
 struct Properties { cyui::InspectorState view; };
 const char* result(const std::string& value) { returned = value; return returned.c_str(); }
 }
-HUB_API int cyhub_ui_abi() { return 1; }
+HUB_API int cyhub_ui_abi() { return 2; }
 HUB_API const char* cyhub_ui_imgui_version() { return ImGui::GetVersion(); }
 HUB_API const char* cyhub_ui_revision() { return "ff023e646c6a3038b3dfbfd53f6d2b4a2f5955e3"; }
 HUB_API void cyhub_ui_apply(const char* theme, int comfortable, float scale, const char* locale) {
@@ -60,6 +60,7 @@ HUB_API void cyhub_ui_translation(const char* locale, const char* key, const cha
     cyui::registerTranslations(locale, {{key, value}});
 }
 HUB_API void* cyhub_document_create() { return new DocumentView; }
+HUB_API float cyhub_document_content_height(void* pointer) { return static_cast<DocumentView*>(pointer)->contentHeight; }
 HUB_API void cyhub_document_destroy(void* pointer) { delete static_cast<DocumentView*>(pointer); }
 HUB_API void cyhub_document_set(void* pointer, const char* markdown) {
     auto& document = *static_cast<DocumentView*>(pointer);
@@ -69,7 +70,12 @@ HUB_API const char* cyhub_document_draw(void* pointer, const char* id, float wid
     auto& document = *static_cast<DocumentView*>(pointer);
     const auto availableWidth = width > 0 ? width : ImGui::GetContentRegionAvail().x;
     if (document.width != availableWidth) { document.width = availableWidth; document.contentHeight = 0; }
-    const auto viewportHeight = height > 0 && document.contentHeight > 0 ? std::min(height, document.contentHeight) : height;
+    // Negative height requests natural flow inside the application's outer reader.
+    // Keep spare space for rounding/padding so this child cannot capture wheel input.
+    const bool flow = height < 0;
+    const auto viewportHeight = flow ? std::max(cyui::dp(80), document.contentHeight + cyui::dp(16)) :
+        height > 0 && document.contentHeight > 0 ? std::min(height, document.contentHeight) : height;
+    if (flow) ImGui::SetNextWindowScroll({0, 0});
     auto* parent = ImGui::GetCurrentWindow();
     auto action = cyui::documentView(id, document.view, document.model, {width, viewportHeight});
     // Observe the shared renderer's actual child-content extent. This is viewport

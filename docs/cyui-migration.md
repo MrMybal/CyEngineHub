@@ -45,6 +45,11 @@ theme/font state. Theme preferences propagate to secondary browser chrome.
 
 ## Reproducible build
 
+The application bridge requires ABI 2, including measured natural-flow
+DocumentViews. An older native runtime is rejected at startup. The bilingual
+manual has since moved to the offline CyDoc reader; product descriptions still
+use CyUI DocumentViews. Upstream CyUI/cimgui revisions remain pinned and unchanged.
+
 Requirements: .NET SDK compatible with `global.json`, Git, CMake 3.21+, and a
 C++17 compiler. Windows uses Visual Studio 2022 C++ tools/Windows SDK; the script
 finds its CMake installation when it is not on PATH. No machine-specific source

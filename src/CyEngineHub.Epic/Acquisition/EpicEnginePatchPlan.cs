@@ -5,11 +5,18 @@ namespace CyEngineHub.Epic.Acquisition;
 public sealed record EpicEnginePatchPlan(int ChangedFiles, long EstimatedDownloadBytes, long ReusableBytes,
     long AdditionalSpaceBytes, long FinalSizeDeltaBytes, long ChunkCacheLimitBytes)
 {
+    public long PreparedDeltaBytes { get; init; }
+    public long ChangedDataBytes { get; init; }
+    public bool IsDeltaPreparationPending { get; init; }
     public string Summary => $"Patch · {ChangedFiles:N0} fichier(s) · téléchargement estimé : {Size(EstimatedDownloadBytes)} · " +
-        $"espace temporaire supplémentaire : {Size(AdditionalSpaceBytes)} · variation finale : {(FinalSizeDeltaBytes >= 0 ? "+" : "−")}{Size(Math.Abs(FinalSizeDeltaBytes))} · données locales réutilisables : {Size(ReusableBytes)}";
-    public string DisplayText => $"Patch · {ChangedFiles:N0} fichier(s) modifié(s)\nTéléchargement estimé : {Size(EstimatedDownloadBytes)}\n" +
-        $"Espace temporaire supplémentaire : {Size(AdditionalSpaceBytes)}\nVariation finale : {(FinalSizeDeltaBytes >= 0 ? "+" : "−")}{Size(Math.Abs(FinalSizeDeltaBytes))} · données locales réutilisables : {Size(ReusableBytes)}";
-    internal static string Size(long value) => value >= 1L << 30 ? $"{value / (double)(1L << 30):N2} Gio" : $"{value / (double)(1L << 20):N1} Mio";
+        $"{(IsDeltaPreparationPending ? "réserve minimale avant calcul des deltas" : "espace temporaire supplémentaire estimé")} : {Size(AdditionalSpaceBytes)} · variation finale : {(FinalSizeDeltaBytes >= 0 ? "+" : "−")}{Size(Math.Abs(FinalSizeDeltaBytes))} · données locales réutilisables : {Size(ReusableBytes)}";
+    public string DisplayText => $"Patch par plages · {ChangedFiles:N0} fichier(s) modifié(s)\nTéléchargement estimé : {Size(EstimatedDownloadBytes)}\n" +
+        (IsDeltaPreparationPending ? $"Réserve minimale avant calcul des deltas : {Size(AdditionalSpaceBytes)}\n" : $"Espace supplémentaire au pic estimé : {Size(AdditionalSpaceBytes)}\n") +
+        $"Deltas réversibles préparés : {Size(PreparedDeltaBytes)} · octets nouveaux dans les plages : {Size(ChangedDataBytes)}\n" +
+        $"Variation finale : {(FinalSizeDeltaBytes >= 0 ? "+" : "−")}{Size(Math.Abs(FinalSizeDeltaBytes))} · données locales réutilisables : {Size(ReusableBytes)}";
+    internal static string Size(long value) => value >= 1L << 30 ? $"{value / (double)(1L << 30):N2} Gio" :
+        value >= 1L << 20 ? $"{value / (double)(1L << 20):N1} Mio" :
+        value >= 1024 ? $"{value / 1024d:N1} Kio" : $"{value:N0} o";
     internal static long RequiredSpace(long remainingFiles, long peakCache, long existingCache)
     {
         var extra = checked(remainingFiles + Math.Max(0, peakCache - existingCache));
