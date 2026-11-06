@@ -9,8 +9,9 @@ public sealed class DocumentationLocationTests : IDisposable
     public DocumentationLocationTests()
     {
         Directory.CreateDirectory(_root);
-        File.WriteAllText(Path.Combine(_root,"index.html"),"<!doctype html>");
-        File.WriteAllText(Path.Combine(_root,"manifest.json"),"""
+        Directory.CreateDirectory(Path.Combine(_root,"DocData"));
+        File.WriteAllText(Path.Combine(_root,"Documentation.html"),"<!doctype html>");
+        File.WriteAllText(Path.Combine(_root,"DocData","manifest.json"),"""
             {"aliases":{"overview":"welcome"},"pages":[
             {"id":"welcome","locale":"en","headings":[{"id":"start"}],"html":""},
             {"id":"engines","locale":"en","headings":[{"id":"install"}],"html":"<figure data-cydoc-id=\"engines\">"},
@@ -22,7 +23,7 @@ public sealed class DocumentationLocationTests : IDisposable
         var location = new DocumentationLocation(_root);
         var uri = location.CreateUri("help:engines#install","fr",media:"engines");
         Assert.True(uri.IsFile); Assert.Equal("#/fr/engines/install?media=engines",uri.Fragment);
-        Assert.Equal(Path.Combine(_root,"index.html"),uri.LocalPath);
+        Assert.Equal(Path.Combine(_root,"Documentation.html"),uri.LocalPath);
         Assert.EndsWith("#/en/welcome",location.CreateUri("overview").AbsoluteUri,StringComparison.Ordinal);
     }
     [Theory]

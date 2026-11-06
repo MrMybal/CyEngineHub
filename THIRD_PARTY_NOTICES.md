@@ -35,11 +35,11 @@ MIT license below. SDK license metadata/text is included in packaged build notic
 
 ## CyDoc offline documentation reader
 
-- CyDoc 0.1.0, revision `774f2a7eabf7dd181a98ffc5add115b580b67f42` — MIT.
+- CyDoc 0.1.0, revision `6ddf9a582defb2f11fbb3f992afef6f98dcadc93` — MIT.
   https://github.com/MrMybal/CyDoc
-- The complete MIT license is distributed in `Help/CYDOC-LICENSE.txt`.
-- Host documentation retains GPL-3.0-only (`Help/CYENGINEHUB-LICENSE.txt`).
-- Only the image module is bundled. No Three.js, mesh, graph, GIF, gallery or
+- The complete MIT license is distributed in `Documentation/DocData/CYDOC-LICENSE.txt`.
+- Host documentation retains GPL-3.0-only (`Documentation/DocData/CYENGINEHUB-LICENSE.txt`).
+- Only image and gallery modules are bundled. No Three.js, mesh, graph, GIF or
   video runtime is distributed with this reader. CyDoc's compiler dependencies
   are build tools, not part of the installed reader.
 

@@ -35,7 +35,7 @@ internal static class Program
     internal static async Task Run(Window window)
     {
         Directory.CreateDirectory(Output);
-        var root=Path.Combine(AppContext.BaseDirectory,"Help");
+        var root=Path.Combine(AppContext.BaseDirectory,"Documentation");
         var location=new DocumentationLocation(root);
         using var view=new DocumentationWebView(location,location.CreateUri("welcome"),Path.Combine(Output,"Profile"));
         var ready=new TaskCompletionSource();
@@ -52,8 +52,8 @@ internal static class Program
         await Until("!!document.querySelector('main article')");
         Check(web.Source.StartsWith("file:///",StringComparison.OrdinalIgnoreCase),"Actual WebView2 opens file:// without a server");
         Check(await Js("document.querySelector('#app').dataset.theme === 'dark'")=="true","Application-coherent default dark theme");
-        using var manifest=JsonDocument.Parse(File.ReadAllText(Path.Combine(root,"manifest.json")));
-        var chapters=manifest.RootElement.GetProperty("pages").EnumerateArray().Where(p=>p.GetProperty("order").GetInt32()<25&&p.GetProperty("section").GetString()!="SDK API").ToArray();
+        using var manifest=JsonDocument.Parse(File.ReadAllText(Path.Combine(root,"DocData","manifest.json")));
+        var chapters=manifest.RootElement.GetProperty("pages").EnumerateArray().Where(p=>p.GetProperty("order").GetInt32()<25).ToArray();
         foreach(var page in chapters)
         {
             var id=page.GetProperty("id").GetString()!;var locale=page.GetProperty("locale").GetString()!;
@@ -63,7 +63,7 @@ internal static class Program
         }
         Check(chapters.Length==50,"All 25 bilingual chapters exercised");
         Check(!typeof(DocumentationLocation).Assembly.GetManifestResourceNames().Any(name=>name.StartsWith("CyEngineHub.Manual.",StringComparison.Ordinal)),"Legacy embedded manual payload is removed");
-        await Js("window.loadedScreenshots=0;for(const name of ['engines','project-creation','source-conversion']){const image=new Image();image.onload=()=>window.loadedScreenshots++;image.src='assets/screenshots/'+name+'.png';}");
+        await Js("window.loadedScreenshots=0;for(const name of ['engines','project-creation','source-conversion']){const image=new Image();image.onload=()=>window.loadedScreenshots++;image.src='DocData/assets/screenshots/'+name+'.png';}");
         await Until("window.loadedScreenshots===3");Check(true,"All three bundled PNG resources decode locally");
         view.Navigate(location.CreateUri("engines","fr",media:"engines"));
         await Until("!!document.querySelector('.cy-image .image-layer img')?.complete && document.querySelector('.cy-image .image-layer img').naturalWidth>0");
@@ -131,9 +131,9 @@ internal static class Program
         await Js("document.querySelector('[data-menu]').click()");
         Check(await Js("document.querySelector('#app').classList.contains('menu-open')")=="true","Narrow-screen navigation remains available");
         window.Width=1280;await Task.Delay(100);
-        view.Navigate(location.CreateUri("reference-docs-source-converters","fr"));
-        await Until("document.querySelector('article')?.textContent.includes('Preserved reference')===true");
-        Check(await Js("document.querySelector('main .callout')?.textContent.includes('Référence originale en français')===true && document.querySelector('article').lang==='fr'")=="true","Original-language fallback is explicit and accessible");
+        view.Navigate(location.CreateUri("api-source-converter","fr"));
+        await Until("document.querySelector('article')?.textContent.includes('Paramètres et résultat')===true");
+        Check(await Js("!document.querySelector('main .callout') && document.documentElement.lang==='fr'")=="true","French API contract is complete without fallback banners");
         await using(var capture=File.Create(Path.Combine(Output,"reader-reference-fr.png")))await web.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png,capture);
         Console.WriteLine($"CyDoc QA: {Checks} checks, {Output}");
     }

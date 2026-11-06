@@ -129,10 +129,12 @@ try {
     }
 
     $required = @('LICENSE', 'LICENSING.md', 'THIRD_PARTY_NOTICES.md',
-        'Help/index.html', 'Help/manifest.json', 'Help/data.js', 'Help/app-reader.js',
-        'Help/viewer.css', 'Help/app-reader.css', 'Help/media-image.js',
-        'Help/translation-report.json', 'Help/migration-report.json',
-        'Help/CYDOC-LICENSE.txt', 'Help/CYENGINEHUB-LICENSE.txt',
+        'Documentation/Documentation.html', 'Documentation/DocAI.md',
+        'Documentation/DocData/manifest.json', 'Documentation/DocData/data.js',
+        'Documentation/DocData/viewer.js', 'Documentation/DocData/viewer.css',
+        'Documentation/DocData/app-reader.css', 'Documentation/DocData/media-image.js',
+        'Documentation/DocData/media-gallery.js', 'Documentation/DocData/translation-report.json',
+        'Documentation/DocData/CYDOC-LICENSE.txt', 'Documentation/DocData/CYENGINEHUB-LICENSE.txt',
         'cimgui.dll', 'Hexa.NET.ImGui.dll', 'LICENCES/CyUI/LICENSE',
         'LICENCES/CyUI/Lexilla.txt', 'LICENCES/DearImGui/LICENSE.txt',
         'LICENCES/cimgui/LICENSE', 'LICENCES/Hexa.NET.ImGui/LICENSE.txt',
@@ -160,7 +162,7 @@ try {
         'Extensions\cyenginehub.source-converters\scripts\blender-convert.py',
         'docs\source-converters.md',
         'docs\application-updates.md',
-        'docs\releases\v2.0.0-alpha.42.md')
+        'docs\releases\v2.0.0-alpha.45.md')
     foreach ($relative in $required) {
         if (-not (Test-Path -LiteralPath (Join-Path $appStage $relative) -PathType Leaf)) { throw "Missing packaged file: $relative" }
     }

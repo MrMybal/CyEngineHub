@@ -14,7 +14,7 @@ public sealed record AssetSourceConversionResult(string ConverterId, string Dire
  * @doc api-source-converter
  * @locale en
  * @title Asset source converter contract
- * @section SDK API
+ * @section API / Conversion
  * @symbol CyEngineHub.Fab.Conversion.IAssetSourceConverter
  * Implement `Descriptor` and `ConvertAsync(request, progress, cancellationToken)`.
  * Read `SourceDirectory` without modifying it; write only to a new owned directory
@@ -23,13 +23,36 @@ public sealed record AssetSourceConversionResult(string ConverterId, string Dire
  * `AssetSourceConverterRegistry.Register`; duplicate IDs are rejected.
  * `RequiresTargetEngine` declares whether the caller must supply a target engine.
  * This contract does not imply that every input format or Unreal version is supported.
- * See [conversion procedures](doc:conversion) and [source converter reference](doc:reference-docs-source-converters).
+ *
+ * ## Signature and imports {#signature}
+ * ```csharp
+ * using CyEngineHub.Fab.Conversion;
+ * using CyEngineHub.Fab.Installation;
+ * Task<AssetSourceConversionResult> ConvertAsync(
+ *     AssetSourceConversionRequest request,
+ *     IProgress<FabInstallationScriptProgress>? progress = null,
+ *     CancellationToken cancellationToken = default);
+ * ```
+ * ## Parameters and result {#parameters}
+ * `request.SourceDirectory` identifies complete, immutable input. `WorkRoot` is
+ * the owned workspace. `Options` maps declared option IDs to strings;
+ * `TargetEngine` may be null unless the descriptor requires it. `progress` is
+ * optional; `cancellationToken` requests cancellation. The task returns
+ * `ConverterId`, `Directory`, `ReportPath` and `ContentKind`. Propagate failures
+ * rather than returning an apparently valid incomplete output.
+ * ## Registration example {#example}
+ * ```csharp
+ * var registry = new AssetSourceConverterRegistry([]);
+ * registry.Register(myConverter); // A trusted IAssetSourceConverter instance.
+ * var converter = registry.Find(myConverter.Descriptor.Id);
+ * ```
+ * See [conversion procedures](doc:conversion) and [extension SDK](doc:extensions-sdk).
  */
 /**
  * @doc api-source-converter
  * @locale fr
  * @title Contrat des convertisseurs de sources
- * @section SDK API
+ * @section API / Conversion
  * @symbol CyEngineHub.Fab.Conversion.IAssetSourceConverter
  * Implémentez `Descriptor` et `ConvertAsync(request, progress, cancellationToken)`.
  * Lisez `SourceDirectory` sans le modifier ; écrivez uniquement dans un nouveau
@@ -38,7 +61,31 @@ public sealed record AssetSourceConversionResult(string ConverterId, string Dire
  * l'annulation et signalez la progression. `AssetSourceConverterRegistry.Register`
  * refuse les identifiants dupliqués. `RequiresTargetEngine` indique si un moteur
  * cible doit être fourni. Ce contrat ne garantit pas la prise en charge de tous les formats.
- * Voir [la conversion](doc:conversion) et [la référence](doc:reference-docs-source-converters).
+ *
+ * ## Signature et imports {#signature}
+ * ```csharp
+ * using CyEngineHub.Fab.Conversion;
+ * using CyEngineHub.Fab.Installation;
+ * Task<AssetSourceConversionResult> ConvertAsync(
+ *     AssetSourceConversionRequest request,
+ *     IProgress<FabInstallationScriptProgress>? progress = null,
+ *     CancellationToken cancellationToken = default);
+ * ```
+ * ## Paramètres et résultat {#parameters}
+ * `request.SourceDirectory` désigne les sources complètes et immuables.
+ * `WorkRoot` est le dossier de travail possédé. `Options` associe les identifiants
+ * d’options déclarés à des chaînes ; `TargetEngine` peut être null sauf exigence
+ * du descripteur. `progress` est facultatif ; `cancellationToken` demande
+ * l’annulation. La tâche renvoie `ConverterId`, `Directory`, `ReportPath` et
+ * `ContentKind`. Propagez un échec au lieu de présenter une sortie incomplète
+ * comme valide.
+ * ## Exemple d’enregistrement {#example}
+ * ```csharp
+ * var registry = new AssetSourceConverterRegistry([]);
+ * registry.Register(myConverter); // Une instance IAssetSourceConverter de confiance.
+ * var converter = registry.Find(myConverter.Descriptor.Id);
+ * ```
+ * Voir [la conversion](doc:conversion) et [le SDK](doc:extensions-sdk).
  */
 /// <summary>Conversion plug-in contract. Inputs are immutable; only a new owned workspace may be written.</summary>
 public interface IAssetSourceConverter

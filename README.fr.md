@@ -15,11 +15,11 @@ le moteur le plus intégré ; Unity, Godot et CRYENGINE disposent de providers l
 ## Captures d’écran
 
 La build de développement intègre le **lecteur d’aide CyDoc hors ligne (F1)** :
-25 chapitres en anglais (par défaut) et français, références techniques, API source,
-recherche, liens, captures agrandissables et schémas SVG statiques. Le dossier Help
-est distribué avec l’application et s’ouvre en `file://`, sans serveur ni CDN.
-La langue de l'aide reste indépendante de l’interface générale. Voir le
-[manuel](docs/manual/README.md) et le [guide d’intégration](docs/cydoc-integration.md).
+25 chapitres utilisateur en anglais (par défaut) et français complets, contrats SDK
+publics, recherche, galerie de captures et schémas SVG statiques. Le dossier
+`Documentation/` est distribué avec l’application : `Documentation.html` s’ouvre
+en `file://`, sans serveur ni CDN. La langue de l’aide est indépendante de l’interface.
+La maintenance est décrite dans [l’espace de génération privé](.CyDocBuild/internal/MAINTENANCE.md).
 Cela n’annonce pas une nouvelle publication GitHub.
 
 Aperçu de développement (`2.0.0-alpha.41`), capturé dans la vraie application avec

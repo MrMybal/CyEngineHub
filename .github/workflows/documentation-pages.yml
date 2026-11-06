@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/documentation-pages.yml'
-      - 'tools/docs/**'
+      - '.CyDocBuild/**'
       - 'docs/**'
       - 'examples/**'
       - 'extensions/**'
@@ -40,7 +40,7 @@ jobs:
           persist-credentials: false
       - name: Resolve locked CyDoc dependency
         id: cydoc
-        run: node tools/docs/workflow-dependency.mjs
+        run: node .CyDocBuild/workflow-dependency.mjs
       - name: Check out the locked public CyDoc library
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -56,17 +56,19 @@ jobs:
           cache-dependency-path: ${{ steps.cydoc.outputs.directory }}/package-lock.json
       - name: Generate the same complete offline reader as the application
         shell: pwsh
-        run: ./tools/docs/build.ps1
+        run: ./.CyDocBuild/build.ps1
+      - name: Check bilingual reader and contextual-help regressions
+        run: npm test --prefix .CyDocBuild
       - name: Stage only the exported reader and its declared resources
-        run: node tools/docs/prepare-pages.mjs
+        run: node .CyDocBuild/prepare-pages.mjs
       - name: Check publication privacy
-        run: python3 scripts/check-release-privacy.py --directory artifacts/pages
+        run: python3 scripts/check-release-privacy.py --directory .CyDocBuild/.cache/pages
       - name: Configure GitHub Pages metadata
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
       - name: Upload documentation only
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:
-          path: artifacts/pages
+          path: .CyDocBuild/.cache/pages
           retention-days: 1
 
   deploy:

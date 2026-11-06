@@ -1,0 +1,9 @@
+// One-time mechanical compatibility-map conversion from the previous export.
+import {readFile,writeFile} from 'node:fs/promises';
+const root=new URL('../../',import.meta.url), work=new URL('../',import.meta.url);
+const previous=JSON.parse(await readFile(new URL('artifacts/cydoc/help/manifest.json',root),'utf8'));
+const aliases={overview:'welcome',quickstart:'welcome',installation:'install','engine-update':'engine-updates','translation-report':'welcome'};
+const publicIds=new Set(['welcome','navigation','engines','engine-updates','git','projects','profiles','builds','library','fab','megascans','connectors','downloads','install','conversion','derivatives','plugins','editor-plugin','extensions-sdk','ai-mcp','storage','settings','app-updates','troubleshooting','glossary','api-source-converter','api-installation-script']);
+const mapping=[[/source-converter|asset-conversion|downgrade|native.*bridge|native-texture/,'conversion'],[/project-creation/,'profiles'],[/plugin/,'plugins'],[/mcp|ai-mcp/,'ai-mcp'],[/engine|unreal/,'engines'],[/fab|epic|quixel|megascan/,'fab'],[/storage/,'storage'],[/toolchain/,'builds'],[/git-safety/,'git'],[/marketplace/,'connectors'],[/download/,'downloads'],[/package-install/,'install'],[/derived/,'derivatives'],[/extension|schema/,'extensions-sdk'],[/license|licensing|third-party/,'glossary'],[/application-update/,'app-updates']];
+for(const page of previous.pages)if(!publicIds.has(page.id))aliases[page.id]=mapping.find(([pattern])=>pattern.test(page.id))?.[1]||'welcome';
+await writeFile(new URL('cydoc.config.json',work),JSON.stringify({name:'CyEngineHub',logo:'assets/app-logo.png',version:'2.0.0-alpha.44',defaultLocale:'en',locales:[{code:'en',label:'English'},{code:'fr',label:'Français'}],homePage:'welcome',content:'manual',assets:'assets',out:'../Documentation',modules:['image','gallery'],sources:['.cache/sdk'],apiIndex:{enabled:true,includeDirs:['.cache/sdk']},aliases},null,2)+'\n');

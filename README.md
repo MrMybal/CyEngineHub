@@ -298,11 +298,11 @@ project files. Dependencies retain their respective licenses: see
 **[Open Documentation](https://mrmybal.github.io/CyEngineHub/#/en/welcome)** — the complete HTML reader, not the Markdown source files. Switch languages in its toolbar. The bundled offline reader remains available from Help / F1.
 
 The development build includes the **offline CyDoc Help / Documentation reader (F1)**:
-25 chapters in English (default) and French, technical references, source API,
-local search, zoomable screenshots and static SVG workflows. The entire reader
-ships under Help and opens by `file://`, without a server or CDN. Its language
-is independent of the partially translated application UI. See the
-[bundled manual](docs/manual/README.md) and [generation/integration guide](docs/cydoc-integration.md).
+25 user chapters in complete English (default) and French, public SDK contracts,
+local search, a screenshot gallery and static SVG workflows. The entire reader
+ships under `Documentation/` and opens `Documentation.html` by `file://`, without
+a server or CDN. Its language is independent of the application UI. Documentation
+maintainers use the [private build workspace](.CyDocBuild/internal/MAINTENANCE.md).
 This does not announce a new GitHub release.
 
 - [Epic / Fab login: automatic and manual](docs/fab-login.md)

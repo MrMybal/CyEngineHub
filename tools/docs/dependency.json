@@ -1,6 +1,0 @@
-{
-  "repository": "https://github.com/MrMybal/CyDoc.git",
-  "commit": "774f2a7eabf7dd181a98ffc5add115b580b67f42",
-  "version": "0.1.0",
-  "modules": ["image"]
-}

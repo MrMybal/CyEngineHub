@@ -67,7 +67,7 @@ public sealed record FabInstallationScriptResult(
  * @doc api-installation-script
  * @locale en
  * @title Installation script contract
- * @section SDK API
+ * @section API / Installation
  * @symbol CyEngineHub.Fab.Installation.IFabInstallationScript
  * `Descriptor` describes the script and its configurable options. `InstallAsync`
  * receives an asset/version, its content kind, prepared source directory, target
@@ -75,13 +75,36 @@ public sealed record FabInstallationScriptResult(
  * cancellation and return `FabInstallationScriptResult`. Keep original packages
  * intact and validate destination paths. A successful return is not proof of
  * semantic compatibility in a different engine; inspect the generated reports.
+ *
+ * ## Signature and imports {#signature}
+ * ```csharp
+ * using CyEngineHub.Fab.Installation;
+ * Task<FabInstallationScriptResult> InstallAsync(
+ *     FabInstallationScriptContext context,
+ *     IProgress<FabInstallationScriptProgress>? progress = null,
+ *     CancellationToken cancellationToken = default);
+ * ```
+ * ## Parameters and result {#parameters}
+ * `context` supplies `Asset`, `Version`, `ContentKind`, `SourceDirectory`,
+ * `Target` and string-valued `Configuration`. A target identifies its kind,
+ * root path, engine version and optional project/engine model. `progress` is
+ * optional and reports a nullable `Fraction` plus `Message`.
+ * Respect cancellation. The task returns `ScriptId`, `Summary` and `Outputs`;
+ * output paths must identify actual contained results, not arbitrary files.
+ * ## Calling a trusted script {#example}
+ * ```csharp
+ * FabInstallationScriptResult result = await script.InstallAsync(
+ *     context, progress: null, cancellationToken: cancellationToken);
+ * ```
+ * `script` is an approved `IFabInstallationScript`; the host supplies the reviewed
+ * context. This is not permission to execute code contained in an asset download.
  * See [installation](doc:install) and [extension SDK](doc:extensions-sdk).
  */
 /**
  * @doc api-installation-script
  * @locale fr
  * @title Contrat des scripts d'installation
- * @section SDK API
+ * @section API / Installation
  * @symbol CyEngineHub.Fab.Installation.IFabInstallationScript
  * `Descriptor` décrit le script et ses options. `InstallAsync` reçoit l'asset,
  * sa version, son type de contenu, les sources préparées, la cible et la configuration.
@@ -89,6 +112,30 @@ public sealed record FabInstallationScriptResult(
  * et renvoyez `FabInstallationScriptResult`. Conservez les packages originaux et
  * validez les chemins cibles. Le succès d'une copie ne prouve pas la compatibilité
  * sémantique dans un autre moteur : consultez les rapports générés.
+ *
+ * ## Signature et imports {#signature}
+ * ```csharp
+ * using CyEngineHub.Fab.Installation;
+ * Task<FabInstallationScriptResult> InstallAsync(
+ *     FabInstallationScriptContext context,
+ *     IProgress<FabInstallationScriptProgress>? progress = null,
+ *     CancellationToken cancellationToken = default);
+ * ```
+ * ## Paramètres et résultat {#parameters}
+ * `context` fournit `Asset`, `Version`, `ContentKind`, `SourceDirectory`, `Target`
+ * et `Configuration`, dont les valeurs sont des chaînes. La cible indique son
+ * type, chemin racine, version moteur et modèle projet/moteur éventuel.
+ * `progress` est facultatif : il transmet `Fraction`, éventuellement null, et
+ * `Message`. Respectez l’annulation. La tâche renvoie `ScriptId`, `Summary` et
+ * `Outputs` ; les chemins doivent désigner de vrais résultats contenus dans la
+ * destination prévue, pas des fichiers arbitraires.
+ * ## Appeler un script de confiance {#example}
+ * ```csharp
+ * FabInstallationScriptResult result = await script.InstallAsync(
+ *     context, progress: null, cancellationToken: cancellationToken);
+ * ```
+ * `script` est un `IFabInstallationScript` approuvé ; l’hôte fournit le contexte
+ * relu. Cela n’autorise pas à exécuter le code d’un téléchargement d’asset.
  * Voir [l'installation](doc:install) et [le SDK](doc:extensions-sdk).
  */
 public interface IFabInstallationScript

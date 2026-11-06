@@ -10,9 +10,9 @@ public sealed partial class DocumentationLocation
     public DocumentationLocation(string root)
     {
         _root = Path.GetFullPath(root);
-        using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(_root, "manifest.json")));
+        using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(_root, "DocData", "manifest.json")));
         _manifest = manifest.RootElement.Clone();
-        if (!File.Exists(Path.Combine(_root, "index.html"))) throw new FileNotFoundException("The bundled CyDoc reader is missing.");
+        if (!File.Exists(Path.Combine(_root, "Documentation.html"))) throw new FileNotFoundException("The bundled CyDoc reader is missing.");
     }
     public static string Language(string? language) => language == "fr" ? "fr" : "en";
     public Uri CreateUri(string pageId, string language = "en", string? anchor = null, string? media = null)
@@ -34,7 +34,7 @@ public sealed partial class DocumentationLocation
             throw new ArgumentException("Unknown documentation section.", nameof(anchor));
         if (media is not null && (!Identifier().IsMatch(media) || !page.GetProperty("html").GetString()!.Contains("data-cydoc-id=\"" + media + "\"", StringComparison.Ordinal)))
             throw new ArgumentException("Unknown documentation media.", nameof(media));
-        return new Uri(new Uri(Path.Combine(_root, "index.html")).AbsoluteUri + "#/" + language + "/" + Uri.EscapeDataString(pageId) +
+        return new Uri(new Uri(Path.Combine(_root, "Documentation.html")).AbsoluteUri + "#/" + language + "/" + Uri.EscapeDataString(pageId) +
             (anchor is null ? "" : "/" + Uri.EscapeDataString(anchor)) + (media is null ? "" : "?media=" + Uri.EscapeDataString(media)));
     }
     public bool AllowsResource(Uri uri)

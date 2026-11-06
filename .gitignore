@@ -5,6 +5,9 @@
 *.user
 *.suo
 artifacts/
+.CyDocBuild/.cache/
+.CyDocBuild/node_modules/
+/Documentation/
 Data/
 *.db
 *.db-shm

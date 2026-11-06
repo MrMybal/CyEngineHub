@@ -107,7 +107,7 @@ public sealed partial class MainWindow : Window
         {
             if (_documentationWindow is null)
             {
-                var location = new Documentation.DocumentationLocation(Path.Combine(AppContext.BaseDirectory, "Help"));
+                var location = new Documentation.DocumentationLocation(Path.Combine(AppContext.BaseDirectory, "Documentation"));
                 var uri = location.CreateUri(request.Page, model.DocumentationLanguage, request.Anchor, request.Media);
                 var profile = DocumentationProfileDirectory;
                 _documentationWindow = new(location, uri, profile, link => _launcherForDocumentation(link), language => model.DocumentationLanguage = language);
