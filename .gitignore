@@ -8,6 +8,7 @@ artifacts/
 .CyDocBuild/.cache/
 .CyDocBuild/node_modules/
 /Documentation/
+/dist/website/
 Data/
 *.db
 *.db-shm

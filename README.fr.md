@@ -117,6 +117,15 @@ npm test --prefix .CyDocBuild
 
 Seuls les modules image et gallery du lecteur sont sélectionnés. Les schémas SVG statiques n’exigent pas le module graph, et le lecteur n’embarque pas Three.js. Node.js et le compilateur documentaire servent à la génération, pas à la lecture du manuel installé.
 
+Construire la présentation visuelle bilingue, avec une copie locale complète du même manuel :
+
+```powershell
+node website/build.mjs
+node website/preview.mjs --port 4789 --base /showcase/
+```
+
+Ouvrez `http://127.0.0.1:4789/showcase/`, ou directement le fichier généré `dist/website/index.html`. Le [guide de compilation et de vérification du showcase](website/README.md) décrit l’usage local ; ces commandes ne publient et ne déploient rien.
+
 Le packaging Windows nécessite aussi Inno Setup 7 et des adaptateurs de conversion natifs correspondants, contrôlés pour la confidentialité. `tools/release/build-windows.ps1` exécute les tests, prépare les exécutables autonomes et la documentation, contrôle le paquet et produit installateur, ZIP et empreintes ; il ne les publie pas. Voir le [guide de compilation de l’interface native](docs/cyui-migration.md) et le [parcours de publication](docs/application-updates.md). Les adaptateurs Unreal et le client éditeur ont leurs propres prérequis de compilation liés au moteur.
 
 </details>

@@ -122,6 +122,15 @@ npm test --prefix .CyDocBuild
 
 Only the image and gallery reader modules are selected. Static SVG diagrams need no graph module, and the reader does not bundle Three.js. Node.js and the documentation compiler are build tools, not requirements for reading the installed manual.
 
+Build the bilingual visual showcase, including a complete local copy of the same manual:
+
+```powershell
+node website/build.mjs
+node website/preview.mjs --port 4789 --base /showcase/
+```
+
+Open `http://127.0.0.1:4789/showcase/`, or open the generated `dist/website/index.html` directly. The [showcase build and verification guide](website/README.md) explains local use; these commands do not publish or deploy anything.
+
 Windows packaging additionally needs Inno Setup 7 and matching, privacy-checked native conversion adapters. `tools/release/build-windows.ps1` runs tests, stages self-contained executables and documentation, checks the package, and creates the installer, ZIP and hashes; it does not publish them. See the [native UI build guide](docs/cyui-migration.md) and [release workflow](docs/application-updates.md). Unreal adapters and the editor client have separate engine-specific build requirements.
 
 </details>
