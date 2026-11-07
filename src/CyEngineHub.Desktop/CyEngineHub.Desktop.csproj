@@ -68,6 +68,7 @@
     <None Include="../../docs/releases/v2.0.0-alpha.43.md" Condition="Exists('../../docs/releases/v2.0.0-alpha.43.md')" Link="docs/releases/v2.0.0-alpha.43.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/releases/v2.0.0-alpha.44.md" Condition="Exists('../../docs/releases/v2.0.0-alpha.44.md')" Link="docs/releases/v2.0.0-alpha.44.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/releases/v2.0.0-alpha.45.md" Link="docs/releases/v2.0.0-alpha.45.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../docs/releases/v2.0.0-alpha.45.en.md" Link="docs/releases/v2.0.0-alpha.45.en.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/application-updates.md" Link="docs/application-updates.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/source-converters.md" Link="docs/source-converters.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/marketplace-connectors.md" Link="docs/marketplace-connectors.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
