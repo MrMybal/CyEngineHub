@@ -67,14 +67,31 @@ DOM fixture or HTTP response a visual/file-protocol verification.
 
 ## Hosting and scope
 
-This task prepares a local artifact. **No push, deployment, release or GitHub
-Pages workflow change is performed by these commands.** The existing Pages
-documentation and all its old deep links remain unchanged.
+The public showcase is published at
+[English](https://mrmybal.github.io/CyEngineHub/showcase/?lang=en) and
+[Français](https://mrmybal.github.io/CyEngineHub/showcase/?lang=fr).
+The existing **Documentation Pages** workflow builds and checks the manual and
+showcase, then stages only the generated exports. The showcase is deployed under
+`/showcase/`; the original root reader, redirects and deep links stay unchanged.
+README links select their respective language.
 
-On a future explicitly requested publication, host the complete generated folder
-under an agreed path without replacing the existing documentation reader. For
-production hosting, revalidate HTML separately from long-lived immutable caching
-of hashed resources; a new asset hash cannot refresh stale HTML by itself.
+Pushes to `main` affecting the workflow's declared inputs trigger publication;
+the workflow can also be dispatched manually. Build, verify and preview commands
+above remain local: **they do not push, deploy or create a release**. To reproduce
+the publication staging after generating and checking both exports, run:
+
+```powershell
+node .CyDocBuild/prepare-pages.mjs
+python scripts/check-release-privacy.py --directory .CyDocBuild/.cache/pages
+```
+
+Only `.CyDocBuild/.cache/pages/` is uploaded, never application profiles, local
+libraries, authoring tools or QA captures. Staging checks every declared file and
+its integrity, including byte-identical copies of the reader in both locations.
+The embedded application manual and the showcase's complete local copy retain
+their offline build and resource layout. For production hosting, revalidate HTML
+separately from long-lived immutable caching of hashed resources; a new asset
+hash cannot refresh stale HTML by itself.
 External GitHub/download actions are supplemental and need a connection; viewing
 the showcase and its bundled reader does not.
 

@@ -2,6 +2,7 @@
   <tr>
     <td width="300" align="left" valign="top">
       <a href="https://mrmybal.github.io/CyEngineHub/Documentation.html#/fr/welcome">Documentation</a><br>
+      <a href="https://mrmybal.github.io/CyEngineHub/showcase/?lang=fr">Présentation</a><br>
       <a href="https://github.com/MrMybal/CyEngineHub">Dépôt des sources</a><br>
       <a href="https://github.com/MrMybal/CyEngineHub/issues">Suivi des problèmes</a><br><br>
       <sub>README</sub><br>
