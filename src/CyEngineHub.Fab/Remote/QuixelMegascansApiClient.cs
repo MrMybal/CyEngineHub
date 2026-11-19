@@ -256,7 +256,7 @@ public sealed partial class QuixelMegascansApiClient : IQuixelMegascansClient
             1,
             "Téléchargement Megascans terminé.",
             totalDownloaded,
-            totalDownloaded));
+            totalDownloaded) { Phase = DirectFabDownloadPhase.Completed });
         return new DirectFabDownloadResult(
             asset.AssetId,
             $"{asset.Title} · {request.DisplayName}",

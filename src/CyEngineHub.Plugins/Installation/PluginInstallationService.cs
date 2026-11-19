@@ -183,7 +183,9 @@ public sealed class PluginInstallationService : IPluginInstallationService
             if (Directory.Exists(destination))
             {
                 if (!plan.AllowReplacement) throw new PluginOperationException("Un plugin existe déjà à cette destination ; import éditeur arrêté.", "Install", plan.Plugin.DescriptorPath, destination);
-                var backupRoot = Path.Combine(pluginsDirectory, ".cyenginehub-backups");
+                var targetParent = Directory.GetParent(Path.TrimEndingDirectorySeparator(pluginsDirectory))
+                    ?? throw new PluginOperationException("La racine du volume ne peut pas héberger les plugins.", "Install", plan.Plugin.DescriptorPath);
+                var backupRoot = Path.Combine(targetParent.FullName, ".cyenginehub-backups");
                 Directory.CreateDirectory(backupRoot);
                 EnsureRealDirectory(
                     backupRoot,
@@ -335,6 +337,12 @@ public sealed class PluginInstallationService : IPluginInstallationService
                         continue;
                     }
 
+                    var relativePath = Path.GetRelativePath(root, file);
+                    if (plugin.HasSource && IsGeneratedModuleOutput(relativePath, plugin.Modules))
+                    {
+                        continue;
+                    }
+
                     if (files.Count >= MaximumFiles)
                     {
                         throw new PluginOperationException(
@@ -345,7 +353,7 @@ public sealed class PluginInstallationService : IPluginInstallationService
 
                     files.Add(new ManifestFile(
                         file,
-                        Path.GetRelativePath(root, file),
+                        relativePath,
                         new FileInfo(file).Length));
                 }
 
@@ -353,8 +361,7 @@ public sealed class PluginInstallationService : IPluginInstallationService
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var name = Path.GetFileName(child);
-                    if (AlwaysExcludedDirectories.Contains(name) ||
-                        (plugin.HasSource && name.Equals("Binaries", StringComparison.OrdinalIgnoreCase)))
+                    if (AlwaysExcludedDirectories.Contains(name))
                     {
                         continue;
                     }
@@ -383,6 +390,34 @@ public sealed class PluginInstallationService : IPluginInstallationService
                 plugin.DescriptorPath,
                 innerException: exception);
         }
+    }
+
+    private static bool IsGeneratedModuleOutput(string relativePath, IReadOnlyList<UnrealPluginModule> modules)
+    {
+        // UBT writes its modules directly under Binaries/<platform>. Vendor runtimes can share that directory.
+        if (!relativePath.StartsWith("Binaries" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var parts = relativePath.Split(Path.DirectorySeparatorChar);
+        if (parts.Length < 3 || parts[1].Equals("ThirdParty", StringComparison.OrdinalIgnoreCase)) return false;
+        var file = parts[2];
+        if (file.EndsWith(".modules", StringComparison.OrdinalIgnoreCase) ||
+            file.EndsWith(".target", StringComparison.OrdinalIgnoreCase)) return true;
+
+        var stem = file.Split('.')[0];
+        var separator = stem.IndexOf('-');
+        if (separator < 0) return false;
+        var target = stem[..separator];
+        if (target.StartsWith("lib", StringComparison.OrdinalIgnoreCase)) target = target[3..];
+        if (!target.Equals("UnrealEditor", StringComparison.OrdinalIgnoreCase) &&
+            !target.Equals("UnrealGame", StringComparison.OrdinalIgnoreCase) &&
+            !target.Equals("UE4Editor", StringComparison.OrdinalIgnoreCase) &&
+            !target.Equals("UE4Game", StringComparison.OrdinalIgnoreCase)) return false;
+
+        var module = stem[(separator + 1)..].Split('-')[0];
+        return modules.Any(item => item.Name.Equals(module, StringComparison.OrdinalIgnoreCase));
     }
 
     private static async Task CopyFileAsync(

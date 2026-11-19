@@ -263,64 +263,15 @@ public sealed partial class DirectFabApiClient : IDirectFabClient, IDisposable
             .DownloadAsync(manifest.Chunks.Values.ToArray(), chunkCache, totalBytes, 0.72, progress, cancellationToken)
             .ConfigureAwait(false);
 
-        var fileIndex = 0;
-        var lastReconstructionReport = System.Diagnostics.Stopwatch.GetTimestamp();
-        foreach (var file in manifest.Files)
+        await ReconstructFilesAsync(manifest, stagingFiles, chunkCache, completedBytes, cachedBytes, progress, cancellationToken)
+            .ConfigureAwait(false);
+        progress?.Report(new DirectFabDownloadProgress(0.99, "Finalisation du package Fab et nettoyage des chunks…", completedBytes, totalBytes)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            var destination = GetSafeDestination(stagingFiles, file.RelativePath);
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            if (!EpicManifestParser.MatchesSha1(destination, file.Sha1))
-            {
-                var temporary = destination + ".partial";
-                await using (var output = new FileStream(
-                                 temporary,
-                                 FileMode.Create,
-                                 FileAccess.Write,
-                                 FileShare.None,
-                                 128 * 1024,
-                                 FileOptions.Asynchronous | FileOptions.SequentialScan))
-                {
-                    foreach (var part in file.Parts)
-                    {
-                        var chunkInfo = manifest.Chunks[part.ChunkGuid];
-                        var rawChunk = await File.ReadAllBytesAsync(
-                                Path.Combine(chunkCache, part.ChunkGuid + ".chunk"),
-                                cancellationToken)
-                            .ConfigureAwait(false);
-                        var chunkData = EpicManifestParser.ParseChunk(rawChunk, chunkInfo);
-                        var end = checked((long)part.Offset + part.Size);
-                        if (end > chunkData.LongLength)
-                        {
-                            throw new DirectFabException(
-                                $"Le fragment {part.ChunkGuid} dépasse les données du chunk.");
-                        }
-                        await output.WriteAsync(
-                                chunkData.AsMemory(checked((int)part.Offset), checked((int)part.Size)),
-                                cancellationToken)
-                            .ConfigureAwait(false);
-                    }
-                }
-                if (!EpicManifestParser.MatchesSha1(temporary, file.Sha1))
-                {
-                    EpicChunkTransfer.InvalidateFileChunks(chunkCache, file);
-                    throw new DirectFabException(
-                        $"L’intégrité du fichier {file.RelativePath} est invalide après reconstruction.");
-                }
-                File.Move(temporary, destination, overwrite: true);
-            }
-
-            fileIndex++;
-            if (fileIndex != 1 && fileIndex != manifest.Files.Count &&
-                System.Diagnostics.Stopwatch.GetElapsedTime(lastReconstructionReport).TotalMilliseconds < 250) continue;
-            lastReconstructionReport = System.Diagnostics.Stopwatch.GetTimestamp();
-            progress?.Report(new DirectFabDownloadProgress(
-                0.72 + 0.27 * fileIndex / manifest.Files.Count,
-                $"Reconstruction · {fileIndex:N0}/{manifest.Files.Count:N0} fichier(s)",
-                completedBytes,
-                totalBytes) { CachedBytes = cachedBytes });
-        }
-
+            Phase = DirectFabDownloadPhase.Finalization,
+            CachedBytes = cachedBytes,
+        });
+        var revision = FabPackageRevision.FromManifest(manifest);
+        cancellationToken.ThrowIfCancellationRequested();
         var fabRoot = Path.Combine(root, "Fab");
         Directory.CreateDirectory(fabRoot);
         var finalDirectory = GetUniqueDirectory(Path.Combine(fabRoot, stableName));
@@ -330,7 +281,7 @@ public sealed partial class DirectFabApiClient : IDirectFabClient, IDisposable
             1,
             "Téléchargement Fab terminé et vérifié.",
             completedBytes,
-            totalBytes) { CachedBytes = cachedBytes });
+            totalBytes) { Phase = DirectFabDownloadPhase.Completed, CachedBytes = cachedBytes });
         return new DirectFabDownloadResult(
             asset.AssetId,
             asset.Title,
@@ -338,7 +289,7 @@ public sealed partial class DirectFabApiClient : IDirectFabClient, IDisposable
             manifest.Files.Count,
             completedBytes,
             DateTimeOffset.UtcNow,
-            FabPackageRevision.FromManifest(manifest));
+            revision);
     }
 
     private async Task<DirectFabSession> EnsureSessionAsync(CancellationToken cancellationToken)

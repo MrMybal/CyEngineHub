@@ -125,7 +125,17 @@ public sealed class LibraryPackageService
             throw new DirectFabException("Le dossier de package ne peut pas être un lien ou une jonction.");
         }
 
-        var files = EnumerateContentFiles(root, cancellationToken);
+        var diskProgress = new LibraryPackageProgress(progress, DirectFabDownloadPhase.Packaging);
+        diskProgress.Stage("Inventaire des fichiers du package…");
+        PackageFileTree tree;
+        try { tree = PackageFileTree.Read(root, cancellationToken); }
+        catch (InvalidDataException exception) { throw new DirectFabException(exception.Message, exception); }
+        var files = tree.Files;
+        files.RemoveAll(file => string.Equals(file.DirectoryName, root, StringComparison.Ordinal) &&
+            (file.Name.Equals(ManifestFileName, StringComparison.OrdinalIgnoreCase) ||
+             file.Name.Equals(ManifestFileName + ".partial", StringComparison.OrdinalIgnoreCase) ||
+             file.Name.Equals(ArchiveFileName, StringComparison.OrdinalIgnoreCase) ||
+             file.Name.Equals(ArchiveFileName + ".partial", StringComparison.OrdinalIgnoreCase)));
         var uncompressedBytes = files.Sum(file => file.Length);
         var entryPoints = files
             .Where(file => IsEntryPoint(file.Extension))
@@ -147,11 +157,6 @@ public sealed class LibraryPackageService
         {
             if (IsZipStorageMode(storageMode))
             {
-                progress?.Report(new DirectFabDownloadProgress(
-                    null,
-                    $"Création du package {FormatStorageMode(storageMode)}…",
-                    0,
-                    uncompressedBytes));
                 var archivePath = Path.Combine(root, ArchiveFileName);
                 var temporaryArchive = archivePath + ".partial";
                 if (File.Exists(temporaryArchive)) File.Delete(temporaryArchive);
@@ -161,7 +166,7 @@ public sealed class LibraryPackageService
                         temporaryArchive,
                         uncompressedBytes,
                         storageMode,
-                        progress,
+                        diskProgress,
                         cancellationToken)
                     .ConfigureAwait(false);
                 File.Move(temporaryArchive, archivePath, overwrite: true);
@@ -190,19 +195,17 @@ public sealed class LibraryPackageService
                 download.SourceManifest,
                 DateTimeOffset.UtcNow,
                 derivation);
+            diskProgress.Stage("Écriture du manifeste du package…");
             await WriteManifestAsync(root, manifest, cancellationToken).ConfigureAwait(false);
 
             if (IsZipStorageMode(storageMode))
             {
-                RemoveArchivedContent(root, files);
+                diskProgress.Stage("Nettoyage des fichiers archivés…");
+                tree.RemoveCopiedContent(root);
             }
-            progress?.Report(new DirectFabDownloadProgress(
-                1,
-                IsZipStorageMode(storageMode)
+            diskProgress.Stage(IsZipStorageMode(storageMode)
                     ? $"Package {FormatStorageMode(storageMode)} et manifeste CyEngineHub prêts."
-                    : "Manifeste CyEngineHub prêt; fichiers conservés sans compression.",
-                storedBytes,
-                storedBytes));
+                    : "Manifeste prêt, fichiers conservés sans compression.", finished: true);
             return download with
             {
                 DownloadedBytes = storedBytes,
@@ -259,38 +262,17 @@ public sealed class LibraryPackageService
         return RemoteFabAssetClassifier.Classify(asset, version).Kind;
     }
 
-    private static List<FileInfo> EnumerateContentFiles(string root, CancellationToken cancellationToken)
-    {
-        var files = new List<FileInfo>();
-        foreach (var path in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var relative = Path.GetRelativePath(root, path);
-            if (relative.Equals(ManifestFileName, StringComparison.OrdinalIgnoreCase) ||
-                relative.Equals(ArchiveFileName, StringComparison.OrdinalIgnoreCase) ||
-                relative.Equals(ArchiveFileName + ".partial", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-            var info = new FileInfo(path);
-            if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
-            {
-                throw new DirectFabException("Le contenu du package contient un lien ou point de jonction non autorisé.");
-            }
-            files.Add(info);
-        }
-        return files;
-    }
-
     private static async Task CreateArchiveAsync(
         string root,
         IReadOnlyList<FileInfo> files,
         string archivePath,
         long totalBytes,
         LibraryPackageStorageMode storageMode,
-        IProgress<DirectFabDownloadProgress>? progress,
+        LibraryPackageProgress progress,
         CancellationToken cancellationToken)
     {
+        var message = $"Création du package {FormatStorageMode(storageMode)}";
+        progress.Bytes(message, 0, totalBytes, force: true);
         await using var output = new FileStream(
             archivePath,
             FileMode.CreateNew,
@@ -304,6 +286,7 @@ public sealed class LibraryPackageService
         foreach (var file in files)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            PackageFileTree.RequirePlainPath(root, file.FullName);
             var relative = Path.GetRelativePath(root, file.FullName).Replace('\\', '/');
             var entry = archive.CreateEntry(relative, ResolveCompressionLevel(storageMode, file.Extension));
             await using var source = new FileStream(
@@ -320,13 +303,11 @@ public sealed class LibraryPackageService
                 if (read == 0) break;
                 await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
                 completedBytes += read;
+                progress.Bytes(message, completedBytes, totalBytes);
             }
-            progress?.Report(new DirectFabDownloadProgress(
-                totalBytes == 0 ? 1 : Math.Clamp((double)completedBytes / totalBytes, 0, 1),
-                $"{FormatStorageMode(storageMode)} · {completedBytes / 1024d / 1024d:0.0} MB",
-                completedBytes,
-                totalBytes));
         }
+        progress.Bytes(message, completedBytes, totalBytes, force: true);
+        progress.Stage("Fermeture de l’archive ZIP…");
     }
 
     private static bool IsZipStorageMode(LibraryPackageStorageMode mode) =>
@@ -386,23 +367,6 @@ public sealed class LibraryPackageService
                 .ConfigureAwait(false);
         }
         File.Move(temporary, path, overwrite: true);
-    }
-
-    private static void RemoveArchivedContent(string root, IReadOnlyList<FileInfo> files)
-    {
-        foreach (var file in files)
-        {
-            if (file.Exists) file.Delete();
-        }
-        foreach (var directory in Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories)
-                     .OrderByDescending(path => path.Length))
-        {
-            if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
-            {
-                throw new DirectFabException("Nettoyage refusé : le package contient une jonction.");
-            }
-            if (!Directory.EnumerateFileSystemEntries(directory).Any()) Directory.Delete(directory);
-        }
     }
 
     private static bool IsEntryPoint(string extension) =>

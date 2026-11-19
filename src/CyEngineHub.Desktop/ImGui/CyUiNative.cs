@@ -13,7 +13,7 @@ internal static partial class CyUiNative
     private const string Library = "cimgui";
     internal static void VerifyAbi()
     {
-        if (Abi() != 2 || Marshal.PtrToStringUTF8(Revision()) != "ff023e646c6a3038b3dfbfd53f6d2b4a2f5955e3" ||
+        if (Abi() != 2 || Marshal.PtrToStringUTF8(Revision()) != "6ef01cfcdb197f3a89d64618ce5ef8818c704728" ||
             Marshal.PtrToStringUTF8(ImGuiVersion()) != "1.92.1")
             throw new InvalidOperationException("CyUI/ImGui runtime does not match the application's pinned ABI. Rebuild the native dependency.");
     }

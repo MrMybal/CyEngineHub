@@ -7,6 +7,136 @@ namespace CyEngineHub.Epic.Tests;
 
 public sealed class LibraryPackageServiceTests
 {
+    private sealed class TransferProgress(Action<DirectFabDownloadProgress> report) : IProgress<DirectFabDownloadProgress>
+    {
+        public void Report(DirectFabDownloadProgress value) => report(value);
+    }
+
+    [Fact]
+    public async Task CleanupPreservesAFileEditedSinceTheInventory()
+    {
+        var root = Directory.CreateTempSubdirectory("CyHub-package-changed-").FullName;
+        try
+        {
+            var payload = Path.Combine(root, "model.txt");
+            await File.WriteAllTextAsync(payload, "first");
+            var tree = PackageFileTree.Read(root, CancellationToken.None);
+            await File.WriteAllTextAsync(payload, "updated locally");
+
+            Assert.Throws<IOException>(() => tree.RemoveCopiedContent(root));
+            Assert.Equal("updated locally", await File.ReadAllTextAsync(payload));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public async Task InventoryRejectsDirectoryLinksBeforeArchiving()
+    {
+        var root = Directory.CreateTempSubdirectory("CyHub-package-inventory-").FullName;
+        try
+        {
+            var emptyFolder = Directory.CreateDirectory(Path.Combine(root, "empty")).FullName;
+            var alias = Path.Combine(root, "alias");
+            if (OperatingSystem.IsWindows())
+            {
+                var start = new System.Diagnostics.ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true };
+                start.Environment["CYHUB_TEST_LINK"] = alias;
+                start.Environment["CYHUB_TEST_TARGET"] = emptyFolder;
+                foreach (var argument in new[] { "-NoProfile", "-NonInteractive", "-Command",
+                    "New-Item -ItemType Junction -Path $env:CYHUB_TEST_LINK -Target $env:CYHUB_TEST_TARGET -ErrorAction Stop | Out-Null" })
+                    start.ArgumentList.Add(argument);
+                using var process = System.Diagnostics.Process.Start(start)!;
+                await process.WaitForExitAsync();
+                Assert.Equal(0, process.ExitCode);
+            }
+            else Directory.CreateSymbolicLink(alias, emptyFolder);
+            try
+            {
+                Assert.Throws<InvalidDataException>(() => PackageFileTree.Read(root, CancellationToken.None));
+                Assert.Empty(Directory.GetFiles(emptyFolder));
+            }
+            finally { Directory.Delete(alias); }
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public async Task SourceCleanupRetainsNewFilesAndThePublishedCompletePackage()
+    {
+        var root = Directory.CreateTempSubdirectory("CyHub-storage-cleanup-").FullName;
+        try
+        {
+            var source = Directory.CreateDirectory(Path.Combine(root, "downloads")).FullName;
+            Directory.CreateDirectory(Path.Combine(source, "empty-directory"));
+            await File.WriteAllTextAsync(Path.Combine(source, "payload.txt"), "original");
+            var destination = Path.Combine(root, "published");
+            var newFile = Path.Combine(source, "new.txt");
+            var reports = new List<DirectFabDownloadProgress>();
+            var progress = new LibraryPackageProgress(new TransferProgress(value =>
+            {
+                reports.Add(value);
+                if (value.ProcessedBytes > 0) File.WriteAllText(newFile, "new data");
+            }), DirectFabDownloadPhase.Placement);
+
+            var warning = await MarketplaceStorageRouter.CopyPublishAndCleanAsync(source, destination, progress, CancellationToken.None);
+
+            Assert.NotNull(warning);
+            Assert.Equal("original", await File.ReadAllTextAsync(Path.Combine(destination, "payload.txt")));
+            Assert.True(Directory.Exists(Path.Combine(destination, "empty-directory")));
+            Assert.Equal("new data", await File.ReadAllTextAsync(newFile));
+            Assert.Empty(Directory.GetDirectories(root, "*.incoming-*"));
+            Assert.All(reports, report => Assert.Equal(DirectFabDownloadPhase.Placement, report.Phase));
+            Assert.Contains(reports, report => report.ProcessedBytes == 8 && report.TotalProcessingBytes == 8);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public async Task CanceledCopyKeepsOriginalAndNeverPublishesPartialPackage()
+    {
+        var root = Directory.CreateTempSubdirectory("CyHub-storage-cancel-").FullName;
+        try
+        {
+            var source = Directory.CreateDirectory(Path.Combine(root, "downloads")).FullName;
+            var payload = Path.Combine(source, "payload.txt");
+            await File.WriteAllTextAsync(payload, "unchanged");
+            var destination = Path.Combine(root, "published");
+            using var stop = new CancellationTokenSource();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => MarketplaceStorageRouter.CopyPublishAndCleanAsync(
+                source, destination, new LibraryPackageProgress(new TransferProgress(value =>
+                {
+                    if (value.ProcessedBytes > 0) stop.Cancel();
+                }), DirectFabDownloadPhase.Placement), stop.Token));
+
+            Assert.Equal("unchanged", await File.ReadAllTextAsync(payload));
+            Assert.False(Directory.Exists(destination));
+            Assert.Empty(Directory.GetDirectories(root, "*.incoming-*"));
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
+    [Fact]
+    public async Task SameVolumeMoveNeedsNoSecondAllocationAndResidentPackageIsCountedOnce()
+    {
+        var root = Directory.CreateTempSubdirectory("CyHub-storage-quota-").FullName;
+        try
+        {
+            var source = Directory.CreateDirectory(Path.Combine(root, "downloads", "pack")).FullName;
+            await File.WriteAllTextAsync(Path.Combine(source, "payload.txt"), "pack");
+            var library = Path.Combine(root, "library");
+            var profile = new MarketplaceStorageProfile("Fab", root, root, [new(library)]);
+            var download = new DirectFabDownloadResult("pack", "pack", source, 1, long.MaxValue, DateTimeOffset.UtcNow);
+
+            var placed = await MarketplaceStorageRouter.PlaceAsync(download, profile);
+            Assert.Equal("pack", await File.ReadAllTextAsync(Path.Combine(placed.DestinationDirectory, "payload.txt")));
+            var atQuota = profile with { Libraries = [new(library, MaximumBytes: 4)] };
+            var resident = await MarketplaceStorageRouter.PlaceAsync(placed with { DownloadedBytes = 4 }, atQuota);
+            Assert.Equal(placed.DestinationDirectory, resident.DestinationDirectory);
+        }
+        finally { Directory.Delete(root, recursive: true); }
+    }
+
     [Fact]
     public async Task DerivedPackagePreservesSourceAndRecordsLineage()
     {
@@ -169,11 +299,13 @@ public sealed class LibraryPackageServiceTests
                 DateTimeOffset.UtcNow,
                 new DirectFabSourceManifest("EpicBuildPatchManifest", "Plugin", "1.0", 15, 2, 9));
 
+            var reports = new List<DirectFabDownloadProgress>();
             var result = await LibraryPackageService.PackageAsync(
                 asset,
                 version,
                 download,
-                LibraryPackageStorageMode.ZipFastest);
+                LibraryPackageStorageMode.ZipFastest,
+                new TransferProgress(reports.Add));
 
             var archivePath = Path.Combine(downloadRoot, LibraryPackageService.ArchiveFileName);
             var manifestPath = Path.Combine(downloadRoot, LibraryPackageService.ManifestFileName);
@@ -183,6 +315,9 @@ public sealed class LibraryPackageServiceTests
             Assert.Equal("CodePlugin", result.PackageKind);
             Assert.Equal("ZipFastest", result.StorageMode);
             Assert.True(result.UncompressedBytes > 0);
+            Assert.All(reports, report => Assert.Equal(DirectFabDownloadPhase.Packaging, report.Phase));
+            Assert.Contains(reports, report => report.ProcessedBytes == result.UncompressedBytes && report.Fraction == 1);
+            Assert.Contains(reports, report => report.Message.Contains("Nettoyage") && report.Fraction is null);
             Assert.True(result.StoredBytes > 0);
             Assert.Equal(new FileInfo(archivePath).Length, result.StoredBytes);
             var json = await File.ReadAllTextAsync(manifestPath);

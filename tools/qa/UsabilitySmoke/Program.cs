@@ -205,12 +205,43 @@ static partial class Program
         using var stop = new CancellationTokenSource(args.Contains("--interactive") ? TimeSpan.FromMinutes(20) : TimeSpan.FromSeconds(240));
         Dispatcher.UIThread.Post(async () =>
         {
-            try { await Run(args.Contains("--interactive"), stop); }
+            try
+            {
+                if (args.Contains("--shutdown-only"))
+                {
+                    await TestShutdownWithPendingUiWork();
+                    stop.Cancel();
+                }
+                else await Run(args.Contains("--interactive"), stop);
+            }
             catch (Exception ex) { Console.WriteLine(ex); Environment.ExitCode = 1; stop.Cancel(); }
         });
         Dispatcher.UIThread.MainLoop(stop.Token);
         Environment.Exit(Environment.ExitCode);
     }
+    static async Task TestShutdownWithPendingUiWork()
+    {
+        var app = new CyEngineHub.Desktop.App();
+        var scheduler = new HubTaskScheduler();
+        typeof(CyEngineHub.Desktop.App).GetField("_taskScheduler", Private)!.SetValue(app, scheduler);
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var onUi = false;
+        var worker = scheduler.Enqueue(new HubTaskDefinition("Test", "Installation", async (_, token) =>
+        {
+            started.SetResult();
+            await release.Task.ConfigureAwait(false);
+            await Dispatcher.UIThread.InvokeAsync(() => onUi = Dispatcher.UIThread.CheckAccess());
+            token.ThrowIfCancellationRequested();
+        }));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var cleanup = app.DisposeAsync().AsTask();
+        release.SetResult();
+        await cleanup.WaitAsync(TimeSpan.FromSeconds(5));
+        Check(onUi && (await worker.Completion).Status == HubTaskStatus.Canceled,
+            "Desktop cleanup drains installation callbacks on the live UI dispatcher");
+    }
+
     static async Task Run(bool interactive, CancellationTokenSource stop)
     {
         var paths = new AppDataPaths(Output, Path.Combine(Output, "qa.db"), Path.Combine(Output, "Logs"), true);
@@ -282,7 +313,8 @@ static partial class Program
         window.Show();
         if (ImGuiDiagnostics.IsHosted(window))
         {
-            if (ManualOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestManual(window, vm); Console.WriteLine("OUTPUT " + Output); }
+            if (Environment.GetCommandLineArgs().Contains("--assistant-only")) { await TestAssistant(window, vm, store); Console.WriteLine("OUTPUT " + Output); }
+            else if (ManualOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestManual(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (ApplicationUpdatesOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestApplicationUpdates(window, vm, updateSettings, updateService, launcher); Console.WriteLine("OUTPUT " + Output); }
             else if (ReadmeScreenshotsOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await CaptureReadmeScreenshots(window, vm); Console.WriteLine("OUTPUT " + Output); }
             else if (CyUiOnly) { await ImGuiDiagnostics.FramesAsync(window, 4); await TestCyUiMigration(window, vm); Console.WriteLine("OUTPUT " + Output); }
@@ -620,6 +652,19 @@ static partial class Program
         try
         {
             await Wait(() => vm.RunningActions == 1 && vm.QueuedActions == 1 && vm.RunningDownloads == 1 && vm.QueuedDownloads == 1);
+            var presenter = new FabDownloadProgressText();
+            var disk = presenter.Format("CitySample_5.5", new DirectFabDownloadProgress(.98, "Reconstruction", 1000, 1000)
+                { Phase = DirectFabDownloadPhase.Reconstruction, ProcessedBytes = 350, TotalProcessingBytes = 1000 });
+            var running = scheduler.GetSnapshot(transfer.Id) with { Stage = disk.Stage, Progress = disk.Fraction, Message = disk.Message };
+            var productRow = new FabVersionDownloadViewModel("QA", "Fab", "UE 5.5", "CitySample_5.5", _ => { });
+            productRow.ApplySnapshot(running);
+            var activityRow = new TaskItemViewModel(running, _ => { }, _ => { });
+            Check(productRow.Status == "Reconstruction" && productRow.ProgressPercent == 35 && activityRow.Status == productRow.Status &&
+                !productRow.IsProgressIndeterminate && !productRow.Message.Contains("100,0 %", StringComparison.Ordinal),
+                "The Fab variant and activity views present reconstruction independently of the completed transfer");
+            productRow.ApplySnapshot(running with { Stage = "Finalisation", Progress = null });
+            Check(productRow.Status == "Finalisation" && productRow.IsProgressIndeterminate && productRow.CanCancel,
+                "Finalization has its own badge and remains cancellable with indeterminate progress");
             await ImGuiDiagnostics.ClickAsync(window, "nav/Actions");
             Check(vm.IsActionsVisible && ImGuiDiagnostics.Elements(window).Contains("task/" + build.Id) &&
                 ImGuiDiagnostics.Elements(window).Contains("task/" + install.Id) && !ImGuiDiagnostics.Elements(window).Contains("task/" + transfer.Id), "Actions contains builds and installations but excludes downloads");

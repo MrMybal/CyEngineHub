@@ -21,6 +21,7 @@ public sealed partial class MainWindow : Window
 
     private static readonly ConditionalWeakTable<Control, RealizedRemoteFabRow> RealizedRemoteFabRows = new();
     private ExtensionHubWindow? _extensionHubWindow;
+    private Window? _assistantWindow;
     private MainWindowViewModel? _viewModel;
     private DocumentationWindow? _documentationWindow;
     public string DocumentationProfileDirectory { get; init; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "CyEngineHub", "DocumentationWebView");
@@ -64,6 +65,20 @@ public sealed partial class MainWindow : Window
 
     private void OnDataContextChanged(object? sender, EventArgs args) =>
         AttachViewModel(DataContext as MainWindowViewModel);
+
+    private void OpenAssistantWindow(object? sender, Avalonia.Interactivity.RoutedEventArgs args)
+    {
+        if (_assistantWindow is { } current) { current.Activate(); return; }
+        if (_viewModel is not { } model) return;
+        var window = new Window
+        {
+            Title = "Assistant CyEngineHub", Width = 880, Height = 720,
+            DataContext = model, Content = new CyEngineHub.Desktop.ImGui.ImGuiHost("Assistant"),
+        };
+        window.Closed += (_, _) => _assistantWindow = null;
+        _assistantWindow = window;
+        window.Show(this);
+    }
 
     private void FocusEngineCompilation(object? sender, Avalonia.Interactivity.RoutedEventArgs args) =>
         this.FindControl<Border>("EngineCompilationPanel")?.BringIntoView();

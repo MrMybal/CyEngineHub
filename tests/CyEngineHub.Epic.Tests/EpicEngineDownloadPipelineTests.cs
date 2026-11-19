@@ -99,6 +99,7 @@ public sealed class EpicEngineDownloadPipelineTests
                 if (scenario == "update-cancel")
                 {
                     Assert.False(File.Exists(Path.Combine(target + ".cyenginehub-update", "journal.json")));
+                    Assert.False(File.Exists(Path.Combine(target + ".cyenginehub-update", "journal.jsonl")));
                     var resumed = await backend.UpdateAsync(new("qa", "UE_QA", "5.6", "QA engine"), target);
                     Assert.Equal(2, resumed.FileCount);
                 }

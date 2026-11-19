@@ -4,7 +4,7 @@
   "displayName": "Unreal Version Bridge",
   "version": "0.5.0-alpha",
   "publisher": "CyEngineHub",
-  "description": "Alpha · Bridge natif C++ et assistance IA/MCP optionnelle via CyToolsCore 0.10.1 : diagnostic, scripts source/cible, adaptation et compilation de plugins dans une copie. Consentement d’exécution distinct, validation et réouverture cible avant publication. Aucun downgrade universel ni équivalence visuelle garantis.",
+  "description": "Alpha · Bridge natif C++ et assistance IA/MCP optionnelle via CyMCPSDK : diagnostic, scripts source/cible, adaptation et compilation de plugins dans une copie. Consentement d’exécution distinct, validation et réouverture cible avant publication. Aucun downgrade universel ni équivalence visuelle garantis.",
   "kind": "EngineIntegration",
   "executionKind": "WebLink",
   "capabilities": "AssetInspect, AssetConvert, AssetDowngrade, ProjectTool",

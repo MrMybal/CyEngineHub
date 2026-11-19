@@ -1910,6 +1910,7 @@ public sealed class FabVersionDownloadViewModel : ObservableObject
     private string _status = "En attente";
     private string _message = "Le téléchargement est dans la file.";
     private double _progressPercent;
+    private bool _isProgressIndeterminate = true;
     private bool _canCancel = true;
 
     public FabVersionDownloadViewModel(
@@ -1966,6 +1967,11 @@ public sealed class FabVersionDownloadViewModel : ObservableObject
     }
 
     public bool IsTerminal => Status is "Terminé" or "Échec" or "Annulé";
+    public bool IsProgressIndeterminate
+    {
+        get => _isProgressIndeterminate;
+        private set => SetProperty(ref _isProgressIndeterminate, value);
+    }
 
     public void AttachTask(Guid taskId)
     {
@@ -1976,10 +1982,11 @@ public sealed class FabVersionDownloadViewModel : ObservableObject
     public void ApplySnapshot(HubTaskSnapshot snapshot)
     {
         ProgressPercent = Math.Clamp((snapshot.Progress ?? 0) * 100, 0, 100);
+        IsProgressIndeterminate = snapshot.Progress is null && snapshot.Status is HubTaskStatus.Queued or HubTaskStatus.Running;
         Status = snapshot.Status switch
         {
             HubTaskStatus.Queued => "En attente",
-            HubTaskStatus.Running => "Téléchargement",
+            HubTaskStatus.Running => snapshot.Stage ?? "En cours",
             HubTaskStatus.Completed => "Terminé",
             HubTaskStatus.Failed => "Échec",
             HubTaskStatus.Canceled => "Annulé",
@@ -3664,6 +3671,8 @@ public sealed class TaskItemViewModel : ObservableObject
     public Guid Id { get; }
 
     public string Category { get; }
+    internal DateTimeOffset CreatedAt => _snapshot.CreatedAt;
+    internal HubTaskStatus TaskStatus => _snapshot.Status;
     public bool IsDownload => _snapshot.IsDownload;
     public bool IsRunning => _snapshot.Status == HubTaskStatus.Running;
     public bool IsQueued => _snapshot.Status == HubTaskStatus.Queued;
@@ -3673,7 +3682,7 @@ public sealed class TaskItemViewModel : ObservableObject
     public string Status => _snapshot.Status switch
     {
         HubTaskStatus.Queued => "En attente",
-        HubTaskStatus.Running => "En cours",
+        HubTaskStatus.Running => _snapshot.Stage ?? "En cours",
         HubTaskStatus.Completed => "Terminé",
         HubTaskStatus.Failed => "Échec",
         HubTaskStatus.Canceled => "Annulé",

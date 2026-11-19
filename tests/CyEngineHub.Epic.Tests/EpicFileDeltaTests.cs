@@ -153,8 +153,10 @@ public sealed class EpicFileDeltaTests
         Assert.Equal("original", await File.ReadAllTextAsync(fixture.Original));
     }
 
-    [Fact]
-    public async Task BackendRecoversInterruptedRangeJournalBeforeAnotherUpdate()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task BackendRecoversInterruptedRangeJournalBeforeAnotherUpdate(bool legacy)
     {
         using var fixture = new DeltaFixture();
         var old = new byte[1 << 20]; new Random(12).NextBytes(old);
@@ -166,8 +168,9 @@ public sealed class EpicFileDeltaTests
                 afterRange: () => throw new IOException("Simulated process interruption")));
         var stage = Path.Combine(fixture.Root, "stage"); Directory.CreateDirectory(Path.Combine(stage, "deltas"));
         File.Copy(fixture.Patch, Path.Combine(stage, "deltas", "test.delta"));
-        var journal = Path.Combine(stage, "journal.json");
-        await File.WriteAllTextAsync(journal, "[{\"Path\":\"Engine/Test.dll\",\"Existed\":true,\"Delta\":\"deltas/test.delta\"}]");
+        var journal = Path.Combine(stage, legacy ? "journal.json" : "journal.jsonl");
+        const string entry = "{\"Path\":\"Engine/Test.dll\",\"Existed\":true,\"Delta\":\"deltas/test.delta\"}";
+        await File.WriteAllTextAsync(journal, legacy ? $"[{entry}]" : entry + "\n{\"Path\":");
         var recover = typeof(OfficialEpicGamesLauncherEngineBackend).GetMethod("RecoverEngineUpdate",
             System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
         recover.Invoke(null, [fixture.Root, stage]);
@@ -175,6 +178,24 @@ public sealed class EpicFileDeltaTests
         Assert.False(File.Exists(journal));
         recover.Invoke(null, [fixture.Root, stage]);
         Assert.Equal(old, await File.ReadAllBytesAsync(fixture.Original));
+    }
+
+    [Fact]
+    public async Task RecoveryAfterCommitKeepsThePublishedFileAndTheWriterLock()
+    {
+        using var fixture = new DeltaFixture();
+        var stage = Directory.CreateDirectory(Path.Combine(fixture.Root, "stage")).FullName;
+        await File.WriteAllTextAsync(fixture.Original, "published");
+        await File.WriteAllTextAsync(Path.Combine(stage, "journal.jsonl"), "{\"Path\":\"Engine/Test.dll\",\"Existed\":false}\n");
+        await File.WriteAllTextAsync(Path.Combine(stage, "committed"), "done");
+        var lockPath = Path.Combine(stage, "update.lock");
+        using var writer = new FileStream(lockPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+        var recover = typeof(OfficialEpicGamesLauncherEngineBackend).GetMethod("RecoverEngineUpdate",
+            System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!;
+
+        recover.Invoke(null, [fixture.Root, stage]);
+        Assert.Equal("published", await File.ReadAllTextAsync(fixture.Original));
+        Assert.Equal(lockPath, Assert.Single(Directory.EnumerateFileSystemEntries(stage)));
     }
 
     private sealed class DeltaFixture : IDisposable

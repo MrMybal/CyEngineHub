@@ -1,4 +1,5 @@
 using CyEngineHub.Plugins.Compatibility;
+using CyEngineHub.Plugins.Discovery;
 using CyEngineHub.Plugins.Installation;
 using CyEngineHub.Plugins.Models;
 using CyEngineHub.Plugins.Parsing;
@@ -36,13 +37,17 @@ public sealed class PluginInstallationServiceTests : IDisposable
         Directory.CreateDirectory(Path.Combine(source, "Source", "CyPlugin"));
         Directory.CreateDirectory(Path.Combine(source, "Content"));
         Directory.CreateDirectory(Path.Combine(source, "Binaries", "Win64"));
+        Directory.CreateDirectory(Path.Combine(source, "Binaries", "ThirdParty", "SDK", "Win64"));
         Directory.CreateDirectory(destination);
         await File.WriteAllTextAsync(
             Path.Combine(source, "CyPlugin.uplugin"),
             "{ \"FileVersion\": 3, \"EngineVersion\": \"5.8.0\", \"CanContainContent\": true, \"Modules\": [{ \"Name\": \"CyPlugin\" }] }");
         await File.WriteAllTextAsync(Path.Combine(source, "Source", "CyPlugin", "CyPlugin.Build.cs"), "// source");
         await File.WriteAllTextAsync(Path.Combine(source, "Content", "Asset.uasset"), "asset");
-        await File.WriteAllTextAsync(Path.Combine(source, "Binaries", "Win64", "stale.dll"), "binary");
+        await File.WriteAllTextAsync(Path.Combine(source, "Binaries", "Win64", "UnrealEditor-CyPlugin.dll"), "stale");
+        await File.WriteAllTextAsync(Path.Combine(source, "Binaries", "Win64", "VendorRuntime.dll"), "runtime");
+        await File.WriteAllTextAsync(Path.Combine(source, "Binaries", "ThirdParty", "SDK", "Win64", "ExampleLibrary.dll"), "runtime");
+        await File.WriteAllTextAsync(Path.Combine(destination, "CyPlugin.uplugin"), "{ \"FileVersion\": 3, \"CanContainContent\": true }");
         await File.WriteAllTextAsync(Path.Combine(destination, "old-version.txt"), "old");
         var parser = new UpluginDescriptorParser();
         var plugin = await parser.ParseAsync(new PluginCandidate(
@@ -62,12 +67,21 @@ public sealed class PluginInstallationServiceTests : IDisposable
         var result = await service.InstallAsync(plan);
 
         Assert.True(plan.WillReplaceExisting);
-        Assert.Equal(3, plan.FileCount);
+        Assert.Equal(5, plan.FileCount);
         Assert.True(File.Exists(Path.Combine(destination, "CyPlugin.uplugin")));
         Assert.True(File.Exists(Path.Combine(destination, "Content", "Asset.uasset")));
-        Assert.False(File.Exists(Path.Combine(destination, "Binaries", "Win64", "stale.dll")));
+        Assert.False(File.Exists(Path.Combine(destination, "Binaries", "Win64", "UnrealEditor-CyPlugin.dll")));
+        Assert.True(File.Exists(Path.Combine(destination, "Binaries", "Win64", "VendorRuntime.dll")));
+        Assert.True(File.Exists(Path.Combine(destination, "Binaries", "ThirdParty", "SDK", "Win64", "ExampleLibrary.dll")));
         Assert.NotNull(result.BackupDirectory);
         Assert.True(File.Exists(Path.Combine(result.BackupDirectory!, "old-version.txt")));
+        Assert.Equal(Path.Combine(Path.GetDirectoryName(pluginsDirectory)!, ".cyenginehub-backups"),
+            Path.GetDirectoryName(result.BackupDirectory!));
+        var legacyBackup = Directory.CreateDirectory(Path.Combine(pluginsDirectory, ".cyenginehub-backups", "older"));
+        File.Copy(plugin.DescriptorPath, Path.Combine(legacyBackup.FullName, "CyPlugin.uplugin"));
+        var installed = Assert.Single(await new PluginDiscoveryService(parser).RefreshAsync(
+            new PluginDiscoveryRequest([], [], [pluginsDirectory])));
+        Assert.Equal(PluginHealth.Healthy, installed.Health);
         Assert.Empty(Directory.GetDirectories(pluginsDirectory, ".cyenginehub-staging-*"));
     }
 

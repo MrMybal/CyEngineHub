@@ -47,6 +47,19 @@ public sealed class ProjectCreationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task GeneratesGameAndEditorTargetsUsingTheSelectedUnrealBuildToolDefaults()
+    {
+        var service = new ProjectCreationService();
+        var preset = service.Presets.Single(item => item.Id == "unreal-cpp");
+        var result = await service.CreateAsync(new ProjectCreationRequest(preset, "TestGame", _root, "5.3", []));
+        foreach (var name in new[] { "TestGame.Target.cs", "TestGameEditor.Target.cs" })
+        {
+            var target = await File.ReadAllTextAsync(Path.Combine(result.ProjectRoot, "Source", name));
+            Assert.Contains("DefaultBuildSettings = BuildSettingsVersion.Latest;", target, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public async Task CreatesUnrealCppLegacyProfileWithDeclaredPlugins()
     {
         var service = new ProjectCreationService();

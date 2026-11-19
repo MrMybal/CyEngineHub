@@ -8,6 +8,7 @@
     <CyUiNativeRuntime Condition="'$(CyUiNativeRuntime)' == '' And '$(OS)' == 'Windows_NT'">$(MSBuildThisFileDirectory)../../artifacts/cyui-native/runtime/Release/cimgui.dll</CyUiNativeRuntime>
     <CyUiNativeRuntime Condition="'$(CyUiNativeRuntime)' == '' And $([MSBuild]::IsOSPlatform('Linux'))">$(MSBuildThisFileDirectory)../../artifacts/cyui-native/runtime/cimgui.so</CyUiNativeRuntime>
     <CyUiNativeRuntime Condition="'$(CyUiNativeRuntime)' == '' And $([MSBuild]::IsOSPlatform('OSX'))">$(MSBuildThisFileDirectory)../../artifacts/cyui-native/runtime/cimgui.dylib</CyUiNativeRuntime>
+    <CyMcpNotices Condition="'$(CyMcpNotices)' == ''">$(MSBuildThisFileDirectory)../../artifacts/cyui-native/cymcp-notices</CyMcpNotices>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../CyEngineHub.Core/CyEngineHub.Core.csproj" />
@@ -57,6 +58,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="$(CyUiNativeRuntime)" Link="$([System.IO.Path]::GetFileName('$(CyUiNativeRuntime)'))" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(CyMcpNotices)/LICENSE;$(CyMcpNotices)/THIRD_PARTY_NOTICES.md;$(CyMcpNotices)/REVISION.txt;$(CyMcpNotices)/nlohmann-LICENSE.txt;$(CyMcpNotices)/httplib-LICENSE.txt;$(CyMcpNotices)/picosha2-LICENSE.txt"
+          Link="LICENCES/CyMCPSDK/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../LICENCES/**/*" Link="LICENCES/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../native/CyEngineHub.CyUI/dependencies.lock.json" Link="CyUI/dependencies.lock.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/cyui-migration.md" Link="docs/cyui-migration.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
@@ -69,6 +72,8 @@
     <None Include="../../docs/releases/v2.0.0-alpha.44.md" Condition="Exists('../../docs/releases/v2.0.0-alpha.44.md')" Link="docs/releases/v2.0.0-alpha.44.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/releases/v2.0.0-alpha.45.md" Link="docs/releases/v2.0.0-alpha.45.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/releases/v2.0.0-alpha.45.en.md" Link="docs/releases/v2.0.0-alpha.45.en.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../docs/releases/v2.0.0-alpha.46.md" Link="docs/releases/v2.0.0-alpha.46.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../docs/releases/v2.0.0-alpha.46.en.md" Link="docs/releases/v2.0.0-alpha.46.en.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/application-updates.md" Link="docs/application-updates.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/source-converters.md" Link="docs/source-converters.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="../../docs/marketplace-connectors.md" Link="docs/marketplace-connectors.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
@@ -126,12 +131,14 @@
       <VersionBridgeWorkerOutputRoot Condition="Exists('$(OutDir)CyEngineHub.VersionBridge.Tool.dll')">$(OutDir)</VersionBridgeWorkerOutputRoot>
     </PropertyGroup>
     <ItemGroup>
-      <VersionBridgeWorkerFiles Include="$(VersionBridgeWorkerOutputRoot)CyEngineHub.VersionBridge.Tool.*;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Fab.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Core.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Unreal.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Projects.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Plugins.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Engines.dll" Exclude="$(VersionBridgeWorkerOutputRoot)*.pdb" />
+      <VersionBridgeWorkerFiles Include="$(VersionBridgeWorkerOutputRoot)CyEngineHub.VersionBridge.Tool.*;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Fab.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Core.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Unreal.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Projects.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Plugins.dll;$(VersionBridgeWorkerOutputRoot)CyEngineHub.Engines.dll;$(VersionBridgeWorkerOutputRoot)Microsoft.Data.Sqlite.dll;$(VersionBridgeWorkerOutputRoot)SQLitePCLRaw*.dll" Exclude="$(VersionBridgeWorkerOutputRoot)*.pdb" />
+      <VersionBridgeWorkerNative Include="$(VersionBridgeWorkerOutputRoot)runtimes/**/e_sqlite3.*" />
     </ItemGroup>
     <Copy
         SourceFiles="@(UnrealVersionBridgeFiles)"
         DestinationFiles="@(UnrealVersionBridgeFiles->'$(OutDir)Extensions/cyenginehub.unreal-version-bridge/%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(VersionBridgeWorkerFiles)" DestinationFolder="$(OutDir)Extensions/cyenginehub.unreal-version-bridge/mcp/tools" />
+    <Copy SourceFiles="@(VersionBridgeWorkerNative)" DestinationFiles="@(VersionBridgeWorkerNative->'$(OutDir)Extensions/cyenginehub.unreal-version-bridge/mcp/tools/runtimes/%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="../../extensions/builtin/cyenginehub.unreal-version-bridge/scripts/agent-validate.py" DestinationFolder="$(OutDir)Extensions/cyenginehub.unreal-version-bridge/mcp/tools/Extensions/cyenginehub.unreal-version-bridge/scripts" />
     <Copy SourceFiles="@(SdkLicenseFiles)" DestinationFiles="@(SdkLicenseFiles->'$(OutDir)LICENCES/%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(NativeTextureAdapterFiles)" DestinationFiles="@(NativeTextureAdapterFiles->'$(OutDir)Extensions/cyenginehub.unreal-version-bridge/native-binaries/%(RecursiveDir)%(Filename)%(Extension)')" />

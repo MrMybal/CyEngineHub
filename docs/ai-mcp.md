@@ -1,60 +1,100 @@
-# Assistants IA : MCP local CyEngineHub
+# Assistant CyEngineHub et MCP
 
-## Connexion
+CyEngineHub passe de **CyMCPSDK 0.5.6** (`70105709d7e0574a3e8b3b240e8134790a9e243b`) à **0.7.0 en développement** (`ced8296b555c1969cb29740eba65beaa0687da7d`). Le script privilégie un dépôt `CyMCPSDK` voisin de CyEngineHub et en prend un instantané Git. Pour utiliser une autre copie locale contenant cette révision, renseignez `CYHUB_CYMCP_SOURCE` ou `-CyMcpSource`. En l’absence de copie locale, le script récupère la révision épinglée depuis le dépôt public.
 
-1. Lancer le hub et ouvrir **Paramètres > IA / MCP**.
-2. Activer MCP (désactivé par défaut). Le réglage est mémorisé.
-3. Copier le bloc du client choisi, affiché dans cette page avec le chemin du binaire installé, et le fusionner dans sa configuration existante :
-   - Codex : `config.toml`, section `[mcp_servers.cyenginehub]`.
-   - Claude Desktop : `claude_desktop_config.json`, objet `mcpServers`.
-   - Claude Code : `.mcp.json`, objet `mcpServers`.
-   - OpenCode : `opencode.json`, objet `mcp`, entrée locale.
-4. Reconnecter MCP dans le client. Le hub doit rester ouvert (le tray convient). L'authentification au fournisseur IA reste dans le client, pas dans CyEngineHub.
+```powershell
+pwsh -NoProfile -File tools/ui/build-cyui-native.ps1 -CyMcpSource '../CyMCPSDK'
+```
 
-Les configurations ne sont pas écrites automatiquement dans celles des clients. Aucun abonnement, modèle ni clé API n'est ajouté. Cette intégration MCP n'est pas un chat IA embarqué.
+Le pont `cimgui` relie statiquement Core, Platform, HTTP, MCP, AI et ChatUI. Le panneau partage le contexte ImGui du hub. Le pont exporte la révision compilée avec `cyhub_mcp_runtime`. Le paquet contient le même binaire et livre les notices et la révision sous `LICENCES/CyMCPSDK`.
 
-La configuration suit les documentations officielles : [Codex](https://learn.chatgpt.com/docs/extend/mcp?surface=cli), [Claude Code](https://code.claude.com/docs/en/mcp), [OpenCode](https://opencode.ai/docs/mcp-servers/). Le transport externe est [MCP stdio](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports), protocole annoncé `2025-06-18`.
+## Assistant intégré
 
-## Outils
+Dans **Paramètres → IA / MCP**, ouvrez **Assistant CyEngineHub**. En mode classique, le bouton **Ouvrir l’assistant** affiche le même panneau dans une fenêtre.
 
-| Outil | Fonction |
+| Fournisseur | Configuration |
 | --- | --- |
-| `hub_search` | Recherche contains, insensible à la casse, tous les mots requis, dans le nom, la description et les catégories/collections. Pages de 100 résultats maximum. |
-| `hub_asset` | Métadonnées d'une fiche et identifiants précis des variantes disponibles. |
-| `hub_pack_files` | Noms et tailles des fichiers d'un pack téléchargé, dossier ou ZIP, sans extraction. Recherche dans les noms, pas décodage des objets Unreal. |
-| `hub_targets` | Projets et moteurs Unreal connus, utilisés comme cibles du workflow existant. |
-| `hub_tasks` | Statut et progression des 100 tâches les plus récentes, sans logs ni identifiants de connexion. |
-| `hub_propose` | Proposition de catégorisation, téléchargement ou installation, avec justification et identifiants exacts. |
-| `hub_proposals` | État des propositions de la session ; « préparée » ne signifie jamais « installée ». |
+| `ollama` | Service local, par défaut `http://127.0.0.1:11434`. Utilisez un modèle installé qui prend en charge les outils. |
+| `openai` | Responses API et variable d’environnement `OPENAI_API_KEY`. |
+| `anthropic` | Messages API et variable d’environnement `ANTHROPIC_API_KEY`. |
+| `openrouter` | API Chat Completions et variable d’environnement `OPENROUTER_API_KEY`. |
 
-Périmètre du catalogue : Fab et Megascans déjà chargés depuis le compte/cache, ainsi que les téléchargements locaux enregistrés des connecteurs activés, dont Cosmos. Ce n'est pas une recherche dans tout le marché ni une acquisition de produits. Les marketplaces désactivées sont exclues. Un catalogue non chargé doit être ouvert/actualisé dans le hub.
+Détectez les fournisseurs ou renseignez le modèle. Un modèle vide laisse le SDK choisir dans le catalogue du fournisseur. Le panneau affiche le texte au fil de sa génération et permet d’interrompre une réponse. **Restaurer** recharge la dernière conversation locale du fournisseur. Les fichiers choisis avec **Joindre des fichiers** sont transmis selon les capacités du fournisseur. L’historique et les pièces jointes conservées par le SDK se trouvent sous `Assistant` dans le profil CyEngineHub. Les clés ne sont pas enregistrées dans les préférences du hub.
 
-Pour les connecteurs navigateur comme Cosmos, la fiche locale est consultable/classable, mais le MCP n'invente pas d'API de téléchargement. Les variantes distantes Fab/Megascans empruntent les mécanismes existants du hub.
+Dans les options du fournisseur, **Contexte API envoyé en Kio** vaut 0 par défaut. Une valeur positive borne la vue envoyée au fournisseur et **Tours récents** fixe le nombre de tours à conserver. Les instructions système, le tour actif et les échanges d’outils restent ensemble. Une demande active trop volumineuse est signalée avant l’envoi. L’historique et les sauvegardes restent complets. La projection ne produit pas de résumé automatique. Les anciennes préférences chargent le contexte complet par défaut.
 
-## Validation des actions
+Activez MCP pour que le chat et les clients externes puissent appeler les fonctions du hub. Le chat peut aussi utiliser un serveur MCP HTTP configuré dans **Fournisseur et outils d’autres applications**. Saisissez une URL HTTPS ou HTTP sur la boucle locale et les noms exacts des outils autorisés. Le SDK découvre leurs schémas et les présente au modèle avec le préfixe `remote_`. Si le serveur demande un jeton Bearer, fournissez `CYHUB_REMOTE_MCP_TOKEN` dans l’environnement du processus. Les schémas externes doivent relever du profil JSON Schema pris en charge par CyMCPSDK. Cette connexion couvre les serveurs HTTP. Le service Ollama et les poids de modèles s’installent séparément.
 
-- Les propositions apparaissent dans **Paramètres > IA / MCP**. Sélectionner une proposition pour lire sa justification, sa variante et sa cible, puis valider ou refuser.
-- Catégoriser **ajoute** des collections personnelles pour Fab/Megascans, sans remplacer les catégories du fournisseur. Pour les fiches locales de connecteurs, les catégories sont ajoutées aux notes de la fiche. Ces modifications persistent.
-- Télécharger/installer ouvre le popup existant avec la proposition présélectionnée : vérifier stockage, compatibilité et script, puis confirmer l'action finale. Aucun téléchargement ni lancement de script n'est réalisé par la seule requête MCP.
-- Les propositions sont limitées à 30 en attente, 100 dans l'historique de session ; elles ne sont pas rejouées après redémarrage. Désactiver MCP révoque les propositions encore en attente. Cela n'annule pas des tâches déjà confirmées manuellement.
-- Il n'existe pas d'outil d'auto-approbation, de shell, de suppression ou de lecture arbitraire d'un chemin.
+## Client MCP externe
 
-## Confidentialité et limites
+Activez MCP dans **Paramètres → IA / MCP** et gardez CyEngineHub ouvert. Fusionnez le bloc généré par cette page dans la configuration de votre client. Le bloc contient le chemin réel de `Mcp/CyEngineHub.Mcp.exe`. Par exemple dans `config.toml` de Codex
 
-L'activation permet au client connecté de lire les métadonnées et noms de fichiers. Ils peuvent être transmis à son fournisseur IA : l'utilisateur choisit son client et ses autorisations. Le MCP ne renvoie pas les cookies, sessions marketplace, URL signées de téléchargement, logs ou fichiers bruts.
+```toml
+[mcp_servers.cyenginehub]
+command = 'C:\Program Files\CyEngineHub\Mcp\CyEngineHub.Mcp.exe'
+args = []
+```
 
-Le proxy console `Mcp/CyEngineHub.Mcp.exe` communique avec le hub par pipe nommé limité au même compte système (`CurrentUserOnly`). Pas de port HTTP ni de serveur exposé au navigateur. Jusqu'à quatre sessions simultanées. Ce n'est pas une protection contre un logiciel malveillant exécuté sous le même compte utilisateur.
+Les blocs Claude Desktop, Claude Code et OpenCode sont également disponibles dans cette page. Le proxy stdio relaie vers un pipe nommé limité au même compte système. Le registre CyMCPSDK de l’application valide les schémas et appelle le même code métier que le chat.
 
-Les scans utilisent seulement les chemins enregistrés par le hub, ignorent les liens/jonctions et n'extraient jamais d'archive. Bornes : 50 000 entrées inspectées, 100 chemins de versions, 100 résultats par page et 16 Mio de répertoire central ZIP. Les répertoires centraux ZIP64 nécessitant l'extension ZIP64 ne sont pas encore pris en charge ; les packs ignorés et limites atteintes sont signalés. Aucun index vectoriel, reconnaissance visuelle ou analyse sémantique des `.uasset` n'est annoncé.
+## Commandes CLI
 
-Les noms, descriptions, notes et noms de fichiers restent des **données non fiables**, jamais des instructions à suivre. Une recommandation doit expliquer quels indices observés la motivent et signaler les incertitudes.
+Sans verbe, les exécutables conservent leur transport MCP stdio et leurs anciennes options. Avec un verbe, la sortie standard contient un seul résultat JSON.
 
-## Exemple de demande au client IA
+```powershell
+& .\Mcp\CyEngineHub.Mcp.exe --help
+& .\Mcp\CyEngineHub.Mcp.exe list
+& .\Mcp\CyEngineHub.Mcp.exe describe hub_targets
+& .\Mcp\CyEngineHub.Mcp.exe call hub_targets
+& .\Mcp\CyEngineHub.Mcp.exe call hub_propose --json-file .\proposition.json
+```
 
-> Cherche dans mes packs possédés des arbres pour une forêt tempérée. Inspecte les fichiers des candidats déjà téléchargés. Propose trois packs en expliquant pourquoi. Pour celui que je choisis, prépare la variante Unreal 5.5 et l'installation dans mon projet ; ne valide rien à ma place.
+Les opérations du hub utilisent l’instance ouverte avec MCP activé. Pour cibler un profil isolé, lancez son application avec `--mcp-pipe CyEngineHub.ProfilQA` et placez `--pipe CyEngineHub.ProfilQA` avant le verbe côté CLI. Les blocs de connexion de cette instance incluent ce même nom.
 
-## Vérification
+Le compagnon de réparation peut fonctionner sans interface. Il exige `--workspace` avec le dossier d’une tâche préparée par le hub. `call op_…` attend un état terminal et imprime le job, avec ses résultats ou son erreur. Les anciens clients stdio reçoivent toujours immédiatement le job à suivre.
 
-Les tests `HubMcpTests` utilisent exclusivement des données fictives et des dossiers temporaires dédiés. Ils couvrent JSON-RPC, notifications, pagination, isolation marketplace, validation des propositions, refus d'auto-approbation, limites des messages, lecture ZIP sans extraction, pipe local et aller-retour du **véritable exécutable stdio** jusqu'à EOF. Les clients Codex/Claude/OpenCode eux-mêmes nécessitent encore un essai connecté par l'utilisateur ; aucune configuration personnelle n'a été modifiée pendant les tests.
+| Code | Résultat |
+| --- | --- |
+| 0 | Succès |
+| 1 | Transport, protocole ou démarrage |
+| 2 | Usage ou argument JSON invalide |
+| 3 | Outil inconnu, refus métier ou job en échec |
+| 130 | Arrêt de la commande |
 
-Validation du 11 septembre 2026 : 20 tests MCP et 438 tests au total réussis, aucun échec (`artifacts/test-results-mcp`). Build Release Windows sans erreur ni avertissement : `artifacts/mcp-build/CyEngineHub.Desktop.exe`, avec le proxy dans `Mcp/`. Le panneau Avalonia compile ; aucune validation visuelle manuelle n'est revendiquée. Aucun téléchargement réel ni installation dans un projet utilisateur n'a été lancé pour ces tests.
+## Catalogue et options du SDK
+
+CyMCPSDK active la découverte à la demande au-delà de 32 outils par défaut. Le hub conserve le catalogue complet de dix outils et des outils tiers sélectionnés, pour garder les mêmes définitions dans le chat et les clients existants. L’ouverture ou la restauration du chat redécouvre le catalogue tiers. Le SDK borne son cache de catalogues à 30 secondes. Un appel métier est exécuté à chaque demande. Le registre du hub est fixe pendant une connexion, donc il utilise le TTL et la reconnexion pour le rafraîchissement.
+
+Les inspections et recherches conservent la pagination et les limites du hub. Les résultats publics gardent leur format JSON en ligne, y compris pour les anciens clients. Le hub ne configure ni stockage temporaire des résultats sur disque, ni ressources grep, ni abonnements aux changements, ni journal de performances. Les jobs persistés continuent à utiliser le stockage de la copie de réparation.
+
+## Opérations du hub
+
+| Outil | Utilisation |
+| --- | --- |
+| `hub_search` | Chercher par mots dans les catalogues de packs possédés et locaux, avec pagination. |
+| `hub_asset` | Lire les métadonnées et identifiants de variantes d’une fiche. |
+| `hub_pack_files` | Rechercher les noms dans un dossier ou une archive enregistrés, sans extraction. |
+| `hub_targets` | Lister projets et moteurs connus. |
+| `hub_tasks` | Suivre les tâches, statuts et progressions. |
+| `hub_options` | Lire les limites et les permissions enregistrées. |
+| `hub_download_plan` | Estimer un transfert depuis les manifests disponibles. |
+| `hub_download_batch` | Proposer ou mettre en file un lot selon les permissions enregistrées. |
+| `hub_propose` | Proposer un classement, un téléchargement ou une installation pour une fiche connue. |
+| `hub_proposals` | Lire l’état des propositions et les identifiants de tâches associés. |
+
+Pour les outils de liste `hub_targets`, `hub_tasks` et `hub_proposals`, le contenu structuré contient `items`. La réponse textuelle conserve le tableau utilisé par les clients existants.
+
+Les options de classement, de téléchargement et d’installation automatiques sont indépendantes et désactivées par défaut. Les opérations nécessitant une approbation apparaissent dans la page IA / MCP. Les confirmations existantes s’appliquent, et le hub vérifie encore les marketplaces activées, les variantes et les cibles. Désactiver MCP révoque les propositions en attente et laisse les tâches déjà confirmées suivre leur cycle normal.
+
+| Fonctions en dehors du registre général | Motif |
+| --- | --- |
+| Achats, comptes, cookies et jetons marketplace | Les transactions et l’authentification appartiennent au site officiel et à la session de l’utilisateur. |
+| Création de projets, installation de moteurs, gestion de plugins, compilation et nettoyage | Ces flux ont leurs propres choix de cibles, prérequis et confirmations dans le hub. |
+| Droits IA, suppression de fichiers, accès par chemin arbitraire et commandes système | Les droits restent sous contrôle de l’utilisateur et les appels sont limités au catalogue et aux opérations nommées. |
+| Scripts de réparation Unreal | Ils exigent une copie de réparation précise et un consentement d’exécution distinct. |
+
+## Réparation Unreal Version Bridge
+
+Le compagnon de réparation utilise un registre CyMCPSDK propre à la copie de réparation. Utilisez le `mcp.json` créé par le hub. Les contrôles d’écriture et de compilation exigent le consentement distinct déjà enregistré dans la tâche. Pour une copie existante, la reprise dans le hub rafraîchit `mcp.json` avant la revalidation. Son format de tâche reste compatible.
+
+Les opérations `op_*` retournent un job. Utilisez `cy_get_job` pour récupérer son statut et ses résultats, `cy_cancel_job` pour demander l’arrêt, `cy_list_jobs` pour retrouver les jobs et `cy_finish_task` pour nettoyer les rapports temporaires des jobs terminés. Les résultats historiques de `McpRuntime/state.sqlite3` restent lisibles. La publication reste une étape explicite du hub après validation dans le moteur cible. [Détail des opérations de réparation](../extensions/builtin/cyenginehub.unreal-version-bridge/mcp/README.md)

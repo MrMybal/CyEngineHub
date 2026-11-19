@@ -11,17 +11,20 @@ public sealed class DownloadTelemetry
     private TimeSpan _last;
     private long _previousBytes;
 
-    public DownloadTelemetrySnapshot Update(string path, long received, long? total, TimeSpan now, string state)
+    public DownloadTelemetrySnapshot Update(string path, long received, long? total, TimeSpan now, string state) =>
+        Update(path, received, total, now, state, measureThroughput: state == "Téléchargement");
+
+    public DownloadTelemetrySnapshot Update(string path, long received, long? total, TimeSpan now, string state, bool measureThroughput)
     {
         received = Math.Max(0, received);
         total = total > 0 ? total : null;
         if (now < _last) now = _last;
         _started ??= now;
-        if (received < _previousBytes || state != "Téléchargement") _samples.Clear();
+        if (received < _previousBytes || !measureThroughput) _samples.Clear();
         _last = now;
         _previousBytes = received;
         double? rate = null;
-        if (state == "Téléchargement")
+        if (measureThroughput)
         {
             while (_samples.Count > 1 && now - _samples.Peek().At > TimeSpan.FromSeconds(5)) _samples.Dequeue();
             if (_samples.TryPeek(out var first) && now > first.At)

@@ -133,12 +133,13 @@ public static class ConnectorLibraryPackageService
             var files = Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories).Select(p => new FileInfo(p)).ToArray();
             var result = await LibraryPackageService.PackageAsync(asset, version,
                 new(id, asset.Title, root, files.Length, files.Sum(f => f.Length), DateTimeOffset.UtcNow), mode, progress, token).ConfigureAwait(false);
-            return await MarketplaceStorageRouter.PlaceAsync(result, storage, progress, token).ConfigureAwait(false);
+            return await MarketplaceStorageRouter.PlaceAsync(result, storage, "Packages", progress, token).ConfigureAwait(false);
         }
-        finally
+        catch
         {
-            // Only the fresh, owned GUID staging; never the selected source or a library root.
+            // Once the router publishes, it owns cleanup and reports any source remainder.
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+            throw;
         }
     }
 }

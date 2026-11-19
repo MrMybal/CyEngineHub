@@ -23,7 +23,7 @@ const char* result(const std::string& value) { returned = value; return returned
 }
 HUB_API int cyhub_ui_abi() { return 2; }
 HUB_API const char* cyhub_ui_imgui_version() { return ImGui::GetVersion(); }
-HUB_API const char* cyhub_ui_revision() { return "ff023e646c6a3038b3dfbfd53f6d2b4a2f5955e3"; }
+HUB_API const char* cyhub_ui_revision() { return "6ef01cfcdb197f3a89d64618ce5ef8818c704728"; }
 HUB_API void cyhub_ui_apply(const char* theme, int comfortable, float scale, const char* locale) {
     cyui::Config config;
     config.themeKey = theme;

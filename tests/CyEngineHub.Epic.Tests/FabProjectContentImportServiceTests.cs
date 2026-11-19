@@ -187,6 +187,25 @@ public sealed class FabProjectContentImportServiceTests
     }
 
     [Fact]
+    public async Task LargeExistingReceiptCanBeReloadedAndRolledBack()
+    {
+        using var temporary = new TemporaryDirectory();
+        var source = Directory.CreateDirectory(Path.Combine(temporary.Path, "Pack", "Content"));
+        await File.WriteAllTextAsync(Path.Combine(source.FullName, "Asset.uasset"), "test");
+        var project = Path.Combine(Directory.CreateDirectory(Path.Combine(temporary.Path, "Target")).FullName, "Target.uproject");
+        await File.WriteAllTextAsync(project, "{}");
+        var service = new FabProjectContentImportService();
+        var imported = await service.ExecuteAsync(await service.PrepareAsync(source.FullName, project));
+        // Exercise the old on-disk boundary without creating thousands of assets on every CI run.
+        await File.AppendAllTextAsync(imported.Receipt.ReceiptPath, new string(' ', 8 * 1024 * 1024));
+        var restarted = new FabProjectContentImportService();
+        var receipt = Assert.Single(await restarted.LoadHistoryAsync([project]));
+        var result = await restarted.ExecuteRollbackAsync(await restarted.PrepareRollbackAsync(receipt));
+        Assert.Equal(1, result.DeletedFileCount);
+        Assert.False(Assert.Single(await restarted.LoadHistoryAsync([project])).IsApplied);
+    }
+
+    [Fact]
     public async Task LegacyReceiptHistoryRemainsVisibleAndMigratesOnRollback()
     {
         using var temporary = new TemporaryDirectory();

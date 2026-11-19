@@ -51,7 +51,7 @@ using CyEngineHub.Updates;
 
 namespace CyEngineHub.Desktop;
 
-public sealed partial class App : Application, IDisposable
+public sealed partial class App : Application, IAsyncDisposable
 {
     private HubTaskScheduler? _taskScheduler;
     private JsonLineAppLogger? _logger;
@@ -61,7 +61,7 @@ public sealed partial class App : Application, IDisposable
     private QuixelMegascansApiClient? _quixelClient;
     private MainWindow? _mainWindow;
     private bool _isExplicitShutdown;
-    private bool _disposed;
+    private Task? _cleanup;
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
@@ -217,7 +217,8 @@ public sealed partial class App : Application, IDisposable
 
     private void OnDesktopExit(object? sender, ControlledApplicationLifetimeExitEventArgs eventArgs)
     {
-        Dispose();
+        // A forced platform exit may bypass the cancellable shutdown request.
+        _ = DisposeAsync().AsTask();
     }
 
     private void ConfigureTrayIcon(MainWindowViewModel viewModel)
@@ -233,16 +234,21 @@ public sealed partial class App : Application, IDisposable
 
     private void OnMainWindowClosing(object? sender, WindowClosingEventArgs eventArgs)
     {
-        if (!OperatingSystem.IsWindows() ||
-            _isExplicitShutdown ||
-            eventArgs.CloseReason is WindowCloseReason.ApplicationShutdown or
-                WindowCloseReason.OSShutdown)
+        if (_cleanup?.IsCompleted == true || eventArgs.CloseReason == WindowCloseReason.OSShutdown)
         {
             return;
         }
-
-        eventArgs.Cancel = true;
-        _mainWindow?.Hide();
+        if (eventArgs.CloseReason == WindowCloseReason.ApplicationShutdown ||
+            (!OperatingSystem.IsWindows() && ApplicationLifetime is IClassicDesktopStyleApplicationLifetime { Windows.Count: 1 }))
+        {
+            eventArgs.Cancel = true;
+            RequestShutdown();
+        }
+        else if (OperatingSystem.IsWindows())
+        {
+            eventArgs.Cancel = true;
+            _mainWindow?.Hide();
+        }
     }
 
     private void HideMainWindowAfterStartup(object? sender, EventArgs eventArgs)
@@ -261,7 +267,7 @@ public sealed partial class App : Application, IDisposable
     {
         Dispatcher.UIThread.Post(() =>
         {
-            if (_mainWindow is null) return;
+            if (_mainWindow is null || _isExplicitShutdown) return;
             _mainWindow.ShowInTaskbar = true;
             if (!_mainWindow.IsVisible) _mainWindow.Show();
             if (_mainWindow.WindowState == WindowState.Minimized)
@@ -274,14 +280,23 @@ public sealed partial class App : Application, IDisposable
 
     private void OnTrayExitClicked(object? sender, EventArgs eventArgs)
     {
-        Dispatcher.UIThread.Post(() =>
-        {
-            _isExplicitShutdown = true;
-            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            {
-                desktop.Shutdown();
-            }
-        });
+        Dispatcher.UIThread.Post(RequestShutdown);
+    }
+
+    private void RequestShutdown()
+    {
+        if (_isExplicitShutdown || ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop) return;
+        _isExplicitShutdown = true;
+        if (_mainWindow is not null) _mainWindow.IsEnabled = false;
+        _ = ShutdownAfterCleanupAsync(desktop);
+    }
+
+    private async Task ShutdownAfterCleanupAsync(IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        // Leave any window-closing callback before asking the lifetime to close windows.
+        await Task.Yield();
+        try { await DisposeAsync().ConfigureAwait(true); }
+        finally { desktop.Shutdown(); }
     }
 
     private void OnUpdateInstallerReady(object? sender, UpdateInstallerReadyEventArgs eventArgs)
@@ -322,11 +337,7 @@ public sealed partial class App : Application, IDisposable
         using var updaterProcess = Process.Start(startInfo) ??
             throw new InvalidOperationException("Impossible de démarrer le lanceur externe de mise à jour.");
 
-        _isExplicitShutdown = true;
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            desktop.Shutdown();
-        }
+        RequestShutdown();
     }
 
     private static void CopyDirectory(string sourceDirectory, string destinationDirectory)
@@ -348,23 +359,15 @@ public sealed partial class App : Application, IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        if (_disposed)
-        {
-            return;
-        }
+    public ValueTask DisposeAsync() => new(_cleanup ??= CleanupAsync());
 
-        _disposed = true;
-        if (_mainWindow?.DataContext is MainWindowViewModel settingsViewModel)
-        {
-            // These tasks only write immutable snapshots off the UI context; wait before process exit.
-            try { settingsViewModel.FlushMarketplaceSettingsWritesAsync().GetAwaiter().GetResult(); }
-            catch (Exception exception) { Debug.WriteLine("Marketplace settings not saved: " + exception.Message); }
-        }
-        (_mainWindow?.DataContext as MainWindowViewModel)?.StopMcp();
-        (_mainWindow?.DataContext as MainWindowViewModel)?.StopEditorBridge();
-        _isExplicitShutdown = true;
+    private async Task CleanupAsync()
+    {
+        var viewModel = _mainWindow?.DataContext as MainWindowViewModel;
+        viewModel?.StopMcp();
+        viewModel?.StopEditorBridge();
+        var assistantStop = viewModel?.StopAssistantAsync() ?? Task.CompletedTask;
+        var settingsWrite = viewModel?.FlushMarketplaceSettingsWritesAsync() ?? Task.CompletedTask;
         var trayIcons = TrayIcon.GetIcons(this);
         if (trayIcons is not null)
         {
@@ -374,10 +377,20 @@ public sealed partial class App : Application, IDisposable
                 trayIcon.Dispose();
             }
         }
-        _taskScheduler?.DisposeAsync().AsTask().GetAwaiter().GetResult();
-        _directFabClient?.Dispose();
-        _fabHttpClient?.Dispose();
-        _updateHttpClient?.Dispose();
-        _logger?.Dispose();
+        try
+        {
+            try { await assistantStop.ConfigureAwait(false); }
+            catch (Exception exception) { Debug.WriteLine("Assistant shutdown: " + exception.Message); }
+            if (_taskScheduler is not null) await _taskScheduler.DisposeAsync().ConfigureAwait(false);
+            try { await settingsWrite.ConfigureAwait(false); }
+            catch (Exception exception) { Debug.WriteLine("Marketplace settings not saved: " + exception.Message); }
+        }
+        finally
+        {
+            _directFabClient?.Dispose();
+            _fabHttpClient?.Dispose();
+            _updateHttpClient?.Dispose();
+            _logger?.Dispose();
+        }
     }
 }

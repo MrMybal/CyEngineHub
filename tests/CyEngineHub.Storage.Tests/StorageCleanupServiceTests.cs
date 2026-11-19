@@ -42,6 +42,43 @@ public sealed class StorageCleanupServiceTests
     }
 
     [Fact]
+    public async Task PrepareAndExecuteRejectLinkedParentOfMissingTarget()
+    {
+        using var directory = new StorageTestDirectory();
+        var target = directory.CreateDirectory("Saved", "Logs");
+        var service = new StorageCleanupService();
+        var entry = CreateEntry(StorageCategory.ProjectLogs, directory.Root, target, isSafe: true);
+        var plan = service.Prepare(entry);
+        var saved = Path.GetDirectoryName(target)!;
+        Directory.Move(saved, Path.Combine(directory.Root, "OriginalSaved"));
+        var empty = directory.CreateDirectory("Empty");
+        if (OperatingSystem.IsWindows())
+        {
+            // Directory junctions work on Windows without symbolic-link privileges.
+            var start = new System.Diagnostics.ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true };
+            start.Environment["CYHUB_TEST_LINK"] = saved;
+            start.Environment["CYHUB_TEST_TARGET"] = empty;
+            foreach (var arg in new[] { "-NoProfile", "-NonInteractive", "-Command",
+                "New-Item -ItemType Junction -Path $env:CYHUB_TEST_LINK -Target $env:CYHUB_TEST_TARGET -ErrorAction Stop | Out-Null" })
+                start.ArgumentList.Add(arg);
+            using var process = System.Diagnostics.Process.Start(start)!;
+            await process.WaitForExitAsync();
+            Assert.Equal(0, process.ExitCode);
+        }
+        else Directory.CreateSymbolicLink(saved, empty);
+
+        try
+        {
+            Assert.Equal(saved, Assert.Throws<StorageException>(() => service.Prepare(entry)).Path);
+            Assert.Equal(saved, (await Assert.ThrowsAsync<StorageException>(() => service.ExecuteAsync(plan))).Path);
+        }
+        finally
+        {
+            Directory.Delete(saved, recursive: false);
+        }
+    }
+
+    [Fact]
     public void PrepareRejectsPathThatDoesNotExactlyMatchCategory()
     {
         using var directory = new StorageTestDirectory();

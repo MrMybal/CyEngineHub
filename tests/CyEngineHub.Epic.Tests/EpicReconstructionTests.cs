@@ -110,5 +110,44 @@ public sealed class EpicReconstructionTests(ITestOutputHelper output) : IDisposa
         Assert.Equal(0, cache.Hits);
     }
 
+    [Fact]
+    public async Task FabReusesDecodedPartsAcrossFilesAndReportsBytesInsideOneLargeFile()
+    {
+        var data = new byte[2 * 1024 * 1024];
+        new Random(42).NextBytes(data);
+        var serialized = EpicCompressedChunkTests.Create(data);
+        var chunk = EpicCompressedChunkTests.Expected with { DownloadSize = serialized.Length };
+        var chunkPath = Path.Combine(_root, chunk.ChunkId + ".chunk");
+        await File.WriteAllBytesAsync(chunkPath, serialized);
+        var staging = Path.Combine(_root, "files");
+        var file = new EpicManifestFile("first.dat", SHA1.HashData(data), [new(chunk.ChunkId, 0, (uint)data.Length, 0)], data.Length, []);
+        var manifest = new EpicDownloadManifest("qa", "fixture", 15, new Dictionary<string, EpicManifestChunk> { [chunk.ChunkId] = chunk },
+            [file, file with { RelativePath = "second.dat" }]);
+        var samples = new List<DirectFabDownloadProgress>();
+        void Observe(DirectFabDownloadProgress sample)
+        {
+            samples.Add(sample);
+            if (sample.ProcessedBytes > 0 && File.Exists(chunkPath))
+                File.Move(chunkPath, chunkPath + ".held"); // Subsequent parts can only come from the decoded cache.
+        }
+        await DirectFabApiClient.ReconstructFilesAsync(manifest, staging, _root, serialized.Length, 456, new ReportSink(Observe), default);
+
+        Assert.Contains(samples, sample => sample.ProcessedBytes > 0 && sample.ProcessedBytes < data.Length &&
+            sample.TotalProcessingBytes == 2L * data.Length && sample.Phase == DirectFabDownloadPhase.Reconstruction);
+        Assert.All(samples, sample => { Assert.Equal(serialized.Length, sample.DownloadedBytes); Assert.Equal(456, sample.CachedBytes); });
+        Assert.Equal(2L * data.Length, samples[^1].ProcessedBytes);
+        samples.Clear();
+        // Both outputs validate on resume even though the raw chunk is unavailable.
+        await DirectFabApiClient.ReconstructFilesAsync(manifest, staging, _root, serialized.Length, 456, new ReportSink(samples.Add), default);
+        Assert.Contains(samples, sample => sample.Phase == DirectFabDownloadPhase.Verification && sample.ProcessedBytes > 0 && sample.ProcessedBytes < data.Length);
+        Assert.DoesNotContain(samples, sample => sample.Phase == DirectFabDownloadPhase.Reconstruction);
+        Assert.Equal(data, await File.ReadAllBytesAsync(Path.Combine(staging, "second.dat")));
+    }
+
+    private sealed class ReportSink(Action<DirectFabDownloadProgress> report) : IProgress<DirectFabDownloadProgress>
+    {
+        public void Report(DirectFabDownloadProgress value) => report(value);
+    }
+
     public void Dispose() => Directory.Delete(_root, recursive: true);
 }

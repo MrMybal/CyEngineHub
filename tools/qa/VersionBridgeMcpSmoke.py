@@ -1,4 +1,4 @@
-"""Real official MCP client -> shipped Core wheel -> packaged .NET worker.
+"""Independent MCP client -> CyMCPSDK -> packaged .NET repair operations.
 Optional --unreal exercises real source/target editors and a small C++ plugin.
 These fixtures validate the repair workflow, not arbitrary marketplace conversions.
 """
@@ -9,7 +9,9 @@ import os
 from pathlib import Path
 import sys
 import time
-from importlib.metadata import version, metadata
+import sqlite3
+import subprocess
+import shutil
 import psutil
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -31,8 +33,8 @@ def fixture(root, *, execute=True, real=False, plugin=False, source_engine=None,
     task = dict(schemaVersion=1, assetId="mcp-smoke", artifactId="fixture", sourceEngineRoot=str(source_engine),
                 targetEngineRoot=str(target_engine), sourceVersion=engine_version(source_engine, "5.7.0"),
                 targetVersion=engine_version(target_engine, "5.5.0"), allowCodeExecution=execute,
-                sourceEditor=str(source_engine / "Engine/Binaries/Win64/UnrealEditor-Cmd.exe") if real else sys.executable,
-                targetEditor=str(target_engine / "Engine/Binaries/Win64/UnrealEditor-Cmd.exe") if real else sys.executable,
+                sourceEditor=str(source_engine / "Engine/Binaries/Win64/UnrealEditor-Cmd.exe") if real else sys._base_executable,
+                targetEditor=str(target_engine / "Engine/Binaries/Win64/UnrealEditor-Cmd.exe") if real else sys._base_executable,
                 expectedPackages=[] if plugin else ["/Game/Example"], plugins=["CyRepairFixture"] if plugin else [],
                 requiredModules=["CyRepairFixture"] if plugin else [])
     (root / "agent-task.json").write_text(json.dumps(task), encoding="utf-8")
@@ -69,23 +71,31 @@ async def invoke(session, operation, parameters=None, **options):
     return await wait_job(session, reply, **options)
 
 
+def repair_executable(app):
+    return app / "Extensions/cyenginehub.unreal-version-bridge/mcp/tools/CyEngineHub.VersionBridge.Tool.exe"
+
+
 def connection(app, workspace):
-    return StdioServerParameters(command=sys.executable,
-        args=[str(app / "Extensions/cyenginehub.unreal-version-bridge/mcp/server.py"), "--data-dir", str(workspace / "McpRuntime"), "mcp"],
-        env={**os.environ, "CYHUB_BRIDGE_WORKSPACE": str(workspace)})
+    return StdioServerParameters(command=str(repair_executable(app)),
+        args=["--workspace", str(workspace)])
 
 
-async def main(app, root, real, source_engine=None, target_engine=None):
-    assert version("cytools-core") == "0.10.1"
-    assert metadata("cytools-core")["License-Expression"] == "MIT"
-    assert version("mcp") == "1.30.0"
+async def main(app, root, real, source_engine=None, target_engine=None, previous_journal=None):
     workspace = fixture(root / "protocol")
+    (workspace / "McpRuntime").mkdir()
+    database = workspace / "McpRuntime/state.sqlite3"
+    with sqlite3.connect(database) as records:
+        records.execute("create table records(kind text, id text, value text)")
+        records.execute("insert into records values('jobs', 'legacy-job', ?)", (json.dumps(
+            dict(jobId="legacy-job", state="Completed", outputs=dict(persisted=True))),))
+    original_database = database.read_bytes()
     async with stdio_client(connection(app, workspace)) as streams:
         async with ClientSession(*streams) as session:
             await session.initialize()
             names = {tool.name for tool in (await session.list_tools()).tools}
             assert {"op_describe", "op_read_file", "op_write_file", "op_run_source", "op_run_target", "op_build_plugin", "op_build_source_plugin", "op_validate", "cy_get_job", "cy_cancel_job"} <= names
             job = await invoke(session, "describe")
+            saved_job = job["jobId"]
             assert job["outputs"]["task"]["expectedPackages"] == ["/Game/Example"]
             assert job["outputs"]["canInstall"] is False
             await invoke(session, "write_file", dict(path="../escape.py", text="bad"), expected="Failed")
@@ -100,6 +110,37 @@ async def main(app, root, real, source_engine=None, target_engine=None):
             assert not run_workspace.exists()
             assert (workspace / "Scripts/source.py").is_file() and (workspace / "Exchange/proof.txt").is_file()
             print("PASS MCP discovery, actual worker, bounded writes, persistent repair vs temporary job cleanup", flush=True)
+    async with stdio_client(connection(app, workspace)) as streams:
+        async with ClientSession(*streams) as session:
+            await session.initialize()
+            recent = await session.call_tool("cy_get_job", {"jobId": saved_job})
+            legacy = await session.call_tool("cy_get_job", {"jobId": "legacy-job"})
+            assert json.loads(recent.content[0].text)["state"] == "Completed"
+            assert json.loads(legacy.content[0].text)["outputs"]["persisted"]
+            assert database.read_bytes() == original_database
+            print("PASS completed jobs survive restart and historical SQLite is read without changes", flush=True)
+    def command(*arguments, code=0, workspace_path=workspace):
+        argv = [str(repair_executable(app)), "--workspace", str(workspace_path), *arguments]
+        result = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", timeout=25)
+        assert result.returncode == code, (argv, result.stdout, result.stderr)
+        return json.loads(result.stdout)
+    assert "usage" in command("--help")
+    assert any(tool["name"] == "op_describe" for tool in command("list")["tools"])
+    assert command("describe", "op_describe")["inputSchema"]["required"] == ["parameters"]
+    assert command("call", "op_describe", "--json", '{"parameters":{}}')["outputs"]["canInstall"] is False
+    assert command("call", "unknown_operation", code=3)["error"]["code"] == "operation"
+    assert command("call", "op_describe", "--json", "[]", code=2)["error"]["code"] == "usage"
+    print(f'PASS headless CLI executed: CyEngineHub.VersionBridge.Tool.exe --workspace "{workspace}" call op_describe --json \'{{"parameters":{{}}}}\'', flush=True)
+    if previous_journal is not None:
+        older = fixture(root / "sdk-056-journal")
+        new_runtime = older / "McpRuntime/CyMCPSDK"
+        new_runtime.mkdir(parents=True)
+        shutil.copyfile(previous_journal, new_runtime / "jobs.json")
+        old_job = next(job for job in json.loads(previous_journal.read_text(encoding="utf-8")).values()
+                       if job["State"] == "Completed" and job["OperationId"] == "describe")
+        restored = command("call", "cy_get_job", "--json", json.dumps(dict(jobId=old_job["JobId"])), workspace_path=older)
+        assert restored["outputs"] == old_job["Outputs"]
+        print("PASS a persisted repair result from CyMCPSDK 0.5.6 is retrieved unchanged", flush=True)
     readonly = fixture(root / "readonly", execute=False)
     async with stdio_client(connection(app, readonly)) as streams:
         async with ClientSession(*streams) as session:
@@ -112,15 +153,18 @@ async def main(app, root, real, source_engine=None, target_engine=None):
     async with stdio_client(connection(app, cancellation)) as streams:
         async with ClientSession(*streams) as session:
             await session.initialize()
-            script = "import os,json,subprocess,sys,time\nfrom pathlib import Path\nchild=subprocess.Popen([sys.executable,'-c','import time;time.sleep(300)'])\nPath(os.environ['CYHUB_BRIDGE_EXCHANGE'],'pids.json').write_text(json.dumps([os.getpid(),child.pid]))\ntime.sleep(300)\n"
+            script = "import os,json,subprocess,sys,time\nfrom pathlib import Path\nproof=Path(os.environ['CYHUB_BRIDGE_EXCHANGE'],'pids.json')\nproof.with_suffix('.entered').write_text(str(os.getpid()))\nchild=subprocess.Popen([sys.executable,'-c','import time;time.sleep(300)'])\ntemp=proof.with_suffix('.tmp')\ntemp.write_text(json.dumps([os.getpid(),child.pid]))\ntemp.replace(proof)\ntime.sleep(300)\n"
             await invoke(session, "write_file", dict(path="Scripts/source.py", text=script))
             reply = await session.call_tool("op_run_source", {"parameters": {}, "executionTimeout": 60})
             job = json.loads(reply.content[0].text)
             proof = cancellation / "Exchange/pids.json"
-            deadline = time.monotonic() + 20
+            deadline = time.monotonic() + 45
             while not proof.exists():
-                assert time.monotonic() < deadline
-                await asyncio.sleep(.1)
+                snapshot = await session.call_tool("cy_get_job", {"jobId": job["jobId"]})
+                latest = json.loads(snapshot.content[0].text)
+                if latest["state"] in ("Failed", "Cancelled", "Completed") or time.monotonic() >= deadline:
+                    raise TimeoutError(latest)
+                await asyncio.sleep(.2)
             pids = json.loads(proof.read_text())
             await session.call_tool("cy_cancel_job", {"jobId": job["jobId"]})
             await wait_job(session, reply, expected="Cancelled")
@@ -195,6 +239,7 @@ if __name__ == "__main__":
     parser.add_argument("--source-engine", type=Path)
     parser.add_argument("--target-engine", type=Path)
     parser.add_argument("--recheck-real", action="store_true")
+    parser.add_argument("--previous-journal", type=Path)
     args = parser.parse_args()
     asyncio.run(recheck_real(args.app.resolve(), args.output.resolve()) if args.recheck_real else
-        main(args.app.resolve(), args.output.resolve(), args.unreal, args.source_engine, args.target_engine))
+        main(args.app.resolve(), args.output.resolve(), args.unreal, args.source_engine, args.target_engine, args.previous_journal))

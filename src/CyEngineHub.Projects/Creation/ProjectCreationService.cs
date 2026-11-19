@@ -526,8 +526,9 @@ public sealed partial class ProjectCreationService : IProjectCreationService
             $"using UnrealBuildTool;{Environment.NewLine}using System.Collections.Generic;{Environment.NewLine}{Environment.NewLine}" +
             $"public class {projectName}{suffix}Target : TargetRules{Environment.NewLine}{{{Environment.NewLine}" +
             $"    public {projectName}{suffix}Target(TargetInfo Target) : base(Target){Environment.NewLine}    {{{Environment.NewLine}" +
-            $"        Type = TargetType.{targetType};{Environment.NewLine}        DefaultBuildSettings = BuildSettingsVersion.V5;{Environment.NewLine}" +
-            $"        IncludeOrderVersion = EngineIncludeOrderVersion.Latest;{Environment.NewLine}        ExtraModuleNames.Add(\"{projectName}\");{Environment.NewLine}    }}{Environment.NewLine}}}{Environment.NewLine}";
+            $"        Type = TargetType.{targetType};{Environment.NewLine}        DefaultBuildSettings = BuildSettingsVersion.Latest;{Environment.NewLine}" +
+            $"#if UE_5_1_OR_LATER{Environment.NewLine}        IncludeOrderVersion = EngineIncludeOrderVersion.Latest;{Environment.NewLine}#endif{Environment.NewLine}" +
+            $"        ExtraModuleNames.Add(\"{projectName}\");{Environment.NewLine}    }}{Environment.NewLine}}}{Environment.NewLine}";
     }
 
     private static async Task<string> CreateUnityAsync(

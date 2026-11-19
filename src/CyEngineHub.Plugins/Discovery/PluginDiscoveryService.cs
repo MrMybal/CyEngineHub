@@ -17,7 +17,7 @@ public sealed record PluginDiscoveryProgress(int Completed, int Total, string Me
 public sealed class PluginDiscoveryService
 {
     private static readonly HashSet<string> ExcludedDirectories = new(
-        [".git", ".vs", "Binaries", "Intermediate", "Saved", "DerivedDataCache", "Content"],
+        [".git", ".vs", ".cyenginehub-backups", "Binaries", "Intermediate", "Saved", "DerivedDataCache", "Content"],
         StringComparer.OrdinalIgnoreCase);
 
     private readonly IUpluginDescriptorParser _parser;
@@ -172,7 +172,7 @@ public sealed class PluginDiscoveryService
             foreach (var directory in directories)
             {
                 var name = Path.GetFileName(directory);
-                if (ExcludedDirectories.Contains(name))
+                if (ExcludedDirectories.Contains(name) || name.StartsWith(".cyenginehub-staging-", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }

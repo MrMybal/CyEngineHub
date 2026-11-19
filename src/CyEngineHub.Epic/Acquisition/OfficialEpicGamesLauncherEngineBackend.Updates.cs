@@ -17,10 +17,12 @@ public sealed partial class OfficialEpicGamesLauncherEngineBackend
         var stage = target + ".cyenginehub-update";
         EnsureSafeStaging(target, stage);
         RejectUpdateLinks(target);
-        RejectUpdateTreeLinks(stage);
+        var lockPath = Path.Combine(stage, "update.lock");
+        RejectUpdateLinks(lockPath);
         // One writer per engine, including another running Hub instance.
         Directory.CreateDirectory(stage);
-        using var updateLock = new FileStream(Path.Combine(stage, "update.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        using var updateLock = new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+        RejectUpdateTreeLinks(stage);
         RecoverEngineUpdate(target, stage);
         using var localJson = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(target, "Engine", "Build", "Build.version"), cancellationToken).ConfigureAwait(false));
         var local = localJson.RootElement;
@@ -90,11 +92,12 @@ public sealed partial class OfficialEpicGamesLauncherEngineBackend
         var sizeDelta = changed.Sum(file => file.Size - (File.Exists(GetSafeDestination(target, file.RelativePath)) ? new FileInfo(GetSafeDestination(target, file.RelativePath)).Length : 0));
         var growth = changed.Sum(file => Math.Max(0, file.Size - (File.Exists(GetSafeDestination(target, file.RelativePath)) ? new FileInfo(GetSafeDestination(target, file.RelativePath)).Length : 0)));
         var journalBytes = changed.Count == 0 ? 0 : changed.Sum(file => (long)System.Text.Encoding.UTF8.GetByteCount(
-            JsonSerializer.Serialize(new EngineUpdateEntry(file.RelativePath, true, Path.GetRelativePath(stage, DeltaPath(prepared, file.RelativePath))))) + 1) + 1024;
-        var metadataBytes = changed.Count == 0 ? 0 : checked(2 * journalBytes + bytes.Length);
+            JsonSerializer.Serialize(new EngineUpdateEntry(file.RelativePath, false, Path.GetRelativePath(stage, DeltaPath(prepared, file.RelativePath))))) + 1) + 1024;
+        var metadataBytes = changed.Count == 0 ? 0 : checked(journalBytes + bytes.Length);
+        var preparedBytes = patches.Values.Sum(patch => patch.DiskBytes);
         var plan = new EpicEnginePatchPlan(changed.Count, networkBytes, localContent.ReusableBytes,
             EpicEnginePatchPlan.RequiredSpace(checked(growth + metadataBytes), peakCache, existingCache), sizeDelta, cacheLimit)
-            { IsDeltaPreparationPending = remaining.Count > 0, PreparedDeltaBytes = alreadyPrepared, ChangedDataBytes = patches.Values.Sum(patch => patch.NewBytes) };
+            { IsDeltaPreparationPending = remaining.Count > 0, PreparedDeltaBytes = preparedBytes, ChangedDataBytes = patches.Values.Sum(patch => patch.NewBytes) };
         progress?.Report(new(.18, plan.DisplayText, 0, networkBytes) { PatchPlan = plan });
         var available = PatchFreeSpace(target);
         if (available < plan.AdditionalSpaceBytes)
@@ -118,7 +121,8 @@ public sealed partial class OfficialEpicGamesLauncherEngineBackend
                     InvalidateFileChunks(cache, file);
                     patches[file.RelativePath] = await Prepare().ConfigureAwait(false);
                 }
-                plan = plan with { PreparedDeltaBytes = patches.Values.Sum(patch => patch.DiskBytes), ChangedDataBytes = patches.Values.Sum(patch => patch.NewBytes) };
+                var completedPatch = patches[file.RelativePath];
+                plan = plan with { PreparedDeltaBytes = checked(plan.PreparedDeltaBytes + completedPatch.DiskBytes), ChangedDataBytes = checked(plan.ChangedDataBytes + completedPatch.NewBytes) };
                 progress?.Report(new(.18 + .70 * (index + 1d) / remaining.Count, $"Préparation du patch · {index + 1}/{remaining.Count} delta(s), sans copie complète des fichiers moteur", content.Downloaded, Math.Max(networkBytes, content.Downloaded)) { PatchPlan = plan });
 
                 Task<EpicFileDelta.Info> Prepare() => EpicFileDelta.CreateAsync(GetSafeDestination(target, file.RelativePath), file, destination, decoded, count =>
@@ -138,7 +142,6 @@ public sealed partial class OfficialEpicGamesLauncherEngineBackend
             await output.WriteAsync(bytes, cancellationToken).ConfigureAwait(false);
             output.Flush(flushToDisk: true);
         }
-        var journal = new List<EngineUpdateEntry>();
         var locked = new Dictionary<string, FileStream>(StringComparer.OrdinalIgnoreCase);
         var patchLocks = new List<FileStream>();
         try
@@ -159,7 +162,8 @@ public sealed partial class OfficialEpicGamesLauncherEngineBackend
                 }
                 if (!EpicFileDelta.MatchesOriginal(patch, handle)) throw new IOException("Un fichier moteur a changé depuis la préparation ; patch interrompu avant remplacement.");
             }
-            if (changed.Count > 0)
+            using var journal = changed.Count > 0 ? CreateUpdateJournal(stage) : null;
+            if (journal is not null)
                 CommitPatchFile(target, stage, snapshot, ".cyenginehub-install.manifest", journal);
             var installedFiles = 0;
             // Build.version is committed last so discovery never announces the new version early.
@@ -168,7 +172,7 @@ public sealed partial class OfficialEpicGamesLauncherEngineBackend
                 cancellationToken.ThrowIfCancellationRequested();
                 var destination = GetSafeDestination(target, file.RelativePath);
                 var patch = patches[file.RelativePath];
-                void RecordDelta() { journal.Add(new(file.RelativePath, patch.Header.Existed, Path.GetRelativePath(stage, patch.PatchPath))); WriteUpdateJournal(stage, journal); }
+                void RecordDelta() => AppendUpdateEntry(journal!, new(file.RelativePath, patch.Header.Existed, Path.GetRelativePath(stage, patch.PatchPath)));
                 if (!locked.TryGetValue(file.RelativePath, out var output))
                 {
                     // Journal the creation before it can leave a partial new engine file.
@@ -195,52 +199,98 @@ public sealed partial class OfficialEpicGamesLauncherEngineBackend
             throw;
         }
         finally { ReleaseLocks(); }
-        updateLock.Dispose();
-        TryDeleteCompletedStaging(stage, target);
+        try
+        {
+            CleanCommittedUpdate(stage);
+            updateLock.Dispose();
+            // Another writer may now have opened the lock or started a new transaction.
+            // Only remove an unused lock file and an empty directory from this point on.
+            File.Delete(lockPath);
+            Directory.Delete(stage, recursive: false);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // Commit is durable. Retry any remaining cleanup at the next update.
+        }
         progress?.Report(new(1, $"Moteur mis à jour · {changed.Count} fichier(s) remplacé(s), fichiers personnels conservés.", content.Downloaded, content.Downloaded) { PatchPlan = plan });
         return new(release, target, manifest.BuildVersion, changed.Count, content.Downloaded);
 
         void ReleaseLocks() { foreach (var handle in locked.Values) handle.Dispose(); locked.Clear(); foreach (var handle in patchLocks) handle.Dispose(); patchLocks.Clear(); }
     }
 
-    private static void CommitPatchFile(string target, string stage, string prepared, string relative, List<EngineUpdateEntry> journal)
+    private static void CommitPatchFile(string target, string stage, string prepared, string relative, FileStream journal)
     {
         var destination = GetSafeDestination(target, relative);
         var backup = GetSafeDestination(Path.Combine(stage, "backup"), relative);
         RejectUpdateLinks(destination); RejectUpdateLinks(backup); RejectUpdateLinks(prepared);
-        journal.Add(new(relative, File.Exists(destination)));
-        WriteUpdateJournal(stage, journal);
+        AppendUpdateEntry(journal, new(relative, File.Exists(destination)));
         if (File.Exists(destination)) { Directory.CreateDirectory(Path.GetDirectoryName(backup)!); File.Move(destination, backup); }
         Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
         File.Move(prepared, destination, overwrite: false);
     }
 
-    private static void WriteUpdateJournal(string stage, List<EngineUpdateEntry> journal)
+    private const string UpdateJournalName = "journal.jsonl";
+
+    private static FileStream CreateUpdateJournal(string stage)
     {
-        var path = Path.Combine(stage, "journal.json");
-        RejectUpdateLinks(path); RejectUpdateLinks(path + ".tmp");
-        using (var output = new FileStream(path + ".tmp", FileMode.Create, FileAccess.Write, FileShare.None))
-        { output.Write(JsonSerializer.SerializeToUtf8Bytes(journal)); output.Flush(flushToDisk: true); }
-        EpicPatchFileSafety.PublishJournal(path + ".tmp", path);
+        var path = Path.Combine(stage, UpdateJournalName);
+        RejectUpdateLinks(path);
+        var temporary = Path.Combine(stage, Path.GetRandomFileName());
+        using (var empty = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            empty.Flush(flushToDisk: true);
+        EpicPatchFileSafety.PublishJournal(temporary, path);
+        return new FileStream(path, FileMode.Open, FileAccess.Write, FileShare.None);
+    }
+
+    private static void AppendUpdateEntry(FileStream journal, EngineUpdateEntry entry)
+    {
+        JsonSerializer.Serialize(journal, entry);
+        journal.WriteByte((byte)'\n');
+        journal.Flush(flushToDisk: true);
+    }
+
+    private static List<EngineUpdateEntry> ReadUpdateEntries(string path)
+    {
+        var entries = new List<EngineUpdateEntry>();
+        using var input = File.OpenRead(path);
+        if (input.Length == 0) return entries;
+        input.Seek(-1, SeekOrigin.End);
+        var endsWithNewline = input.ReadByte() == '\n';
+        input.Position = 0;
+        using var reader = new StreamReader(input);
+        while (reader.ReadLine() is { } line)
+        {
+            // An incomplete final append precedes the corresponding engine write.
+            if (!endsWithNewline && reader.EndOfStream) break;
+            entries.Add(JsonSerializer.Deserialize<EngineUpdateEntry>(line) ?? throw new IOException("Entrée de journal moteur illisible."));
+        }
+        return entries;
     }
 
     private static void RecoverEngineUpdate(string target, string stage)
     {
         RejectUpdateLinks(stage);
-        var path = Path.Combine(stage, "journal.json");
+        var path = Path.Combine(stage, UpdateJournalName);
+        var legacyPath = Path.Combine(stage, "journal.json");
         if (File.Exists(Path.Combine(stage, "committed")))
         {
-            // A crash after the commit must not undo a successfully installed revision.
-            var backupDirectory = Path.Combine(stage, "backup");
-            RejectUpdateTreeLinks(backupDirectory);
-            if (Directory.Exists(backupDirectory)) Directory.Delete(backupDirectory, recursive: true);
-            if (File.Exists(path)) File.Delete(path);
-            File.Delete(Path.Combine(stage, "committed"));
+            CleanCommittedUpdate(stage);
             return;
         }
-        if (!File.Exists(path)) return;
-        var entries = JsonSerializer.Deserialize<EngineUpdateEntry[]>(File.ReadAllText(path)) ?? throw new IOException("Journal moteur illisible.");
-        foreach (var entry in entries.Reverse())
+        List<EngineUpdateEntry> entries;
+        if (File.Exists(path))
+        {
+            if (File.Exists(legacyPath)) throw new IOException("Deux journaux de patch incompatibles sont présents.");
+            entries = ReadUpdateEntries(path);
+        }
+        else if (File.Exists(legacyPath))
+        {
+            path = legacyPath;
+            entries = JsonSerializer.Deserialize<List<EngineUpdateEntry>>(File.ReadAllText(path)) ?? throw new IOException("Journal moteur illisible.");
+        }
+        else return;
+        entries.Reverse();
+        foreach (var entry in entries)
         {
             var destination = GetSafeDestination(target, entry.Path);
             if (entry.Delta is not null)
@@ -255,6 +305,21 @@ public sealed partial class OfficialEpicGamesLauncherEngineBackend
             else if (!entry.Existed && File.Exists(destination)) File.Delete(destination);
         }
         File.Delete(path);
+    }
+
+    private static void CleanCommittedUpdate(string stage)
+    {
+        // Keep the commit marker until both undo journals and all staging data have gone.
+        File.Delete(Path.Combine(stage, UpdateJournalName));
+        File.Delete(Path.Combine(stage, "journal.json"));
+        foreach (var path in Directory.EnumerateFileSystemEntries(stage))
+        {
+            var name = Path.GetFileName(path);
+            if (name is "committed" or "update.lock") continue;
+            if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+            else File.Delete(path);
+        }
+        File.Delete(Path.Combine(stage, "committed"));
     }
 
     private static void RejectUpdateLinks(string path)

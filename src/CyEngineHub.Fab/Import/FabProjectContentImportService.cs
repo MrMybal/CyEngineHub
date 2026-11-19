@@ -34,12 +34,10 @@ public sealed class FabProjectContentImportService : IFabProjectContentImportSer
 {
     private const int MaximumFileCount = 100_000;
     private const long MaximumTotalBytes = 100L * 1024 * 1024 * 1024;
-    private const long MaximumReceiptBytes = 8L * 1024 * 1024;
+    // Includes per-file hashes and backup metadata for imports of up to 100,000 files.
+    private const long MaximumReceiptBytes = 128L * 1024 * 1024;
     private static readonly TimeSpan PlanLifetime = TimeSpan.FromMinutes(30);
-    private static readonly JsonSerializerOptions ReceiptJsonOptions = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = true,
-    };
+    private static readonly JsonSerializerOptions ReceiptJsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly HashSet<string> AllowedExtensions = new(
         [
             ".uasset", ".umap", ".uexp", ".ubulk", ".uptnl",
@@ -299,12 +297,6 @@ public sealed class FabProjectContentImportService : IFabProjectContentImportSer
                     try
                     {
                         RejectReparsePoint(path);
-                        var info = new FileInfo(path);
-                        if (info.Length is <= 0 or > MaximumReceiptBytes)
-                        {
-                            continue;
-                        }
-
                         await using var stream = new FileStream(
                             path,
                             FileMode.Open,
@@ -312,6 +304,10 @@ public sealed class FabProjectContentImportService : IFabProjectContentImportSer
                             FileShare.Read,
                             64 * 1024,
                             FileOptions.Asynchronous | FileOptions.SequentialScan);
+                        if (stream.Length is <= 0 or > MaximumReceiptBytes)
+                        {
+                            continue;
+                        }
                         var receipt = await JsonSerializer.DeserializeAsync<FabImportReceipt>(
                                 stream,
                                 ReceiptJsonOptions,
@@ -785,6 +781,12 @@ public sealed class FabProjectContentImportService : IFabProjectContentImportSer
                         cancellationToken)
                     .ConfigureAwait(false);
                 await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                // Reserve room for the timestamp added when the import is rolled back.
+                if (stream.Length > MaximumReceiptBytes - (receipt.IsApplied ? 64 : 0))
+                {
+                    throw new FabContentOperationException("Le reçu de cet import dépasse la limite de 128 Mio.",
+                        "SaveReceipt", receiptPath);
+                }
             }
 
             File.Move(temporaryPath, receiptPath, overwrite: true);

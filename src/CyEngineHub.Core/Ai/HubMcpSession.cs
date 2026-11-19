@@ -68,7 +68,7 @@ public sealed class HubMcpSession(IHubAiBackend backend)
         catch (InvalidOperationException) { return Error(id, -32600, "Invalid request value."); }
     }
 
-    private async Task<object> CallAsync(string name, JsonElement args, CancellationToken token)
+    public async Task<object> CallAsync(string name, JsonElement args, CancellationToken token)
     {
         var options = (await backend.GetOptionsAsync(token).ConfigureAwait(false)).Validate();
         if (name == "hub_options") return options;
@@ -193,10 +193,20 @@ public sealed class HubMcpSession(IHubAiBackend backend)
         return count;
     }
 
-    private static object[] Tools()
+    public static object[] Tools()
     {
         object Tool(string name, string description, string properties, string[] required, bool readOnly = true) => new {
             name, description, inputSchema = new { type = "object", properties = JsonNode.Parse(properties), required, additionalProperties = false },
+            outputSchema = JsonNode.Parse(name switch
+            {
+                "hub_targets" or "hub_tasks" or "hub_proposals" => """{"type":"object","required":["items"],"properties":{"items":{"type":"array","items":{"type":"object"}}}}""",
+                "hub_search" => """{"type":"object","required":["results","total"],"properties":{"results":{"type":"array","items":{"type":"object"}},"total":{"type":"integer"}}}""",
+                "hub_asset" => """{"type":"object","required":["id","source","variants"],"properties":{"id":{"type":"string"},"source":{"type":"string"},"variants":{"type":"array","items":{"type":"object"}}}}""",
+                "hub_propose" => """{"type":"object","required":["id","status"],"properties":{"id":{"type":"string"},"status":{"type":"string"}}}""",
+                "hub_download_plan" => """{"type":"object","required":["items","knownDownloadBytes"],"properties":{"items":{"type":"array","items":{"type":"object"}},"knownDownloadBytes":{"type":"integer"}}}""",
+                "hub_download_batch" => """{"type":"object","required":["batchId","results"],"properties":{"batchId":{"type":"string"},"results":{"type":"array","items":{"type":"object"}}}}""",
+                _ => """{"type":"object"}""",
+            }),
             annotations = new { readOnlyHint = readOnly, destructiveHint = !readOnly, idempotentHint = readOnly, openWorldHint = true } };
         const string identity = "\"assetId\":{\"type\":\"string\"},\"source\":{\"type\":\"string\"}";
         return [

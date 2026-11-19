@@ -5,6 +5,8 @@
 // its public minimum is 1.92. Do not copy/patch its implementation: filter only
 // entries for menus absent from this pinned 1.92.1 ABI. Existing keys keep their translations.
 #if IMGUI_VERSION_NUM < 19297
+// Keep the host ABI. The chat composer remains multiline with horizontal scrolling.
+inline constexpr ImGuiInputTextFlags ImGuiInputTextFlags_WordWrap = ImGuiInputTextFlags_None;
 inline constexpr ImGuiLocKey ImGuiLocKey_TableReset = static_cast<ImGuiLocKey>(-1);
 inline constexpr ImGuiLocKey ImGuiLocKey_TableResetVisibility = static_cast<ImGuiLocKey>(-2);
 namespace ImGui {

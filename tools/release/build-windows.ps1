@@ -145,11 +145,10 @@ try {
         'Updater\coreclr.dll', 'Extensions\cyenginehub.asset-bridge\tools\CyEngineHub.AssetBridge.Tool.exe',
         'Extensions\cyenginehub.unreal-version-bridge\mcp\tools\CyEngineHub.VersionBridge.Tool.exe',
         'Extensions\cyenginehub.unreal-version-bridge\mcp\tools\coreclr.dll',
-        'Extensions\cyenginehub.unreal-version-bridge\mcp\server.py',
-        'Extensions\cyenginehub.unreal-version-bridge\mcp\Setup.ps1',
-        'Extensions\cyenginehub.unreal-version-bridge\mcp\requirements.txt',
-        'Extensions\cyenginehub.unreal-version-bridge\mcp\vendor\cytools_core-0.10.1-py3-none-any.whl',
-        'LICENCES\CyToolsCore-MIT.txt', 'LICENCES\SOURCES.txt',
+        'Extensions\cyenginehub.unreal-version-bridge\mcp\operations.json',
+        'LICENCES\CyMCPSDK\LICENSE', 'LICENCES\CyMCPSDK\THIRD_PARTY_NOTICES.md',
+        'LICENCES\CyMCPSDK\REVISION.txt', 'LICENCES\CyMCPSDK\nlohmann-LICENSE.txt',
+        'LICENCES\CyMCPSDK\httplib-LICENSE.txt', 'LICENCES\CyMCPSDK\picosha2-LICENSE.txt',
         'Extensions\cyenginehub.unreal-version-bridge\scripts\source-export.py',
         'Extensions\cyenginehub.unreal-relocated-install\scripts\relocate-pack.py',
         'Extensions\cyenginehub.marketplace-kitbash3d\extension.json',
@@ -162,7 +161,7 @@ try {
         'Extensions\cyenginehub.source-converters\scripts\blender-convert.py',
         'docs\source-converters.md',
         'docs\application-updates.md',
-        'docs\releases\v2.0.0-alpha.45.md')
+        "docs\releases\v$version.md", "docs\releases\v$version.en.md")
     foreach ($relative in $required) {
         if (-not (Test-Path -LiteralPath (Join-Path $appStage $relative) -PathType Leaf)) { throw "Missing packaged file: $relative" }
     }

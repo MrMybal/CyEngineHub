@@ -40,9 +40,9 @@ The confirmed workflow is:
 1. inventory the source and re-check compatibility;
 2. copy into a unique `.cyenginehub-staging-*` directory inside the target's Plugins
    directory;
-3. omit generated folders and omit `Binaries` when source code is available;
+3. omit generated folders and known Unreal module outputs for source plugins, preserving vendor binaries;
 4. parse the staged `.uplugin` again;
-5. move an existing destination to `.cyenginehub-backups/<plugin>-<timestamp>-<id>`;
+5. move an existing destination to `.cyenginehub-backups/<plugin>-<timestamp>-<id>` beside the target's `Plugins` directory;
 6. atomically move staging to the final plugin directory;
 7. restore the backup if the final move fails.
 

@@ -32,6 +32,6 @@ public sealed class DownloadProgressText
         $"Vitesse : {(value.BytesPerSecond is { } speed ? Size(speed) + "/s" : "—")} · " +
         $"Restant estimé : {(value.Remaining is { } remaining ? Duration(remaining) : "—")} · Écoulé : {Duration(value.Elapsed)}";
 
-    private static string Size(double bytes) => bytes >= 1073741824 ? $"{bytes / 1073741824:N2} Gio" : bytes >= 1048576 ? $"{bytes / 1048576:N1} Mio" : bytes >= 1024 ? $"{bytes / 1024:N1} Kio" : $"{bytes:N0} o";
-    private static string Duration(TimeSpan time) => time.TotalHours >= 1 ? $"{(int)time.TotalHours} h {time.Minutes:00} min" : $"{(int)time.TotalMinutes} min {time.Seconds:00} s";
+    public static string Size(double bytes) => bytes >= 1073741824 ? $"{bytes / 1073741824:N2} Gio" : bytes >= 1048576 ? $"{bytes / 1048576:N1} Mio" : bytes >= 1024 ? $"{bytes / 1024:N1} Kio" : $"{bytes:N0} o";
+    public static string Duration(TimeSpan time) => time.TotalHours >= 1 ? $"{(int)time.TotalHours} h {time.Minutes:00} min" : $"{(int)time.TotalMinutes} min {time.Seconds:00} s";
 }

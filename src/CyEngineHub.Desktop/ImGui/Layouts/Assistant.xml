@@ -1,0 +1,31 @@
+<StackPanel>
+  <Border Classes="card">
+    <StackPanel>
+      <TextBlock Text="Assistant CyEngineHub" FontSize="18" />
+      <TextBlock Text="MCP autorise les outils du hub, dans ce chat et pour les clients externes." TextWrapping="Wrap" />
+      <Button Content="Activer / désactiver MCP" Command="{Binding ToggleMcpCommand}" />
+      <Expander Header="Fournisseur et outils d’autres applications">
+        <StackPanel>
+          <TextBox Text="{Binding AssistantProvider}" PlaceholderText="ollama, openai, anthropic ou openrouter" />
+          <TextBox Text="{Binding AssistantModel}" PlaceholderText="Modèle avec outils · vide pour la sélection automatique" />
+          <TextBox Text="{Binding AssistantEndpoint}" PlaceholderText="Adresse du fournisseur · facultative" />
+          <TextBlock Text="Les clés du fournisseur sont lues dans l’environnement du processus." TextWrapping="Wrap" />
+          <Button Content="Détecter les fournisseurs" Command="{Binding DetectAssistantProvidersCommand}" />
+          <TextBox Text="{Binding AssistantRemoteUrl}" PlaceholderText="Adresse MCP HTTP du serveur externe · facultative" />
+          <TextBox Text="{Binding AssistantRemoteTools}" PlaceholderText="Noms exacts des outils autorisés, séparés par des virgules" />
+          <TextBlock Text="Contexte API envoyé en Kio · 0 conserve le contexte complet" />
+          <NumericUpDown Value="{Binding AssistantContextKiB}" Minimum="0" Maximum="4096" />
+          <TextBlock Text="Tours récents lorsque la limite est active" />
+          <NumericUpDown Value="{Binding AssistantRecentContextTurns}" Minimum="1" Maximum="128" />
+        </StackPanel>
+      </Expander>
+      <StackPanel Orientation="Horizontal">
+        <Button Content="Nouvelle conversation" Command="{Binding OpenAssistantCommand}" />
+        <Button Content="Restaurer" Command="{Binding RestoreAssistantCommand}" />
+        <Button Content="Joindre des fichiers" Command="{Binding AttachAssistantFilesCommand}" />
+      </StackPanel>
+      <TextBlock Text="{Binding AssistantStatus}" TextWrapping="Wrap" />
+      <AssistantPanel />
+    </StackPanel>
+  </Border>
+</StackPanel>

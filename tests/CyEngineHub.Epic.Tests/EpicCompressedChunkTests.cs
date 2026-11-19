@@ -37,6 +37,7 @@ public sealed class EpicCompressedChunkTests
     [InlineData("valid")]
     [InlineData("unknown-size")]
     [InlineData("overrun")]
+    [InlineData("short-output")]
     [InlineData("oversized-header")]
     [InlineData("invalid-zlib")]
     public void EnforcesDecodedSizeBeforeUnboundedAllocation(string scenario)
@@ -45,6 +46,7 @@ public sealed class EpicCompressedChunkTests
         var raw = Create(payload);
         if (scenario == "unknown-size") BinaryPrimitives.WriteUInt32LittleEndian(raw.AsSpan(4), 1);
         if (scenario == "overrun") BinaryPrimitives.WriteUInt32LittleEndian(raw.AsSpan(62), 1);
+        if (scenario == "short-output") BinaryPrimitives.WriteUInt32LittleEndian(raw.AsSpan(62), (uint)payload.Length + 1);
         if (scenario == "oversized-header") BinaryPrimitives.WriteUInt32LittleEndian(raw.AsSpan(62), 256 * 1024 * 1024 + 1);
         if (scenario == "invalid-zlib") raw[66] = 0xff;
         if (scenario is "valid" or "unknown-size") Assert.Equal(payload, EpicManifestParser.ParseChunk(raw, Expected));

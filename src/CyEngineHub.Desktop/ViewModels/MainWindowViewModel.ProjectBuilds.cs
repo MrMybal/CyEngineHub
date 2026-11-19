@@ -142,8 +142,7 @@ public sealed partial class MainWindowViewModel
                     }
                     context.Report(1, "Opération Unreal terminée et vérifiée.");
                 }));
-            var snapshot = _taskScheduler.GetSnapshot().First(item => item.Id == handle.Id);
-            if (!Tasks.Any(item => item.Id == handle.Id)) Tasks.Insert(0, new TaskItemViewModel(snapshot, CancelTask, NavigateTaskLink));
+            ApplyTaskRow(_taskScheduler.GetSnapshot(handle.Id));
             NotifyProjectBuildState(); NotifyActivityQueues();
             var completed = await handle.Completion.ConfigureAwait(true);
             session.Summary = completed.Status switch

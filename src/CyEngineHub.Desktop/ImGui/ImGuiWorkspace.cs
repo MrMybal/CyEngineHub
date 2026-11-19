@@ -267,6 +267,10 @@ internal sealed unsafe partial class ImGuiWorkspace : IDisposable
             case "ConnectorLibraryPanel": Panel("Connector", node, context); break;
             case "QuixelCollectionsPanel": Panel("Collections", node, context); break;
             case "FabSignInPanel": Panel("FabSignIn", node, context); break;
+            case "AssistantSettingsPanel": Panel("Assistant", node, context); break;
+            case "AssistantPanel":
+                if (_root is MainWindowViewModel assistant) assistant.DrawAssistant(CyUiNative.Dp(480));
+                break;
             case "Ellipse": case "Path": case "Canvas": break;
             default:
                 if (!node.Kind.Contains('.', StringComparison.Ordinal)) DrawChildren(node, context);

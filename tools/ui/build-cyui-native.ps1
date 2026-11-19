@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$OutputRoot, [string]$SourcesRoot, [string]$CMake, [switch]$ConfigureOnly)
+param([string]$OutputRoot, [string]$SourcesRoot, [string]$CMake, [string]$CyMcpSource = $env:CYHUB_CYMCP_SOURCE, [switch]$ConfigureOnly)
 $ErrorActionPreference = 'Stop'
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $nativeRoot = Join-Path $repoRoot 'native/CyEngineHub.CyUI'
@@ -15,15 +15,20 @@ if (!$CMake) {
         $CMake = Join-Path $installation 'Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe'
     }
 }
-if (!$CMake -or !(Test-Path -LiteralPath $CMake)) { throw 'CMake 3.21+ and a C++17 toolchain are required.' }
+if (!$CMake -or !(Test-Path -LiteralPath $CMake)) { throw 'CMake 3.24+ and a C++20 toolchain are required.' }
 New-Item -ItemType Directory -Path $SourcesRoot -Force | Out-Null
-function Get-PinnedSource($name, $dependency) {
+function Get-PinnedSource($name, $dependency, $localSource = '') {
     $path = Join-Path $SourcesRoot ($name + '-' + $dependency.revision)
     if (!(Test-Path -LiteralPath $path)) {
-        & git clone --filter=blob:none --no-checkout $dependency.repository $path
-        if ($LASTEXITCODE -ne 0) { throw "Clone failed: $name" }
-        & git -C $path fetch --depth 1 origin $dependency.revision
-        if ($LASTEXITCODE -ne 0) { throw "Fetch failed: $name" }
+        if ($localSource) {
+            & git clone --local --no-hardlinks --no-checkout $localSource $path
+            if ($LASTEXITCODE -ne 0) { throw "Local clone failed: $name" }
+        } else {
+            & git clone --filter=blob:none --no-checkout $dependency.repository $path
+            if ($LASTEXITCODE -ne 0) { throw "Clone failed: $name" }
+            & git -C $path fetch --depth 1 origin $dependency.revision
+            if ($LASTEXITCODE -ne 0) { throw "Fetch failed: $name" }
+        }
         & git -C $path checkout --detach $dependency.revision
         if ($LASTEXITCODE -ne 0) { throw "Checkout failed: $name" }
     }
@@ -32,14 +37,29 @@ function Get-PinnedSource($name, $dependency) {
     if (@(& git -C $path status --porcelain --untracked-files=no).Count -ne 0) { throw "Dependency has local modifications: $path" }
     return $path
 }
-$cyui = Get-PinnedSource 'CyUI' $lock.cyui
+$workspaceRoot = Split-Path -Parent $repoRoot
+$cyuiLocal = Join-Path $workspaceRoot 'CyImgui_Interface'
+$cyui = if (($IsWindows -or $env:OS -eq 'Windows_NT') -and (Test-Path -LiteralPath $cyuiLocal) -and
+    (& git -C $cyuiLocal rev-parse HEAD) -eq $lock.cyui.revision -and
+    @(& git -C $cyuiLocal status --porcelain --untracked-files=no).Count -eq 0) { $cyuiLocal }
+else { Get-PinnedSource 'CyUI' $lock.cyui }
 $cimgui = Get-PinnedSource 'cimgui' $lock.cimgui
+$sdkLocal = Join-Path $workspaceRoot 'CyMCPSDK'
+if (!$CyMcpSource -and (Test-Path -LiteralPath $sdkLocal -PathType Container)) {
+    $CyMcpSource = $sdkLocal
+}
+$CyMcpSource = Get-PinnedSource 'CyMCPSDK' $lock.cymcp $CyMcpSource
+$sdkRevision = & git -C $CyMcpSource rev-parse HEAD
+if ($LASTEXITCODE -ne 0 -or $sdkRevision -ne $lock.cymcp.revision -or
+    @(& git -C $CyMcpSource status --porcelain --untracked-files=no).Count -ne 0) {
+    throw "CyMCPSDK must match the clean pinned revision $($lock.cymcp.revision): $CyMcpSource"
+}
 & git -C $cimgui submodule update --init --depth 1 imgui
 if ($LASTEXITCODE -ne 0) { throw 'Pinned ImGui submodule could not be prepared.' }
 $imguiRevision = & git -C (Join-Path $cimgui 'imgui') rev-parse HEAD
 if ($imguiRevision -ne $lock.imgui.revision) { throw 'ImGui submodule does not match the C# ABI lock.' }
 if (@(& git -C (Join-Path $cimgui 'imgui') status --porcelain --untracked-files=no).Count -ne 0) { throw 'Pinned ImGui sources have local modifications.' }
-$options = @('-S', $nativeRoot, '-B', $OutputRoot, "-DCYHUB_CYUI_SOURCE=$cyui", "-DCYHUB_CIMGUI_SOURCE=$cimgui", '-DCMAKE_BUILD_TYPE=Release')
+$options = @('-S', $nativeRoot, '-B', $OutputRoot, "-DCYHUB_CYUI_SOURCE=$cyui", "-DCYHUB_CIMGUI_SOURCE=$cimgui", "-DCYHUB_CYMCP_SOURCE=$CyMcpSource", "-DCYHUB_CYMCP_REVISION=$sdkRevision", '-DCMAKE_BUILD_TYPE=Release')
 if ($IsWindows -or $env:OS -eq 'Windows_NT') { $options += @('-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'v143') }
 & $CMake @options
 if ($LASTEXITCODE -ne 0) { throw 'CyUI native configuration failed.' }

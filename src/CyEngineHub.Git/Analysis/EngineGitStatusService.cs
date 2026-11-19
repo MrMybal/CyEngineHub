@@ -15,9 +15,8 @@ public sealed class EngineGitStatusService(IProcessRunner runner)
         timeout.CancelAfter(TimeSpan.FromMinutes(2));
         var token = timeout.Token;
         var inspector = new GitRepositoryInspector(runner);
-        var root = await inspector.FindRepositoryRootAsync(engineRoot, token).ConfigureAwait(false);
-        if (root is null || !Path.TrimEndingDirectorySeparator(Path.GetFullPath(engineRoot)).Equals(root,
-                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)) return null;
+        var root = await inspector.FindRepositoryRootAsync(engineRoot, requireRoot: true, token).ConfigureAwait(false);
+        if (root is null) return null;
         var status = await ReadStatus(root, token).ConfigureAwait(false);
         var checkedRemote = false;
         if (fetch && status.Branch != "(detached)" && !string.IsNullOrWhiteSpace(status.Upstream))

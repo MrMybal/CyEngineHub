@@ -60,6 +60,22 @@ public sealed class KitBashConnectorPackageTests : IDisposable
     }
 
     [Fact]
+    public async Task LibraryIncludingScratchPublishesIntoPermanentPackageDirectory()
+    {
+        var source = Path.Combine(_root, "model.fbx");
+        await File.WriteAllTextAsync(source, "complete model");
+        var library = Storage.Libraries[0].Path;
+        var scratch = Path.Combine(library, "ConnectorImports");
+
+        var result = await ConnectorLibraryPackageService.ImportAsync(source, Id, LibraryPackageStorageMode.Uncompressed, Storage, scratch);
+
+        Assert.Equal("complete model", await File.ReadAllTextAsync(Path.Combine(result.DestinationDirectory, "model.fbx")));
+        Assert.True(File.Exists(result.ManifestPath));
+        Assert.Empty(Directory.GetFileSystemEntries(scratch));
+        Assert.Equal(result.DestinationDirectory, Assert.Single(ConnectorLibraryPackageService.DiscoverPackages(Id, [library])));
+    }
+
+    [Fact]
     public async Task FailedPlacementRemovesOnlyOwnedStaging()
     {
         var source = Directory.CreateDirectory(Path.Combine(_root, "Original")).FullName;

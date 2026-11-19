@@ -48,6 +48,10 @@ public sealed class UpluginDescriptorParser : IUpluginDescriptorParser
                     cancellationToken)
                 .ConfigureAwait(false);
             var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                throw new JsonException("Le descripteur doit être un objet JSON.");
+            }
             var pluginRoot = Path.GetDirectoryName(descriptorPath)!;
             var name = Path.GetFileNameWithoutExtension(descriptorPath);
             var issues = new List<string>();
@@ -101,6 +105,14 @@ public sealed class UpluginDescriptorParser : IUpluginDescriptorParser
                 descriptorPath,
                 innerException: exception);
         }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            throw new PluginOperationException(
+                $"Impossible de lire le descripteur : {exception.Message}",
+                "Parse",
+                descriptorPath,
+                innerException: exception);
+        }
     }
 
     private static List<UnrealPluginModule> ParseModules(
@@ -115,6 +127,7 @@ public sealed class UpluginDescriptorParser : IUpluginDescriptorParser
 
         foreach (var item in array.EnumerateArray())
         {
+            if (item.ValueKind != JsonValueKind.Object) throw new JsonException("Entrée de module invalide.");
             var name = GetString(item, "Name");
             if (string.IsNullOrWhiteSpace(name))
             {
@@ -161,6 +174,7 @@ public sealed class UpluginDescriptorParser : IUpluginDescriptorParser
 
         foreach (var item in array.EnumerateArray())
         {
+            if (item.ValueKind != JsonValueKind.Object) throw new JsonException("Entrée de dépendance invalide.");
             var name = GetString(item, "Name");
             if (!string.IsNullOrWhiteSpace(name))
             {

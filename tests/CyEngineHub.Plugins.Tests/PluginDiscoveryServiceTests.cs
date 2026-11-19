@@ -48,6 +48,23 @@ public sealed class PluginDiscoveryServiceTests : IDisposable
         Assert.StartsWith("BROKEN-", first.Id, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("{ \"Modules\": [null] }")]
+    [InlineData("{ \"Plugins\": [42] }")]
+    public async Task BadDescriptorDoesNotInterruptOtherPlugins(string descriptor)
+    {
+        Directory.CreateDirectory(_testDirectory);
+        await File.WriteAllTextAsync(Path.Combine(_testDirectory, "Broken.uplugin"), descriptor);
+        await File.WriteAllTextAsync(Path.Combine(_testDirectory, "Healthy.uplugin"), "{ \"FileVersion\": 3, \"CanContainContent\": true }");
+
+        var plugins = await new PluginDiscoveryService(new UpluginDescriptorParser()).RefreshAsync(
+            new PluginDiscoveryRequest([], [], [_testDirectory]));
+
+        Assert.Contains(plugins, plugin => plugin.Name == "Broken" && plugin.Health == PluginHealth.Broken);
+        Assert.Contains(plugins, plugin => plugin.Name == "Healthy" && plugin.Health == PluginHealth.Healthy);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_testDirectory))

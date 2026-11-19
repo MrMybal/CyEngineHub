@@ -2263,10 +2263,10 @@
                                 </StackPanel>
                                 <StackPanel Grid.Column="1">
                                   <Grid ColumnDefinitions="*,Auto">
-                                    <TextBlock Text="{Binding Message}" FontSize="9" Foreground="#A8C9F2" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Message}" FontSize="9" Foreground="#A8C9F2" TextWrapping="Wrap" />
                                     <TextBlock Grid.Column="1" Text="{Binding Status}" FontSize="9" FontWeight="SemiBold" Foreground="#65CCA9" Margin="10,0,0,0" />
                                   </Grid>
-                                  <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" Height="7" Margin="0,6,0,0" />
+                                  <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" IsIndeterminate="{Binding IsProgressIndeterminate}" Height="7" Margin="0,6,0,0" />
                                 </StackPanel>
                                 <Button Grid.Column="2" Classes="danger" Content="Annuler" Command="{Binding CancelCommand}" IsVisible="{Binding CanCancel}" />
                               </Grid>
@@ -3888,6 +3888,7 @@
                       <TextBlock Text="Connectez votre client Codex, Claude ou OpenCode au hub. Recherche dans les packs possédés, fichiers locaux, collections et propositions d’installation. Aucun achat, aucun accès aux mots de passe, aucune commande système libre." TextWrapping="Wrap" />
                       <TextBlock Text="{Binding McpStatus}" Foreground="#55C7A6" TextWrapping="Wrap" />
                       <Button Content="Activer / désactiver MCP" Command="{Binding ToggleMcpCommand}" HorizontalAlignment="Left" />
+                      <Button Content="Ouvrir l’assistant" Click="OpenAssistantWindow" HorizontalAlignment="Left" />
                       <TextBlock Text="L’activation autorise le client IA connecté à consulter les métadonnées et noms de fichiers de vos packs. Ces données peuvent être transmises au fournisseur de votre client. Les changements exigent votre validation sauf pour les actions explicitement autorisées dans les options MCP enregistrées. Fermer le hub coupe la connexion ; le mode tray la conserve." TextWrapping="Wrap" Foreground="#8294A8" FontSize="12" />
                     </StackPanel>
                   </Border>

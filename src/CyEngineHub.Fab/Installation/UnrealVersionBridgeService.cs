@@ -20,8 +20,7 @@ internal sealed record UnrealVersionBridgeRequest(
     bool AnalyzeOnly = false,
     bool EnableAgentFallback = false,
     bool AllowAgentCodeExecution = false,
-    string? AgentWorkspace = null,
-    string? AgentPython = null);
+    string? AgentWorkspace = null);
 
 internal sealed record UnrealVersionBridgeResult(
     string VariantDirectory,

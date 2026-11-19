@@ -5,6 +5,58 @@ namespace CyEngineHub.Core.Tests;
 public sealed class HubTaskSchedulerTests
 {
     [Fact]
+    public async Task FinishedHistoryAndHandleReleaseCapturedInputs()
+    {
+        await using var scheduler = new HubTaskScheduler();
+        var (handle, input) = EnqueueWithCapturedInput(scheduler);
+        var result = await handle.Completion;
+        await scheduler.Enqueue(new HubTaskDefinition("Test", "Barrier", (_, _) => Task.CompletedTask)).Completion;
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        Assert.False(input.IsAlive);
+        Assert.Equal(result, scheduler.GetSnapshot(handle.Id));
+        handle.Cancel();
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    private static (HubTaskHandle Handle, WeakReference Input) EnqueueWithCapturedInput(HubTaskScheduler scheduler)
+    {
+        var input = new object();
+        var handle = scheduler.Enqueue(new HubTaskDefinition("Test", "Capture", (_, _) =>
+        {
+            GC.KeepAlive(input);
+            return Task.CompletedTask;
+        }));
+        return (handle, new WeakReference(input));
+    }
+
+    [Fact]
+    public async Task ShutdownCanDrainAWorkerAwaitingACallbackAndRepeatedDisposalWaitsForIt()
+    {
+        var scheduler = new HubTaskScheduler();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var callback = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handle = scheduler.Enqueue(new HubTaskDefinition("Test", "Await callback", async (_, token) =>
+        {
+            started.SetResult();
+            await callback.Task;
+            token.ThrowIfCancellationRequested();
+        }));
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        var first = scheduler.DisposeAsync().AsTask();
+        var second = scheduler.DisposeAsync().AsTask();
+        try
+        {
+            Assert.False(first.IsCompleted);
+            Assert.False(second.IsCompleted);
+        }
+        finally { callback.TrySetResult(); }
+        await Task.WhenAll(first, second).WaitAsync(TimeSpan.FromSeconds(3));
+        Assert.Equal(HubTaskStatus.Canceled, (await handle.Completion).Status);
+    }
+
+    [Fact]
     public async Task AnUnquantifiedPhaseExplicitlyClearsPreviousProgressWithoutChangingMessageOnlyReports()
     {
         await using var scheduler = new HubTaskScheduler();
@@ -14,13 +66,15 @@ public sealed class HubTaskSchedulerTests
         {
             context.Report(.8, "First phase");
             context.Report(message: "Still first phase");
-            context.ReportIndeterminate("Preparing C++");
+            context.ReportStage("Préparation", null, "Preparing C++");
             context.Report(.5, "Compiling");
             return Task.CompletedTask;
         }));
         await task.Completion;
         Assert.Equal(.8, snapshots.Single(item => item.Message == "Still first phase").Progress);
         Assert.Null(snapshots.Single(item => item.Message == "Preparing C++").Progress);
+        Assert.Equal("Préparation", snapshots.Single(item => item.Message == "Preparing C++").Stage);
+        Assert.Null(snapshots.First(item => item.Message == "Compiling").Stage);
         Assert.Contains(snapshots, item => item.Message == "Compiling" && item.Progress == .5);
     }
     [Theory]

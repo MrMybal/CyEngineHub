@@ -54,10 +54,18 @@ public sealed class UnrealVersionBridgeAgentTests : IDisposable
         Assert.Equal("true", result.Outputs["agentPending"]);
         Assert.False(result.Outputs.ContainsKey("variant"));
         Assert.False(result.Outputs.ContainsKey("receipt"));
-        Assert.True(File.Exists(result.Outputs["mcpConfig"]));
+        AssertSdkConfiguration(result.Outputs["mcpConfig"], result.Outputs["agentWorkspace"]);
         Assert.False(Directory.Exists(Path.Combine(context.Target.RootPath, "Content")));
         Assert.False(Directory.Exists(Path.Combine(context.Target.RootPath, "Plugins")));
         return result.Outputs["agentWorkspace"];
+    }
+
+    private static void AssertSdkConfiguration(string configuration, string workspace)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(configuration));
+        var server = document.RootElement.GetProperty("mcpServers").GetProperty("unreal-version-bridge");
+        Assert.StartsWith("CyEngineHub.VersionBridge.Tool", Path.GetFileName(server.GetProperty("command").GetString()), StringComparison.Ordinal);
+        Assert.Equal(new[] { "--workspace", workspace }, server.GetProperty("args").EnumerateArray().Select(item => item.GetString()));
     }
     private static FabInstallationScriptContext Resume(FabInstallationScriptContext context, string workspace) => context with {
         Configuration = new Dictionary<string, string>(context.Configuration) { ["agentWorkspace"] = workspace } };
@@ -131,6 +139,7 @@ public sealed class UnrealVersionBridgeAgentTests : IDisposable
         Assert.StartsWith(workspace, process.Arguments[0], StringComparison.Ordinal);
         Assert.DoesNotContain(context.Target.RootPath, process.Arguments[0], StringComparison.Ordinal);
         Assert.Equal(Path.Combine(workspace, "Exchange"), process.EnvironmentVariables["CYHUB_BRIDGE_EXCHANGE"]);
+        Assert.Equal(string.Empty, process.StandardInput);
     }
 
     [Theory]
@@ -154,8 +163,11 @@ public sealed class UnrealVersionBridgeAgentTests : IDisposable
     public async Task ResumeRevalidatesReopensPublishesAndInstallsRepairedContent()
     {
         var context = Context(); var workspace = await PrepareAsync(context);
+        var configuration = Path.Combine(workspace, "mcp.json");
+        File.WriteAllText(configuration, """{"mcpServers":{"unreal-version-bridge":{"command":"python","args":["server.py"]}}}""");
         File.WriteAllText(Path.Combine(workspace, "TargetProject", "Content", "Example.uasset"), "target serialized fixture");
         var result = await Script().InstallAsync(Resume(context, workspace));
+        AssertSdkConfiguration(configuration, workspace);
         Assert.Equal(2, _runner.Requests.Count(r => r.Arguments.Any(a => a.Contains("agent-validate.py", StringComparison.Ordinal))));
         Assert.Equal("target serialized fixture", File.ReadAllText(Path.Combine(context.Target.RootPath, "Content", "Example.uasset")));
         Assert.True(File.Exists(result.Outputs["manifest"])); Assert.True(File.Exists(result.Outputs["receipt"]));

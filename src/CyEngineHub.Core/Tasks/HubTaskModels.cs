@@ -22,6 +22,7 @@ public sealed record HubTaskSnapshot(
     string? Error)
 {
     public bool IsDownload { get; init; }
+    public string? Stage { get; init; }
     public IReadOnlyList<HubTaskLink> Links { get; init; } = [];
 
 }
@@ -54,9 +55,9 @@ public sealed record HubTaskResources
 
 public sealed class HubTaskContext
 {
-    private readonly Action<double?, string?, bool> _report;
+    private readonly Action<double?, string?, bool, string?> _report;
 
-    internal HubTaskContext(Action<double?, string?, bool> report)
+    internal HubTaskContext(Action<double?, string?, bool, string?> report)
     {
         _report = report;
     }
@@ -68,11 +69,17 @@ public sealed class HubTaskContext
             throw new ArgumentOutOfRangeException(nameof(progress), "Progress must be between 0 and 1.");
         }
 
-        _report(progress, message, false);
+        _report(progress, message, false, null);
     }
 
     /// <summary>Starts an unquantified phase without retaining a previous phase's percentage.</summary>
-    public void ReportIndeterminate(string? message = null) => _report(null, message, true);
+    public void ReportIndeterminate(string? message = null) => _report(null, message, true, null);
+
+    public void ReportStage(string stage, double? progress, string message)
+    {
+        if (progress is < 0 or > 1) throw new ArgumentOutOfRangeException(nameof(progress));
+        _report(progress, message, progress is null, stage);
+    }
 }
 
 public sealed class HubTaskHandle

@@ -1,4 +1,4 @@
-namespace CyEngineHub.Epic.Acquisition;
+namespace CyEngineHub.Fab.Remote;
 
 // Sequential reconstruction cache, scoped to one transfer. No static retained asset data.
 internal sealed class DecodedChunkCache(long maximumBytes, Func<string, CancellationToken, Task<byte[]>> load) : IDisposable

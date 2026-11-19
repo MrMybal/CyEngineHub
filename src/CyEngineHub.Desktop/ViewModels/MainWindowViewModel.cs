@@ -316,7 +316,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _unrealVersionBridgeAssetProfileFile = string.Empty;
     private bool _unrealVersionBridgeKeepStaging;
     private bool _unrealVersionBridgeValidateOutput = true;
-    private string _unrealVersionBridgeAgentPython = string.Empty;
     private HubExtensionInstallPlan? _pendingHubExtensionInstall;
     private string _pendingHubExtensionInstallSummary = string.Empty;
     private HubExtensionExecutionPlan? _pendingHubExtensionExecution;
@@ -1458,6 +1457,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         SavePresetCommand = new AsyncRelayCommand(SavePresetAsync, onError: ShowError);
 
         _taskScheduler.TaskChanged += OnTaskChanged;
+        foreach (var task in _taskScheduler.GetSnapshot()) ApplyTaskRow(task);
     }
 
     public ObservableCollection<EngineCardViewModel> Engines { get; } = [];
@@ -4713,12 +4713,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         set => SetProperty(ref _unrealVersionBridgeStorageRoot, value);
     }
 
-    public string UnrealVersionBridgeAgentPython
-    {
-        get => _unrealVersionBridgeAgentPython;
-        set => SetProperty(ref _unrealVersionBridgeAgentPython, value);
-    }
-
     public string UnrealVersionBridgeProfile
     {
         get => _unrealVersionBridgeProfile;
@@ -5116,7 +5110,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         var versionBridgeProfile = await _settings.GetAsync(UnrealVersionBridgeSettings.ConversionProfile).ConfigureAwait(true);
         UnrealVersionBridgeAssetProfileFile = await _settings.GetAsync(UnrealVersionBridgeSettings.AssetProfileFile).ConfigureAwait(true) ?? string.Empty;
-        UnrealVersionBridgeAgentPython = await _settings.GetAsync(UnrealVersionBridgeSettings.AgentPython).ConfigureAwait(true) ?? string.Empty;
         UnrealVersionBridgeProfile = string.Equals(versionBridgeProfile, "extended", StringComparison.OrdinalIgnoreCase)
             ? "extended"
             : "safe";
@@ -5988,12 +5981,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private async Task SaveUnrealVersionBridgeSettingsAsync()
     {
-        if (!string.IsNullOrWhiteSpace(UnrealVersionBridgeAgentPython))
-        {
-            var python = Path.GetFullPath(UnrealVersionBridgeAgentPython.Trim().Trim((char)34));
-            if (!File.Exists(python)) throw new InvalidOperationException("Choisissez le python.exe de l’environnement privé MCP préparé avec Setup.ps1.");
-            UnrealVersionBridgeAgentPython = python;
-        }
         if (!string.IsNullOrWhiteSpace(UnrealVersionBridgeAssetProfileFile))
         {
             var profilePath = Path.GetFullPath(UnrealVersionBridgeAssetProfileFile.Trim().Trim((char)34));
@@ -6020,7 +6007,6 @@ public sealed partial class MainWindowViewModel : ObservableObject
             : "safe";
         await _settings.SetAsync(UnrealVersionBridgeSettings.StorageRoot, root).ConfigureAwait(true);
         await _settings.SetAsync(UnrealVersionBridgeSettings.AssetProfileFile, UnrealVersionBridgeAssetProfileFile).ConfigureAwait(true);
-        await _settings.SetAsync(UnrealVersionBridgeSettings.AgentPython, UnrealVersionBridgeAgentPython).ConfigureAwait(true);
         OnPropertyChanged(nameof(UnrealVersionBridgeAssetProfilesSummary));
         await _settings.SetAsync(
             UnrealVersionBridgeSettings.ConversionProfile,
@@ -9107,13 +9093,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         await assetGate.WaitAsync(cancellationToken).ConfigureAwait(false);
                         try
                         {
-                        var transfer = new CyEngineHub.Core.Marketplaces.DownloadProgressText();
+                        var transfer = new FabDownloadProgressText();
                         var progress = new InlineProgress<DirectFabDownloadProgress>(value =>
                         {
-                            var fraction = value.Fraction ?? 0;
-                            var message = transfer.Format($"{option.Label} · {value.Message}", value.DownloadedBytes, value.TotalBytes, value.CachedBytes);
-                            context.Report(fraction, message);
-                            Dispatcher.UIThread.Post(() => FabDownloadStatus = message);
+                            var display = transfer.Format(option.Label, value);
+                            context.ReportStage(display.Stage, display.Fraction, display.Message);
+                            Dispatcher.UIThread.Post(() => FabDownloadStatus = display.Message);
                         });
                         var result = isQuixel
                             ? await _quixelClient.DownloadAsync(
@@ -9141,23 +9126,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
                                     cancellationToken)
                                 .ConfigureAwait(false);
                         }
-                        var packageProgress = new InlineProgress<DirectFabDownloadProgress>(value =>
-                        {
-                            context.Report(value.Fraction, $"{option.Label} · {value.Message}");
-                            Dispatcher.UIThread.Post(() => FabDownloadStatus = $"{option.Label} · {value.Message}");
-                        });
                         result = await LibraryPackageService.PackageAsync(
                                 asset,
                                 option.Version,
                                 result,
                                 packageStorageMode,
-                                packageProgress,
+                                progress,
                                 cancellationToken)
                             .ConfigureAwait(false);
                         results[versionIndex] = await MarketplaceStorageRouter.PlaceAsync(
                                 result,
                                 marketplaceStorage,
-                                packageProgress,
+                                progress,
                                 cancellationToken)
                             .ConfigureAwait(false);
                         if (durable is not null)
@@ -9350,16 +9330,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
                 for (var index = 0; index < versions.Length; index++)
                 {
                     var option = versions[index];
-                    var transfer = new CyEngineHub.Core.Marketplaces.DownloadProgressText();
+                    var transfer = new FabDownloadProgressText();
                     var progress = new InlineProgress<DirectFabDownloadProgress>(value =>
                     {
-                        var fraction = (index + (value.Fraction ?? 0)) / versions.Length;
-                        var message = transfer.Format($"{option.Label} · {value.Message}", value.DownloadedBytes, value.TotalBytes, value.CachedBytes);
-                        context.Report(fraction, message);
+                        var display = transfer.Format(option.Label, value);
+                        var fraction = display.Fraction.HasValue ? (index + value.Fraction) / versions.Length : null;
+                        context.ReportStage(display.Stage, fraction, display.Message);
                         Dispatcher.UIThread.Post(() =>
                         {
-                            FabDownloadProgress = fraction;
-                            FabDownloadStatus = message;
+                            FabDownloadProgress = fraction ?? 0;
+                            FabDownloadStatus = display.Message;
                         });
                     });
                     var localDerived = selectedDerived is not null && selectedDerived.ArtifactId == option.Version.ArtifactId ? selectedDerived :
@@ -9433,23 +9413,18 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         if (pendingAgent is null) completedInstallations++;
                         else pendingAgentWorkspaces.Add(pendingAgent);
                     }
-                    var packageProgress = new InlineProgress<DirectFabDownloadProgress>(value =>
-                    {
-                        context.Report(null, $"{option.Label} · {value.Message}");
-                        Dispatcher.UIThread.Post(() => FabDownloadStatus = $"{option.Label} · {value.Message}");
-                    });
                     result = await LibraryPackageService.PackageAsync(
                             asset,
                             option.Version,
                             result,
                             packageStorageMode,
-                            packageProgress,
+                            progress,
                             cancellationToken)
                         .ConfigureAwait(false);
                     result = await MarketplaceStorageRouter.PlaceAsync(
                             result,
                             marketplaceStorage,
-                            packageProgress,
+                            progress,
                             cancellationToken)
                         .ConfigureAwait(false);
                     completedDownloads.Add((option, result));
@@ -10611,13 +10586,13 @@ public sealed partial class MainWindowViewModel : ObservableObject
                         cancellationToken)
                     .ConfigureAwait(false);
             }) { IsDownload = true });
-        var snapshot = _taskScheduler.GetSnapshot().First(item => item.Id == handle.Id);
+        var snapshot = _taskScheduler.GetSnapshot(handle.Id);
         var download = new EngineDownloadCardViewModel(release, targetDirectory, snapshot, CancelTask,
             () => ShowSection(PageSection.Tasks), () => EnqueueEpicEngineDownloadAsync(release, targetDirectory));
         EpicEngineDownloads.Add(download);
         IsEpicEngineDownloadActive = true;
         // Show the task immediately, even before the scheduler's coalesced UI notification.
-        if (!Tasks.Any(item => item.Id == snapshot.Id)) Tasks.Insert(0, new TaskItemViewModel(snapshot, CancelTask, NavigateTaskLink));
+        if (ApplyTaskRow(snapshot)) NotifyActivityQueues();
         EngineBinaryDownloadSummary = $"{release.DisplayName} ajouté à la file de téléchargement.";
         StatusMessage = EngineBinaryDownloadSummary;
         IsEngineImporterVisible = false;
@@ -12031,11 +12006,12 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
                     var packageStorage = ResolveMarketplaceStorageProfile(asset);
                     var storageMode = ResolveMarketplaceStorageMode(asset);
-                    var transfer = new CyEngineHub.Core.Marketplaces.DownloadProgressText();
+                    var transfer = new FabDownloadProgressText();
                     var progress = new InlineProgress<DirectFabDownloadProgress>(value =>
                     {
-                        var fraction = (index + (value.Fraction ?? 0)) / total;
-                        context.Report(fraction, transfer.Format($"{asset.Title} · {value.Message}", value.DownloadedBytes, value.TotalBytes, value.CachedBytes));
+                        var display = transfer.Format(asset.Title, value);
+                        var fraction = display.Fraction.HasValue ? (index + value.Fraction) / total : null;
+                        context.ReportStage(display.Stage, fraction, display.Message);
                     });
                     var download = IsQuixelAsset(asset)
                         ? await _quixelClient.DownloadAsync(
@@ -14838,50 +14814,55 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _activityLogPolicy.LevelFor(eventArgs.Task),
             eventArgs.Task.Category,
             $"{eventArgs.Task.Title} · {eventArgs.Task.Status} · {eventArgs.Task.Error ?? eventArgs.Task.Message ?? string.Empty}");
-        if (Interlocked.Exchange(ref _taskRefreshPending, 1) != 0) return;
-        Dispatcher.UIThread.Post(() =>
+        lock (_pendingTaskUpdates)
         {
-            Interlocked.Exchange(ref _taskRefreshPending, 0);
-            var snapshot = _taskScheduler.GetSnapshot();
-            foreach (var download in EpicEngineDownloads)
-            {
-                var task = snapshot.FirstOrDefault(item => item.Id == download.TaskId);
-                if (task is not null) download.ApplySnapshot(task);
-            }
-            IsEpicEngineDownloadActive = EpicEngineDownloads.Any(item => item.CanCancel);
-            foreach (var task in snapshot)
-            {
-                if (_fabVersionDownloadsByTaskId.TryGetValue(task.Id, out var versionDownload))
-                    versionDownload.ApplySnapshot(task);
-            }
-            if (_fabVersionDownloadsByTaskId.Count > 0)
-            {
-                var activeDownloads = _fabVersionDownloads
-                    .Where(item => !item.IsTerminal)
-                    .ToArray();
-                IsFabDownloadActive = activeDownloads.Length > 0;
-                if (_fabVersionDownloads.Count > 0)
-                {
-                    FabDownloadProgress = _fabVersionDownloads.Average(item => item.ProgressPercent) / 100D;
-                }
-            }
-            var existing = Tasks.ToDictionary(item => item.Id);
-            foreach (var task in snapshot)
-            {
-                if (existing.TryGetValue(task.Id, out var row)) row.ApplySnapshot(task);
-                else
-                {
-                    var index = snapshot.TakeWhile(item => item.Id != task.Id).Count();
-                    Tasks.Insert(Math.Min(index, Tasks.Count), new TaskItemViewModel(task, CancelTask, NavigateTaskLink));
-                }
-            }
+            var postRefresh = _pendingTaskUpdates.Count == 0;
+            _pendingTaskUpdates.Add(eventArgs.Task.Id);
+            if (!postRefresh) return;
+        }
+        Dispatcher.UIThread.Post(RefreshChangedTasks);
+    }
 
-            OnPropertyChanged(nameof(HasNoTasks));
+    private void RefreshChangedTasks()
+    {
+        Guid[] changed;
+        lock (_pendingTaskUpdates)
+        {
+            changed = _pendingTaskUpdates.ToArray();
+            _pendingTaskUpdates.Clear();
+        }
+        var statusChanged = false;
+        var buildStatusChanged = false;
+        var fabChanged = false;
+        foreach (var id in changed)
+        {
+            var task = _taskScheduler.GetSnapshot(id);
+            if (ApplyTaskRow(task))
+            {
+                statusChanged = true;
+                buildStatusChanged |= task.Category == "Build";
+            }
+            EpicEngineDownloads.FirstOrDefault(download => download.TaskId == id)?.ApplySnapshot(task);
+            if (_fabVersionDownloadsByTaskId.TryGetValue(id, out var versionDownload))
+            {
+                versionDownload.ApplySnapshot(task);
+                fabChanged = true;
+            }
+        }
+        if (statusChanged)
+        {
+            IsEpicEngineDownloadActive = EpicEngineDownloads.Any(item => item.CanCancel);
             NotifyActivityQueues();
-            NotifyProjectBuildState();
-            OnPropertyChanged(nameof(FooterProgressPercent));
-            OnPropertyChanged(nameof(FooterActivityText));
-        });
+        }
+        if (buildStatusChanged) NotifyProjectBuildState();
+        if (fabChanged)
+        {
+            IsFabDownloadActive = _fabVersionDownloads.Any(item => !item.IsTerminal);
+            if (_fabVersionDownloads.Count > 0)
+                FabDownloadProgress = _fabVersionDownloads.Average(item => item.ProgressPercent) / 100D;
+        }
+        OnPropertyChanged(nameof(FooterProgressPercent));
+        OnPropertyChanged(nameof(FooterActivityText));
     }
 
     private void CancelTask(Guid taskId)

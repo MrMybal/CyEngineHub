@@ -6,7 +6,7 @@ below concern third parties and do not relicense their code under the Hub licens
 
 ## Dear ImGui user interface
 
-- CyUI 1.2.0, revision `ff023e646c6a3038b3dfbfd53f6d2b4a2f5955e3` — MIT. https://github.com/MrMybal/CyUI
+- CyUI 1.2.0, revision `6ef01cfcdb197f3a89d64618ce5ef8818c704728` — MIT. https://github.com/MrMybal/CyUI
 - Dear ImGui 1.92.1 and cimgui — MIT. https://github.com/ocornut/imgui and https://github.com/JunaMeinhold/cimgui
 - Hexa.NET.ImGui 2.2.8.5 — MIT. https://github.com/HexaEngine/Hexa.NET.ImGui
 - Lexilla, Scintilla interface headers and SciTE language data, brought in by CyUI DocumentViews/Code — permissive Neil Hodgson licenses. No Scintilla editor is linked.
@@ -19,6 +19,11 @@ Native dependency notices are also retained under `LICENCES/CyUI`,
 `LICENCES/DearImGui`, `LICENCES/cimgui` and `LICENCES/Hexa.NET.ImGui`.
 The exact source/ABI revisions and selected modules are recorded in
 `native/CyEngineHub.CyUI/dependencies.lock.json`. ImGui.NET is no longer used.
+
+## CyMCPSDK
+
+CyMCPSDK 0.7.0 (MIT), revision `ced8296b555c1969cb29740eba65beaa0687da7d`, is built from source.
+The Windows archive includes the SDK revision, license and the nlohmann/json, cpp-httplib and PicoSHA2 notices in `LICENCES/CyMCPSDK`.
 
 ## Microsoft Edge WebView2
 

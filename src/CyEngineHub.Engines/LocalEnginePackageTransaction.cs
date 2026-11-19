@@ -121,8 +121,11 @@ public static partial class LocalEnginePackageTransaction
         ValidateProjectOwnedPaths(plan.TargetProject.RootPath, destination, workspace, "ExecuteInstall");
         EnsureNoOverlap(source, workspace, "ExecuteInstall");
         EnsureNoOverlap(destination, workspace, "ExecuteInstall");
-        var currentFiles = await InventoryAsync(source, cancellationToken).ConfigureAwait(false);
-        if (!InventoriesMatch(plan.Files, currentFiles))
+        var sourceFiles = ListPackageFiles(source, cancellationToken);
+        if (plan.Files.Count != sourceFiles.Length || !plan.Files.Zip(sourceFiles).All(pair =>
+                string.Equals(pair.First.RelativePath, pair.Second.RelativePath, StringComparison.OrdinalIgnoreCase) &&
+                pair.First.Length == pair.Second.Info.Length &&
+                pair.First.LastWriteTimeUtc == pair.Second.Info.LastWriteTimeUtc))
         {
             throw Failure("Le package source a changé après confirmation.", "ExecuteInstall", source);
         }
@@ -149,26 +152,31 @@ public static partial class LocalEnginePackageTransaction
         Directory.CreateDirectory(staging);
         try
         {
-            foreach (var file in currentFiles)
+            for (var index = 0; index < sourceFiles.Length; index++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var from = CombineContained(source, file.RelativePath);
+                var file = sourceFiles[index];
                 var to = CombineContained(staging, file.RelativePath);
                 Directory.CreateDirectory(Path.GetDirectoryName(to)!);
-                await CopyFileAsync(from, to, cancellationToken).ConfigureAwait(false);
+                var hash = await CopyAndHashAsync(file.Info.FullName, to, cancellationToken).ConfigureAwait(false);
+                if (!hash.Equals(plan.Files[index].Sha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw Failure("Le package source a changé après confirmation.", "ExecuteInstall", file.Info.FullName);
+                }
                 copiedFiles++;
-                copiedBytes += file.Length;
+                copiedBytes += file.Info.Length;
                 progress?.Report(new LocalEnginePackageInstallProgress(
                     copiedFiles,
-                    currentFiles.Length,
+                    sourceFiles.Length,
                     $"Copie · {file.RelativePath}"));
             }
 
             await validateStagedPackage(staging, cancellationToken).ConfigureAwait(false);
             var stagedFiles = await InventoryAsync(staging, cancellationToken).ConfigureAwait(false);
+            var installedFingerprint = ComputeInventoryFingerprint(stagedFiles);
             if (!string.Equals(
-                    ComputeInventoryFingerprint(currentFiles),
-                    ComputeInventoryFingerprint(stagedFiles),
+                    ComputeInventoryFingerprint(plan.Files),
+                    installedFingerprint,
                     StringComparison.OrdinalIgnoreCase))
             {
                 throw Failure("Le staging ne correspond pas au package source.", "VerifyStaging", staging);
@@ -212,7 +220,7 @@ public static partial class LocalEnginePackageTransaction
                 plan.SourceDirectory,
                 destination,
                 workspace,
-                ComputeInventoryFingerprint(currentFiles),
+                installedFingerprint,
                 retainedBackup,
                 plan.ExistingTargetFingerprint,
                 copiedFiles,
@@ -475,7 +483,22 @@ public static partial class LocalEnginePackageTransaction
         string root,
         CancellationToken cancellationToken)
     {
-        var files = new List<LocalEnginePackageInstallFile>();
+        var files = ListPackageFiles(root, cancellationToken);
+        var inventory = new LocalEnginePackageInstallFile[files.Length];
+        for (var index = 0; index < files.Length; index++)
+        {
+            var (relativePath, info) = files[index];
+            inventory[index] = new LocalEnginePackageInstallFile(
+                relativePath, info.Length, info.LastWriteTimeUtc,
+                await ComputeSha256Async(info.FullName, cancellationToken).ConfigureAwait(false));
+        }
+
+        return inventory;
+    }
+
+    private static (string RelativePath, FileInfo Info)[] ListPackageFiles(string root, CancellationToken cancellationToken)
+    {
+        var files = new List<(string RelativePath, FileInfo Info)>();
         var pending = new Stack<string>();
         pending.Push(root);
         long totalBytes = 0;
@@ -515,11 +538,7 @@ public static partial class LocalEnginePackageTransaction
                         root);
                 }
 
-                files.Add(new LocalEnginePackageInstallFile(
-                    Path.GetRelativePath(root, entry).Replace('\\', '/'),
-                    info.Length,
-                    info.LastWriteTimeUtc,
-                    await ComputeSha256Async(entry, cancellationToken).ConfigureAwait(false)));
+                files.Add((Path.GetRelativePath(root, entry).Replace('\\', '/'), info));
             }
         }
 
@@ -565,7 +584,7 @@ public static partial class LocalEnginePackageTransaction
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    private static async Task CopyFileAsync(
+    private static async Task<string> CopyAndHashAsync(
         string source,
         string destination,
         CancellationToken cancellationToken)
@@ -584,8 +603,11 @@ public static partial class LocalEnginePackageTransaction
             FileShare.None,
             CopyBufferSize,
             FileOptions.Asynchronous | FileOptions.SequentialScan);
-        await input.CopyToAsync(output, cancellationToken).ConfigureAwait(false);
+        using var sha = SHA256.Create();
+        using var hashingInput = new CryptoStream(input, sha, CryptoStreamMode.Read, leaveOpen: true);
+        await hashingInput.CopyToAsync(output, CopyBufferSize, cancellationToken).ConfigureAwait(false);
         await output.FlushAsync(cancellationToken).ConfigureAwait(false);
+        return Convert.ToHexString(sha.Hash!).ToLowerInvariant();
     }
 
     private static string NormalizeExistingRealDirectory(string path, string operation)

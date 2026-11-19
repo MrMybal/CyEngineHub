@@ -5,11 +5,15 @@ description: Connect an AI client, review permissions and follow assisted operat
 section: Plugins and automation
 parent: extensions-sdk
 order: 19
-revision: 2
+revision: 4
 ---
 # AI, MCP and assisted conversion {#ai-mcp-and-assisted-conversion}
 
 MCP is optional and disabled until you enable it in Settings → AI / MCP. Keep the hub running. Copy the configuration displayed for your chosen client and merge it into that client's existing settings; do not overwrite unrelated servers or send tokens through chat. The local stdio proxy communicates with the hub through a same-account named pipe.
+
+The **CyEngineHub Assistant** on the same page provides streaming, cancellation, conversation history and attachments. Choose Ollama for a local tool-capable model or OpenAI, Anthropic or OpenRouter with the matching environment key. Enable MCP to let chat use the hub's business operations. To connect an external MCP HTTP server, enter its endpoint and the exact tool names you allow.
+
+**API context size in KiB** limits the messages sent to the provider. Zero keeps the full context, and the complete history remains in saved conversations. From the application folder, run `Mcp/CyEngineHub.Mcp.exe --help` for the JSON commands `list`, `describe` and `call`. The repair companion accepts `--workspace` for headless commands.
 
 ## Catalog tools and batches {#catalog-tools-and-batches}
 

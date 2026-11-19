@@ -58,6 +58,17 @@ public sealed record RemoteFabAsset(
         .FirstOrDefault();
 }
 
+public enum DirectFabDownloadPhase
+{
+    Transfer,
+    Reconstruction,
+    Verification,
+    Finalization,
+    Packaging,
+    Placement,
+    Completed,
+}
+
 public sealed record DirectFabDownloadProgress(
     double? Fraction,
     string Message,
@@ -65,6 +76,9 @@ public sealed record DirectFabDownloadProgress(
     long? TotalBytes)
 {
     public long CachedBytes { get; init; }
+    public DirectFabDownloadPhase Phase { get; init; }
+    public long ProcessedBytes { get; init; }
+    public long? TotalProcessingBytes { get; init; }
 }
 
 public sealed record DirectFabDownloadResult(

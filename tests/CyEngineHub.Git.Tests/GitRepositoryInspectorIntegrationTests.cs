@@ -39,7 +39,8 @@ public sealed class GitRepositoryInspectorIntegrationTests : IDisposable
             root!,
             [new GitRepositoryOwner("Test Project", nested, GitRepositoryOwnerKind.Project, "P1")]);
 
-        Assert.Equal(Path.GetFullPath(_testDirectory), root);
+        Assert.Equal("initial\nmodified", await File.ReadAllTextAsync(Path.Combine(root!, "Tracked.txt")));
+        Assert.True(Directory.Exists(Path.Combine(root!, ".git")));
         Assert.Equal("main", snapshot.Branch);
         Assert.NotEmpty(snapshot.HeadCommit);
         Assert.Equal(1, snapshot.WorkingTree.Modified);

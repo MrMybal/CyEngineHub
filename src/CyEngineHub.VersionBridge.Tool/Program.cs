@@ -1,31 +1,37 @@
 using System.Text;
-using System.Text.Json;
-using CyEngineHub.Fab.Installation;
-using CyEngineHub.Infrastructure.Processes;
+using System.Runtime.InteropServices;
+using CyEngineHub.Core.Ai;
+using CyEngineHub.VersionBridge.Tool;
 
-// One-shot CyToolsCore ProcessWorker. Stdout is exactly one structured JSON value.
 Console.InputEncoding = Encoding.UTF8;
 Console.OutputEncoding = new UTF8Encoding(false);
-var jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+if (args is ["--help" or "-h" or "help"]) return McpCommands.Help("CyEngineHub.VersionBridge.Tool", "--workspace PATH");
+if (args is not ["--workspace", var workspace, ..])
+    return McpCommands.Failure("usage", "Provide --workspace PATH. See --help.", 2);
+var command = args[2..];
+if (command is ["--help" or "-h" or "help"]) return McpCommands.Help("CyEngineHub.VersionBridge.Tool", "--workspace PATH");
+if (command.Length > 0 && !McpCommands.IsCommand(command))
+    return McpCommands.Failure("usage", McpCommands.Syntax, 2);
 try
 {
-    var workspace = Environment.GetEnvironmentVariable("CYHUB_BRIDGE_WORKSPACE")
-        ?? throw new InvalidOperationException("Le host doit sélectionner CYHUB_BRIDGE_WORKSPACE.");
-    var input = await Console.In.ReadToEndAsync().ConfigureAwait(false);
-    if (input.Length > 2 * 1024 * 1024) throw new InvalidDataException("Message trop volumineux.");
-    using var document = JsonDocument.Parse(input);
-    var payload = document.RootElement;
-    if (payload.GetProperty("protocolVersion").GetString() != "1.0") throw new InvalidDataException("Protocole worker invalide.");
-    var parameters = payload.GetProperty("parameters");
-    var service = new UnrealVersionBridgeAgentWorkspace(new SystemProcessRunner());
-    var result = await service.ExecuteAsync(workspace, parameters.GetProperty("operation").GetString()!,
-        parameters.GetProperty("arguments"), payload.GetProperty("workspace").GetString()!).ConfigureAwait(false);
-    Console.Write(JsonSerializer.Serialize(new { ok = true, result }, jsonOptions));
+    using var stop = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, eventArgs) => { eventArgs.Cancel = true; stop.Cancel(); };
+    var appDirectory = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../.."));
+    var native = OperatingSystem.IsWindows() ? "cimgui.dll" : OperatingSystem.IsMacOS() ? "cimgui.dylib" : "cimgui.so";
+    NativeLibrary.SetDllImportResolver(typeof(SdkMcpRegistry).Assembly, (name, _, _) =>
+        name == "cimgui" ? NativeLibrary.Load(Path.Combine(appDirectory, native)) : 0);
+    await using var jobs = new RepairJobs(workspace);
+    using var registry = new SdkMcpRegistry(RepairJobs.Definitions(), jobs.CallAsync);
+    using var session = registry.CreateSession();
+    if (command.Length > 0)
+        return await McpCommands.RunAsync(command, session.ExchangeAsync, stop.Token, waitForRepair: true).ConfigureAwait(false);
+    using var input = new StreamReader(Console.OpenStandardInput(), Encoding.UTF8);
+    await session.ServeAsync(input, Console.Out, stop.Token).ConfigureAwait(false);
     return 0;
 }
 catch (Exception exception) when (exception is not OutOfMemoryException)
 {
-    // A failed business operation is not a successful conversion.
-    Console.Write(JsonSerializer.Serialize(new { ok = false, error = exception.Message }, jsonOptions));
-    return 0;
+    if (command.Length > 0) return McpCommands.Failure("transport", exception.Message, 1);
+    await Console.Error.WriteLineAsync(exception.Message).ConfigureAwait(false);
+    return 1;
 }

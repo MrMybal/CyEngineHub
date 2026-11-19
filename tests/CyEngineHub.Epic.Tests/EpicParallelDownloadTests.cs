@@ -31,14 +31,25 @@ public sealed class EpicParallelDownloadTests : IDisposable
             var cache = Directory.CreateDirectory(Path.Combine(_root, ".cyenginehub-downloads", asset.AssetId, "chunks")).FullName;
             await File.WriteAllBytesAsync(Path.Combine(cache, FixtureHandler.GuidFor(0) + ".chunk"), FixtureHandler.UpgradedChunk(0));
         }
-        var operation = direct.DownloadAsync(asset, version, _root);
+        var progress = new ConcurrentQueue<DirectFabDownloadProgress>();
+        var operation = direct.DownloadAsync(asset, version, _root, new FabProgressSink(progress.Enqueue));
         await handler.FourRequests.Task.WaitAsync(TimeSpan.FromSeconds(8));
         Assert.Equal(4, handler.Peak);
         handler.Release.TrySetResult();
         var result = await operation;
         Assert.Equal(12, result.FileCount);
+        var samples = progress.ToArray();
+        Assert.Contains(samples, value => value.Phase == DirectFabDownloadPhase.Reconstruction && value.ProcessedBytes > 0);
+        Assert.Equal(DirectFabDownloadPhase.Finalization, samples[^2].Phase);
+        Assert.Equal(DirectFabDownloadPhase.Completed, samples[^1].Phase);
+        Assert.Equal(1, samples[^1].Fraction);
         for (var i = 0; i < 12; i++) Assert.Equal(FixtureHandler.Payload(i), await File.ReadAllBytesAsync(Path.Combine(result.DestinationDirectory, "Engine", $"QA{i}.dat")));
         if (mode == "header-upgrade-cache") Assert.False(handler.Attempts.ContainsKey(FixtureHandler.GuidFor(0)));
+    }
+
+    private sealed class FabProgressSink(Action<DirectFabDownloadProgress> report) : IProgress<DirectFabDownloadProgress>
+    {
+        public void Report(DirectFabDownloadProgress value) => report(value);
     }
 
     [Theory]

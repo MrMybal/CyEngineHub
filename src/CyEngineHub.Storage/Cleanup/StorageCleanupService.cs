@@ -90,15 +90,6 @@ public sealed class StorageCleanupService : IStorageCleanupService
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var rootAttributes = File.GetAttributes(targetPath);
-            if ((rootAttributes & FileAttributes.ReparsePoint) != 0)
-            {
-                throw new StorageException(
-                    "Le dossier cible est un lien ou une jonction; nettoyage refusé.",
-                    "ExecuteCleanup",
-                    targetPath);
-            }
-
             DeleteDirectory(targetPath, cancellationToken);
             return new StorageCleanupResult(
                 targetPath,
@@ -123,6 +114,7 @@ public sealed class StorageCleanupService : IStorageCleanupService
 
     private static void DeleteDirectory(string directory, CancellationToken cancellationToken)
     {
+        ValidateDirectoryChain(directory);
         foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -143,7 +135,7 @@ public sealed class StorageCleanupService : IStorageCleanupService
                 continue;
             }
 
-            if ((attributes & FileAttributes.ReadOnly) != 0)
+            if (!isReparsePoint && (attributes & FileAttributes.ReadOnly) != 0)
             {
                 File.SetAttributes(entry, attributes & ~FileAttributes.ReadOnly);
             }
@@ -171,8 +163,9 @@ public sealed class StorageCleanupService : IStorageCleanupService
 
         var normalizedOwner = Normalize(ownerRoot);
         var normalizedTarget = Normalize(targetPath);
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         var ownerVolumeRoot = Path.TrimEndingDirectorySeparator(Path.GetPathRoot(normalizedOwner) ?? string.Empty);
-        if (string.Equals(normalizedOwner, ownerVolumeRoot, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(normalizedOwner, ownerVolumeRoot, comparison))
         {
             throw new StorageException(
                 "Une racine de volume ne peut jamais être utilisée comme propriétaire de nettoyage.",
@@ -187,7 +180,7 @@ public sealed class StorageCleanupService : IStorageCleanupService
         }
 
         expected = Normalize(expected);
-        if (!string.Equals(expected, normalizedTarget, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(expected, normalizedTarget, comparison))
         {
             throw new StorageException(
                 "La cible ne correspond pas exactement à un dossier Unreal régénérable autorisé.",
@@ -197,7 +190,7 @@ public sealed class StorageCleanupService : IStorageCleanupService
 
         if (!normalizedTarget.StartsWith(
                 normalizedOwner + Path.DirectorySeparatorChar,
-                StringComparison.OrdinalIgnoreCase))
+                comparison))
         {
             throw new StorageException(
                 "La cible sort de la racine propriétaire.",
@@ -205,6 +198,7 @@ public sealed class StorageCleanupService : IStorageCleanupService
                 normalizedTarget);
         }
 
+        ValidateDirectoryChain(normalizedTarget);
         if (requireExisting && !Directory.Exists(normalizedTarget))
         {
             throw new StorageException(
@@ -214,6 +208,23 @@ public sealed class StorageCleanupService : IStorageCleanupService
         }
 
         return (normalizedOwner, normalizedTarget);
+    }
+
+    private static void ValidateDirectoryChain(string path)
+    {
+        for (DirectoryInfo? component = new(path); component is not null; component = component.Parent)
+        {
+            try
+            {
+                if ((File.GetAttributes(component.FullName) & FileAttributes.ReparsePoint) != 0)
+                {
+                    throw new StorageException("Le chemin de nettoyage traverse un lien ou une jonction.",
+                        "ValidateCleanupTarget", component.FullName);
+                }
+            }
+            catch (FileNotFoundException) { }
+            catch (DirectoryNotFoundException) { }
+        }
     }
 
     private static string Normalize(string path)

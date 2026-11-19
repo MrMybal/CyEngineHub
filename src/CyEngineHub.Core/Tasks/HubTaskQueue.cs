@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-
 namespace CyEngineHub.Core.Tasks;
 
 public sealed class HubTaskScheduler : IAsyncDisposable
@@ -8,8 +6,8 @@ public sealed class HubTaskScheduler : IAsyncDisposable
     private readonly List<WorkItem> _pending = [];
     private readonly HashSet<WorkItem> _running = [];
     private readonly SemaphoreSlim _wake = new(0, 1);
-    private readonly ConcurrentDictionary<Guid, WorkItem> _items = new();
-    private readonly CancellationTokenSource _shutdown = new();
+    private readonly Dictionary<Guid, WorkItem> _active = [];
+    private readonly Dictionary<Guid, HubTaskSnapshot> _finished = [];
     private readonly Task _dispatcher;
     private readonly int _maximumConcurrency;
     private readonly IHubTaskDiskResolver _disks;
@@ -26,8 +24,19 @@ public sealed class HubTaskScheduler : IAsyncDisposable
 
     public event EventHandler<HubTaskChangedEventArgs>? TaskChanged;
 
-    public IReadOnlyList<HubTaskSnapshot> GetSnapshot() => _items.Values
-        .Select(item => item.ReadSnapshot()).OrderByDescending(item => item.CreatedAt).ToArray();
+    public IReadOnlyList<HubTaskSnapshot> GetSnapshot()
+    {
+        lock (_gate)
+        {
+            return _active.Values.Select(item => item.ReadSnapshot()).Concat(_finished.Values)
+                .OrderByDescending(item => item.CreatedAt).ToArray();
+        }
+    }
+
+    public HubTaskSnapshot GetSnapshot(Guid id)
+    {
+        lock (_gate) return _active.TryGetValue(id, out var item) ? item.ReadSnapshot() : _finished[id];
+    }
 
     public HubTaskHandle Enqueue(HubTaskDefinition definition)
     {
@@ -36,19 +45,24 @@ public sealed class HubTaskScheduler : IAsyncDisposable
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            item = new WorkItem(definition, RaiseChanged, _disks, _shutdown.Token);
-            _items[item.Id] = item;
+            item = new WorkItem(definition, RaiseChanged, _disks);
+            _active[item.Id] = item;
             _pending.Add(item);
             // Publish the queued snapshot before dispatch can start this work.
             RaiseChanged(item.ReadSnapshot());
+            Signal();
         }
-        Signal();
-        return new HubTaskHandle(item.Id, item.Completion, item.Cancel);
+        var id = item.Id;
+        return new HubTaskHandle(id, item.Completion, () => Cancel(id));
     }
 
     public bool Cancel(Guid id)
     {
-        if (!_items.TryGetValue(id, out var item)) return false;
+        WorkItem? item;
+        lock (_gate)
+        {
+            if (!_active.TryGetValue(id, out item)) return _finished.ContainsKey(id);
+        }
         item.Cancel();
         return true;
     }
@@ -57,8 +71,12 @@ public sealed class HubTaskScheduler : IAsyncDisposable
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(count, 16);
-        lock (_gate) { _downloadLimit = count; }
-        Signal();
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _downloadLimit = count;
+            Signal();
+        }
     }
 
     private void Signal()
@@ -69,8 +87,16 @@ public sealed class HubTaskScheduler : IAsyncDisposable
 
     private void RaiseChanged(HubTaskSnapshot snapshot)
     {
+        if (snapshot.FinishedAt.HasValue)
+        {
+            lock (_gate)
+            {
+                _finished[snapshot.Id] = snapshot;
+                _active.Remove(snapshot.Id);
+                Signal();
+            }
+        }
         TaskChanged?.Invoke(this, new HubTaskChangedEventArgs(snapshot));
-        if (snapshot.Status is HubTaskStatus.Canceled or HubTaskStatus.Completed or HubTaskStatus.Failed) Signal();
     }
 
     private async Task DispatchAsync()
@@ -82,7 +108,15 @@ public sealed class HubTaskScheduler : IAsyncDisposable
             lock (_gate)
             {
                 _pending.RemoveAll(item => item.ReadSnapshot().Status != HubTaskStatus.Queued);
-                if (_disposed && _pending.Count == 0 && _running.Count == 0) return;
+                if (_disposed)
+                {
+                    if (_active.Count == 0 && _running.Count == 0)
+                    {
+                        _wake.Dispose();
+                        return;
+                    }
+                    continue;
+                }
                 List<WorkItem> earlierWaiting = [];
                 foreach (var item in _pending.ToArray())
                 {
@@ -135,36 +169,35 @@ public sealed class HubTaskScheduler : IAsyncDisposable
     private async Task ExecuteAsync(WorkItem item)
     {
         try { await item.ExecuteAsync().ConfigureAwait(false); }
-        finally { lock (_gate) { _running.Remove(item); } Signal(); }
+        finally { lock (_gate) { _running.Remove(item); Signal(); } }
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
+        WorkItem[] active;
         lock (_gate)
         {
-            if (_disposed) return;
+            if (_disposed) return new ValueTask(_dispatcher);
             _disposed = true;
+            active = _active.Values.ToArray();
+            Signal();
         }
-        _shutdown.Cancel();
-        foreach (var item in _items.Values) item.Cancel();
-        Signal();
-        await _dispatcher.ConfigureAwait(false);
-        foreach (var item in _items.Values) item.Dispose();
-        _shutdown.Dispose();
-        _wake.Dispose();
+        foreach (var item in active) item.Cancel();
+        return new ValueTask(_dispatcher);
     }
 
-    private sealed class WorkItem : IDisposable
+    private sealed class WorkItem
     {
         private readonly object _gate = new();
         private readonly HubTaskDefinition _definition;
-        private readonly CancellationTokenSource _cancellation;
+        private CancellationTokenSource? _cancellation;
+        private Task? _cancelCallbacks;
         private readonly TaskCompletionSource<HubTaskSnapshot> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly Action<HubTaskSnapshot> _changed;
         private HubTaskSnapshot _snapshot;
 
         public WorkItem(HubTaskDefinition definition, Action<HubTaskSnapshot> changed,
-            IHubTaskDiskResolver disks, CancellationToken shutdownToken)
+            IHubTaskDiskResolver disks)
         {
             if (definition.IsDownload && definition.IsInstallation) throw new ArgumentException("A task must use one lane.", nameof(definition));
             _definition = definition;
@@ -178,7 +211,6 @@ public sealed class HubTaskScheduler : IAsyncDisposable
             SharedKeys = definition.Resources.SharedKeys.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
             Disks = definition.Resources.DiskPaths.Concat(Paths).SelectMany(disks.Resolve).GroupBy(disk => disk.Id, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.MinBy(disk => disk.MaximumConcurrency)!).ToArray();
-            _cancellation = CancellationTokenSource.CreateLinkedTokenSource(shutdownToken);
             Id = Guid.NewGuid();
             _snapshot = new(Id, definition.Category, definition.Title, HubTaskStatus.Queued, null, null,
                 DateTimeOffset.UtcNow, null, null, null) { Links = definition.Links.ToArray(), IsDownload = definition.IsDownload };
@@ -208,10 +240,14 @@ public sealed class HubTaskScheduler : IAsyncDisposable
 
         public void Cancel()
         {
-            _cancellation.Cancel();
             HubTaskSnapshot snapshot;
             lock (_gate)
             {
+                if (_snapshot.Status == HubTaskStatus.Running)
+                {
+                    _cancelCallbacks ??= _cancellation!.CancelAsync();
+                    return;
+                }
                 if (_snapshot.Status != HubTaskStatus.Queued) return;
                 snapshot = _snapshot = _snapshot with { Status = HubTaskStatus.Canceled, FinishedAt = DateTimeOffset.UtcNow };
             }
@@ -222,22 +258,30 @@ public sealed class HubTaskScheduler : IAsyncDisposable
         public async Task ExecuteAsync()
         {
             HubTaskSnapshot started;
+            using var cancellation = new CancellationTokenSource();
             lock (_gate)
             {
                 if (_snapshot.Status != HubTaskStatus.Queued) return;
+                _cancellation = cancellation;
                 started = _snapshot = _snapshot with { Status = HubTaskStatus.Running, StartedAt = DateTimeOffset.UtcNow, Message = null };
             }
             _changed(started);
-            var context = new HubTaskContext((progress, message, indeterminate) => Update(snapshot => snapshot with
-            { Progress = indeterminate ? null : progress ?? snapshot.Progress, Message = message ?? snapshot.Message }));
+            var context = new HubTaskContext((progress, message, indeterminate, stage) => Update(snapshot => snapshot with
+            { Progress = indeterminate ? null : progress ?? snapshot.Progress, Message = message ?? snapshot.Message, Stage = stage }));
             try
             {
-                _cancellation.Token.ThrowIfCancellationRequested();
-                await _definition.ExecuteAsync(context, _cancellation.Token).ConfigureAwait(false);
+                cancellation.Token.ThrowIfCancellationRequested();
+                await _definition.ExecuteAsync(context, cancellation.Token).ConfigureAwait(false);
                 Complete(HubTaskStatus.Completed, null);
             }
-            catch (OperationCanceledException) when (_cancellation.IsCancellationRequested) { Complete(HubTaskStatus.Canceled, null); }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { Complete(HubTaskStatus.Canceled, null); }
             catch (Exception exception) { Complete(HubTaskStatus.Failed, exception.Message); }
+            finally
+            {
+                Task? callbacks;
+                lock (_gate) { callbacks = _cancelCallbacks; }
+                if (callbacks is not null) await callbacks.ConfigureAwait(false);
+            }
         }
 
         private void Complete(HubTaskStatus status, string? error)
@@ -250,11 +294,14 @@ public sealed class HubTaskScheduler : IAsyncDisposable
         private HubTaskSnapshot Update(Func<HubTaskSnapshot, HubTaskSnapshot> update)
         {
             HubTaskSnapshot snapshot;
-            lock (_gate) { snapshot = _snapshot = update(_snapshot); }
+            lock (_gate)
+            {
+                if (_snapshot.FinishedAt.HasValue) return _snapshot;
+                snapshot = _snapshot = update(_snapshot);
+            }
             _changed(snapshot);
             return snapshot;
         }
 
-        public void Dispose() => _cancellation.Dispose();
     }
 }

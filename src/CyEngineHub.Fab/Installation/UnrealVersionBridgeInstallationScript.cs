@@ -18,7 +18,6 @@ public static class UnrealVersionBridgeSettings
     public const string KeepStaging = "plugins.unrealVersionBridge.keepStaging.v1";
     public const string ValidateOutput = "plugins.unrealVersionBridge.validateOutput.v1";
     public const string AssetProfileFile = "plugins.unrealVersionBridge.assetProfileFile.v1";
-    public const string AgentPython = "plugins.unrealVersionBridge.agentPython.v1";
 }
 
 public sealed record UnrealVersionBridgeVariantManifest(
@@ -54,7 +53,7 @@ public sealed class UnrealVersionBridgeInstallationScript(
             LibraryPackageContentKind.CodePlugin, LibraryPackageContentKind.EnginePackage],
         [FabInstallationTargetKind.Project],
         [
-            new("enableAgentFallback", "Assistance IA / MCP si la conversion bloque", "Optionnelle : prépare une copie de réparation et une configuration MCP CyToolsCore. Aucun agent n’est lancé ni fournisseur sélectionné automatiquement ; aucune installation tant que la tâche n’est pas reprise et validée.", FabInstallationOptionKind.Boolean, "false", []),
+            new("enableAgentFallback", "Assistance IA / MCP si la conversion bloque", "Prépare une copie de réparation et une configuration CyMCPSDK. Reprenez et validez la tâche dans CyEngineHub avant l’installation.", FabInstallationOptionKind.Boolean, "false", []),
             new("allowAgentCodeExecution", "Autoriser les scripts et la compilation de l’agent", "Attention : Python, C++, Build.cs et plugins s’exécutent avec les droits de votre compte Windows. Le dossier isolé n’est pas un bac à sable OS. Laissez désactivé pour une analyse en lecture seule.", FabInstallationOptionKind.Boolean, "false", []),
             new("agentWorkspace", "Reprendre une tâche IA (dossier)", "Vide : conversion habituelle. Sinon : dossier de réparation préparé pour ce pack/couple de moteurs. Le hub recompile le plugin et recharge tous les packages avant de publier et d’installer.", FabInstallationOptionKind.Text, string.Empty, []),
             new("conversionMode", "Méthode", "Natif : pixels source, graphes de matériaux et références pris en charge, contrôle C++ obligatoire. Portable : export/import expérimental sur accord explicite.", FabInstallationOptionKind.Choice, "native", ["native", "portable"]),
@@ -140,8 +139,7 @@ public sealed class UnrealVersionBridgeInstallationScript(
                     analyzeOnly,
                     ParseAgentBoolean(context.Configuration, "enableAgentFallback"),
                     ParseAgentBoolean(context.Configuration, "allowAgentCodeExecution"),
-                    context.Configuration.GetValueOrDefault("agentWorkspace"),
-                    await settings.GetAsync(UnrealVersionBridgeSettings.AgentPython, cancellationToken).ConfigureAwait(false)),
+                    context.Configuration.GetValueOrDefault("agentWorkspace")),
                 progress,
                 cancellationToken)
             .ConfigureAwait(false);

@@ -15,7 +15,26 @@ public sealed class TaskLinkViewModel(HubTaskLink link, Action<HubTaskLink> navi
 public sealed partial class MainWindowViewModel
 {
     private readonly Dictionary<string, RemoteFabAsset> _taskProductSnapshots = new(StringComparer.OrdinalIgnoreCase);
-    private int _taskRefreshPending;
+    private readonly HashSet<Guid> _pendingTaskUpdates = [];
+    private readonly Dictionary<Guid, TaskItemViewModel> _taskRows = [];
+
+    private bool ApplyTaskRow(HubTaskSnapshot task)
+    {
+        if (_taskRows.TryGetValue(task.Id, out var row))
+        {
+            var statusChanged = row.TaskStatus != task.Status;
+            row.ApplySnapshot(task);
+            return statusChanged;
+        }
+
+        row = new TaskItemViewModel(task, CancelTask, NavigateTaskLink);
+        _taskRows.Add(task.Id, row);
+        var index = 0;
+        while (index < Tasks.Count && Tasks[index].CreatedAt > task.CreatedAt) index++;
+        Tasks.Insert(index, row);
+        if (Tasks.Count == 1) OnPropertyChanged(nameof(HasNoTasks));
+        return true;
+    }
 
     private HubTaskLink[] ProductTaskLinks(RemoteFabAsset asset,
         IEnumerable<HubTaskLink>? targets = null)

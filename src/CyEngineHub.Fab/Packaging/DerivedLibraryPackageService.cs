@@ -44,7 +44,7 @@ public static class DerivedLibraryPackageService
         Directory.CreateDirectory(destination);
         try
         {
-            progress?.Report(new DirectFabDownloadProgress(null, "Préparation du dérivé…", 0, null));
+            progress?.Report(new DirectFabDownloadProgress(null, "Préparation du dérivé…", 0, null) { Phase = DirectFabDownloadPhase.Packaging });
             await MaterializeAsync(
                     source,
                     destination,
@@ -169,7 +169,7 @@ public static class DerivedLibraryPackageService
                 total == 0 ? 1 : (double)completed / total,
                 "Copie du contenu dérivé…",
                 completed,
-                total));
+                total) { Phase = DirectFabDownloadPhase.Packaging, ProcessedBytes = completed, TotalProcessingBytes = total });
         }
     }
 
@@ -206,7 +206,8 @@ public static class DerivedLibraryPackageService
                 BufferSize, FileOptions.Asynchronous | FileOptions.SequentialScan);
             await source.CopyToAsync(output, BufferSize, cancellationToken).ConfigureAwait(false);
             completed += entry.Length;
-            progress?.Report(new DirectFabDownloadProgress(null, "Extraction du package source…", completed, null));
+            progress?.Report(new DirectFabDownloadProgress(null, "Extraction du package source…", completed, null)
+                { Phase = DirectFabDownloadPhase.Packaging, ProcessedBytes = completed });
         }
     }
 

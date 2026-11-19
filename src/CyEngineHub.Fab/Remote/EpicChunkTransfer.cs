@@ -118,16 +118,21 @@ internal sealed class EpicChunkTransfer(HttpClient httpClient, int parallelism, 
 
     private static async Task ValidateCachedChunkAsync(string path, EpicManifestChunk chunk, SemaphoreSlim gate, CancellationToken token)
     {
-        var size = new FileInfo(path).Length;
-        if (size is < 41 or > MaximumChunkBytes)
-            throw new DirectFabException("Un chunk en cache est incomplet.");
         await gate.WaitAsync(token).ConfigureAwait(false);
-        try
-        {
-            var bytes = await File.ReadAllBytesAsync(path, token).ConfigureAwait(false);
-            _ = EpicManifestParser.ParseChunk(bytes, chunk);
-        }
+        try { _ = await ReadDecodedChunkAsync(path, chunk, token).ConfigureAwait(false); }
         finally { gate.Release(); }
+    }
+
+    internal static async Task<byte[]> ReadDecodedChunkAsync(string path, EpicManifestChunk chunk, CancellationToken token)
+    {
+        RejectReparsePoint(path);
+        await using var input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 128 * 1024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        var size = input.Length;
+        if (size is < 41 or > MaximumChunkBytes) throw new DirectFabException("Un chunk en cache est incomplet.");
+        var bytes = GC.AllocateUninitializedArray<byte>((int)size);
+        await input.ReadExactlyAsync(bytes, token).ConfigureAwait(false);
+        return EpicManifestParser.DecodeChunk(bytes, chunk, token);
     }
     private static bool IsRetryableChunkError(Exception exception) => exception is IOException or DirectFabException or OperationCanceledException ||
         exception is HttpRequestException { StatusCode: null or HttpStatusCode.RequestTimeout or HttpStatusCode.TooManyRequests or >= HttpStatusCode.InternalServerError };

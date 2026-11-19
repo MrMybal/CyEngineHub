@@ -21,9 +21,22 @@ public sealed partial class MainWindowViewModel
 {
     private static readonly JsonSerializerOptions McpConfigurationJson = new() { WriteIndented = true };
     private readonly string _mcpExecutable = Path.Combine(AppContext.BaseDirectory, "Mcp", OperatingSystem.IsWindows() ? "CyEngineHub.Mcp.exe" : "CyEngineHub.Mcp");
+    private readonly string? _mcpPipe = ReadMcpPipeOverride();
     private CancellationTokenSource? _mcpStop;
     private Task? _mcpServer;
     private bool _mcpEnabled;
+    private SdkMcpRegistry? _sdkMcpRegistry;
+    internal SdkMcpRegistry SdkRegistry => _sdkMcpRegistry ??= CreateSdkRegistry();
+
+    private SdkMcpRegistry CreateSdkRegistry()
+    {
+        var operations = new HubMcpSession(new DesktopAiBackend(this));
+        return new(HubMcpSession.Tools(), async (name, args, token) =>
+        {
+            var result = await operations.CallAsync(name, args, token).ConfigureAwait(false);
+            return name is "hub_targets" or "hub_tasks" or "hub_proposals" ? new { items = result } : result;
+        });
+    }
     private bool _aiAutomaticActionRunning;
     private async Task ObserveAiDownloadAsync(AiProposalViewModel item, Task completion,
         List<CyEngineHub.Core.Tasks.HubTaskHandle> handles)
@@ -57,12 +70,24 @@ public sealed partial class MainWindowViewModel
         {
             var command = _mcpExecutable;
             var escaped = JsonSerializer.Serialize(command);
+            string[] args = _mcpPipe is null ? [] : ["--pipe", _mcpPipe];
             return "Codex · ajouter à config.toml :\n[mcp_servers.cyenginehub]\ncommand = " + escaped +
-                "\nargs = []\n\nClaude Desktop · fusionner dans claude_desktop_config.json\nClaude Code · fusionner dans .mcp.json :\n" +
-                JsonSerializer.Serialize(new { mcpServers = new { cyenginehub = new { command, args = Array.Empty<string>() } } }, McpConfigurationJson) +
+                "\nargs = " + JsonSerializer.Serialize(args) + "\n\nClaude Desktop · fusionner dans claude_desktop_config.json\nClaude Code · fusionner dans .mcp.json :\n" +
+                JsonSerializer.Serialize(new { mcpServers = new { cyenginehub = new { command, args } } }, McpConfigurationJson) +
                 "\n\nOpenCode · fusionner dans opencode.json :\n" +
-                JsonSerializer.Serialize(new { mcp = new { cyenginehub = new { type = "local", command = new[] { command }, enabled = true } } }, McpConfigurationJson);
+                JsonSerializer.Serialize(new { mcp = new { cyenginehub = new { type = "local", command = new[] { command }.Concat(args), enabled = true } } }, McpConfigurationJson);
         }
+    }
+
+    private static string? ReadMcpPipeOverride()
+    {
+        var args = Environment.GetCommandLineArgs();
+        var index = Array.IndexOf(args, "--mcp-pipe");
+        if (index < 0) return null;
+        if (index + 1 < args.Length && args[index + 1] is { Length: > 0 and <= 100 } pipe &&
+            pipe.All(character => char.IsAsciiLetterOrDigit(character) || character is '.' or '-' or '_'))
+            return pipe;
+        throw new ArgumentException("--mcp-pipe exige un nom local de 1 à 100 caractères alphanumériques, points, tirets ou soulignés.");
     }
 
     private void InitializeAiCommands()
@@ -81,6 +106,7 @@ public sealed partial class MainWindowViewModel
 
     private async Task LoadAiSettingsAsync()
     {
+        await LoadAssistantSettingsAsync().ConfigureAwait(true);
         var json = await _settings.GetAsync("ai.mcp.options.v1").ConfigureAwait(true);
         if (!string.IsNullOrWhiteSpace(json))
         {
@@ -91,9 +117,10 @@ public sealed partial class MainWindowViewModel
         if (bool.TryParse(await _settings.GetAsync("ai.mcp.enabled.v1").ConfigureAwait(true), out var enabled) && enabled) StartMcp();
     }
 
-    private void StartMcp()
+    private void StartMcp(string? pipeName = null)
     {
         if (_mcpServer is { IsCompleted: false }) throw new InvalidOperationException("Le serveur MCP précédent termine sa fermeture. Réessayez.");
+        var registry = SdkRegistry;
         _mcpStop?.Dispose();
         _mcpStop = new CancellationTokenSource();
         McpEnabled = true;
@@ -101,7 +128,7 @@ public sealed partial class MainWindowViewModel
         var token = _mcpStop.Token;
         _mcpServer = Task.Run(async () =>
         {
-            try { await HubMcpTransport.ServeAsync(new DesktopAiBackend(this), token).ConfigureAwait(false); }
+            try { await HubMcpTransport.ServeAsync(registry, token, pipeName ?? _mcpPipe).ConfigureAwait(false); }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { }
             catch (Exception exception)
             {

@@ -18,9 +18,13 @@ public sealed class GitRepositoryInspector
         _lfsStorageAnalyzer = lfsStorageAnalyzer ?? new GitLfsStorageAnalyzer();
     }
 
-    public async Task<string?> FindRepositoryRootAsync(
+    public Task<string?> FindRepositoryRootAsync(
         string candidatePath,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        FindRepositoryRootAsync(candidatePath, requireRoot: false, cancellationToken);
+
+    internal async Task<string?> FindRepositoryRootAsync(
+        string candidatePath, bool requireRoot, CancellationToken cancellationToken)
     {
         if (!Directory.Exists(candidatePath))
         {
@@ -35,6 +39,7 @@ public sealed class GitRepositoryInspector
                         candidatePath,
                         "rev-parse",
                         "--path-format=absolute",
+                        "--show-prefix",
                         "--show-toplevel"),
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
@@ -53,12 +58,11 @@ public sealed class GitRepositoryInspector
             return null;
         }
 
-        var root = result.CapturedOutput
-            .LastOrDefault(line => line.Channel == ProcessOutputChannel.StandardOutput)
-            ?.Text.Trim();
-        return string.IsNullOrWhiteSpace(root)
-            ? null
-            : Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+        var lines = result.CapturedOutput.Where(line => line.Channel == ProcessOutputChannel.StandardOutput).ToArray();
+        // Git resolves aliases and emits an empty prefix only at the root of this worktree.
+        if (lines.Length != 2 || (requireRoot && lines[0].Text.Length != 0) || string.IsNullOrEmpty(lines[1].Text))
+            return null;
+        return Path.TrimEndingDirectorySeparator(Path.GetFullPath(lines[1].Text));
     }
 
     public async Task<GitRepositorySnapshot> InspectAsync(

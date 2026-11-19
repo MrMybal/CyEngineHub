@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -174,8 +175,12 @@ public static class EpicManifestParser
             files);
     }
 
-    public static byte[] ParseChunk(ReadOnlyMemory<byte> bytes, EpicManifestChunk expected)
+    public static byte[] ParseChunk(ReadOnlyMemory<byte> bytes, EpicManifestChunk expected) =>
+        DecodeChunk(bytes, expected, CancellationToken.None);
+
+    internal static byte[] DecodeChunk(ReadOnlyMemory<byte> bytes, EpicManifestChunk expected, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (bytes.Length < 41 || bytes.Length > 256 * 1024 * 1024)
         {
             throw new DirectFabException($"Le chunk {expected.ChunkId} a une taille invalide.");
@@ -217,23 +222,36 @@ public static class EpicManifestParser
             !(headerVersion == 3 && headerSize == 66 && bytes.Length == expected.DownloadSize + 4))
             throw new DirectFabException($"La taille du chunk {expected.ChunkId} ne correspond pas au manifest.");
         reader.Skip(headerSize - reader.Position);
-        var payload = reader.ReadBytes(reader.Remaining).ToArray();
+        var payload = reader.ReadBytes(reader.Remaining);
         if (!compressed)
         {
-            ValidateChunkSize(expected.ChunkId, payload, uncompressedSize);
-            return payload;
+            var result = payload.ToArray();
+            ValidateChunkSize(expected.ChunkId, result, uncompressedSize);
+            return result;
         }
 
         try
         {
-            using var input = new MemoryStream(payload, writable: false);
+            using var input = MemoryMarshal.TryGetArray(payload, out var segment)
+                ? new MemoryStream(segment.Array!, segment.Offset, segment.Count, writable: false)
+                : new MemoryStream(payload.ToArray(), writable: false);
             using var zlib = new ZLibStream(input, CompressionMode.Decompress);
+            // Most BuildPatch chunks declare a 1 MiB output. Decode straight into its final array.
+            // Unusually large or absent size declarations keep the bounded, grow-as-needed path.
+            if (uncompressedSize is > 0 and <= 8 * 1024 * 1024)
+            {
+                var decoded = GC.AllocateUninitializedArray<byte>((int)uncompressedSize.Value);
+                if (zlib.ReadAtLeast(decoded, decoded.Length, throwOnEndOfStream: false) != decoded.Length || zlib.ReadByte() != -1)
+                    throw new DirectFabException($"La taille décompressée du chunk {expected.ChunkId} est invalide.");
+                return decoded;
+            }
             using var output = new MemoryStream();
             var limit = uncompressedSize is > 0 ? uncompressedSize.Value : 256L * 1024 * 1024;
             var buffer = new byte[64 * 1024];
             int read;
             while ((read = zlib.Read(buffer)) != 0)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (output.Length + read > limit)
                     throw new DirectFabException($"La décompression du chunk {expected.ChunkId} dépasse la taille autorisée.");
                 output.Write(buffer, 0, read);

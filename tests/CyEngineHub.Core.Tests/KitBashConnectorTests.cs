@@ -45,7 +45,15 @@ public sealed class KitBashConnectorTests : IDisposable
         Assert.False(library.PrepareInstallationCommand.CanExecute(null));
         Assert.False(library.ImportDirectoryPathCommand.CanExecute(null));
         library.ImportDirectoryPath = _root;
-        library.ImportDirectoryPathCommand.Execute(null);
+        // The import delegate returns before the command finishes reloading the list and clearing selection.
+        var command = library.ImportDirectoryPathCommand;
+        var finished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        command.CanExecuteChanged += (_, _) =>
+        {
+            if (command.CanExecute(null)) finished.TrySetResult();
+        };
+        command.Execute(null);
+        await finished.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(_root, await imported.Task.WaitAsync(TimeSpan.FromSeconds(5)));
         await library.LoadAsync(file);
         Assert.True(refreshes > 0); Assert.True(library.PrepareInstallationCommand.CanExecute(null));

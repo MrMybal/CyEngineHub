@@ -62,7 +62,10 @@ public sealed class LocalEnginePackageInstallationTests
         var payload = workspace.Write("Source/package/Runtime/data.txt", "avant");
         var provider = new UnityEngineModule();
         var plan = await provider.PreparePackageInstallAsync(source, project);
-        File.WriteAllText(payload, "après confirmation");
+        // Matching timestamp and length force the installer to compare actual content.
+        var timestamp = File.GetLastWriteTimeUtc(payload);
+        File.WriteAllText(payload, "autre");
+        File.SetLastWriteTimeUtc(payload, timestamp);
 
         var exception = await Assert.ThrowsAsync<LocalEnginePackageOperationException>(
             () => provider.InstallPackageAsync(plan));

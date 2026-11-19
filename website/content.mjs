@@ -48,7 +48,7 @@ export const copy = {
     'plugins.item1': 'Project-scoped progress and additive imports: existing assets and plugins are not replaced by the editor client.', 'plugins.item2': 'Engine-specific builds and exact module compatibility; source plugins may need rebuilding.', 'plugins.item3': 'For conversion and advanced chains, review the installation options in the desktop hub.',
     'plugins.link': 'Install and connect the editor client', 'plugins.diagram': 'Connection overview', 'plugins.hub': 'Desktop hub', 'plugins.pipe': 'Same-account local connection', 'plugins.editor': 'Unreal Editor',
     'sdk.kicker': 'Extend the workflow', 'sdk.title': 'Extension contracts, not a promise of automatic repair.',
-    'sdk.body': 'Add hub extensions and source converters through documented contracts. The optional CyToolsCore/MCP companion supports assisted repair with separate code-execution consent and target validation.',
+    'sdk.body': 'Add hub extensions and source converters through documented contracts. The optional CyMCPSDK companion supports assisted repair with separate code-execution consent and target validation.',
     'sdk.link': 'Extensions and SDK', 'sdk.agent': 'AI / MCP permissions and limits',
     'docs.kicker': '06 / Learn without leaving the workflow', 'docs.title': 'The same manual, online or beside the app.',
     'docs.body': 'Explore 25 user chapters in English and French, plus public SDK references. Search, nested navigation, screenshots, in-window enlargement and static SVG workflows travel with the reader.',
@@ -118,7 +118,7 @@ export const copy = {
     'plugins.item1': 'Progression par projet et imports additifs : le client éditeur ne remplace pas les assets ou plugins existants.', 'plugins.item2': 'Builds liés au moteur et compatibilité exacte des modules ; les plugins sources peuvent nécessiter une recompilation.', 'plugins.item3': 'Pour la conversion et les chaînes avancées, vérifiez les options d’installation dans le hub de bureau.',
     'plugins.link': 'Installer et connecter le client éditeur', 'plugins.diagram': 'Vue d’ensemble de la connexion', 'plugins.hub': 'Hub de bureau', 'plugins.pipe': 'Connexion locale du même compte', 'plugins.editor': 'Éditeur Unreal',
     'sdk.kicker': 'Étendre le parcours', 'sdk.title': 'Des contrats d’extension, pas une promesse de réparation automatique.',
-    'sdk.body': 'Ajoutez des extensions du hub et des convertisseurs grâce aux contrats documentés. Le compagnon CyToolsCore/MCP optionnel permet une réparation assistée, avec consentement séparé pour le code et validation dans la cible.',
+    'sdk.body': 'Ajoutez des extensions du hub et des convertisseurs grâce aux contrats documentés. Le compagnon CyMCPSDK optionnel permet une réparation assistée, avec consentement séparé pour le code et validation dans la cible.',
     'sdk.link': 'Extensions et SDK', 'sdk.agent': 'Autorisations et limites IA / MCP',
     'docs.kicker': '06 / Apprendre dans le même parcours', 'docs.title': 'Le même manuel, en ligne ou à côté de l’application.',
     'docs.body': 'Explorez 25 chapitres utilisateur en anglais et français, plus les références SDK publiques. Recherche, navigation hiérarchique, captures, agrandissement dans la fenêtre et schémas SVG accompagnent le lecteur.',
@@ -156,7 +156,7 @@ export const libraryTabs = [
 ];
 export const optionalDestinations = {
   repository: 'https://github.com/MrMybal/CyEngineHub',
-  release: 'https://github.com/MrMybal/CyEngineHub/releases/tag/v2.0.0-alpha.45',
-  installer: 'https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.45/CyEngineHub-2.0.0-alpha.45-Setup-win-x64.exe',
-  archive: 'https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.45/CyEngineHub-2.0.0-alpha.45-win-x64.zip',
+  release: 'https://github.com/MrMybal/CyEngineHub/releases/tag/v2.0.0-alpha.46',
+  installer: 'https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.46/CyEngineHub-2.0.0-alpha.46-Setup-win-x64.exe',
+  archive: 'https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.46/CyEngineHub-2.0.0-alpha.46-win-x64.zip',
 };
