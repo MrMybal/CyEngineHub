@@ -20,10 +20,13 @@ public sealed class AiProposalViewModel(HubAiProposal proposal, string assetName
 public sealed partial class MainWindowViewModel
 {
     private static readonly JsonSerializerOptions McpConfigurationJson = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions McpPreferencesJson = new() { PropertyNameCaseInsensitive = true };
     private readonly string _mcpExecutable = Path.Combine(AppContext.BaseDirectory, "Mcp", OperatingSystem.IsWindows() ? "CyEngineHub.Mcp.exe" : "CyEngineHub.Mcp");
     private readonly string? _mcpPipe = ReadMcpPipeOverride();
     private CancellationTokenSource? _mcpStop;
     private Task? _mcpServer;
+    private SdkMcpHttpServer? _mcpHttp;
+    private bool _changingMcp;
     private bool _mcpEnabled;
     private SdkMcpRegistry? _sdkMcpRegistry;
     internal SdkMcpRegistry SdkRegistry => _sdkMcpRegistry ??= CreateSdkRegistry();
@@ -64,14 +67,21 @@ public sealed partial class MainWindowViewModel
     public ICommand ToggleMcpCommand { get; private set; } = null!;
     public ICommand ApproveAiProposalCommand { get; private set; } = null!;
     public ICommand RejectAiProposalCommand { get; private set; } = null!;
+    public string McpHttpUrl => _mcpHttp is { } server ? $"http://127.0.0.1:{server.Port}/mcp" : "";
+    public string McpAccessToken => _mcpHttp?.Token ?? "";
+    public bool McpHasAccessToken => McpAccessToken.Length != 0;
     public string McpConnectionConfigurations
     {
         get
         {
+            if (!McpEnabled) return "Activez MCP pour afficher les informations de connexion.";
+            var http = "Transport HTTP · " + McpHttpUrl;
+            if (McpHasAccessToken) return http + "\nConfigurez le jeton de cette session comme identifiant Bearer.";
+
             var command = _mcpExecutable;
             var escaped = JsonSerializer.Serialize(command);
             string[] args = _mcpPipe is null ? [] : ["--pipe", _mcpPipe];
-            return "Codex · ajouter à config.toml :\n[mcp_servers.cyenginehub]\ncommand = " + escaped +
+            return http + "\n\nCodex · config.toml (stdio)\n[mcp_servers.cyenginehub]\ncommand = " + escaped +
                 "\nargs = " + JsonSerializer.Serialize(args) + "\n\nClaude Desktop · fusionner dans claude_desktop_config.json\nClaude Code · fusionner dans .mcp.json :\n" +
                 JsonSerializer.Serialize(new { mcpServers = new { cyenginehub = new { command, args } } }, McpConfigurationJson) +
                 "\n\nOpenCode · fusionner dans opencode.json :\n" +
@@ -92,16 +102,29 @@ public sealed partial class MainWindowViewModel
 
     private void InitializeAiCommands()
     {
-        ToggleMcpCommand = new AsyncRelayCommand(async () =>
+        ToggleMcpCommand = new AsyncRelayCommand(() => ChangeMcpAsync(async () =>
         {
-            if (McpEnabled) StopMcp(); else StartMcp();
+            if (McpEnabled)
+            {
+                StopMcp();
+                if (_mcpServer is { } server) await server.ConfigureAwait(true);
+            }
+            else StartMcp();
             await _settings.SetAsync("ai.mcp.enabled.v1", McpEnabled.ToString()).ConfigureAwait(true);
-        }, onError: ShowError);
+        }), onError: ShowError);
         ApproveAiProposalCommand = new AsyncRelayCommand(ApproveAiProposalAsync, onError: ShowError);
         RejectAiProposalCommand = new RelayCommand(() =>
         {
             if (SelectedAiProposal is { Status: "En attente" } item) item.Status = "Refusée";
         });
+    }
+
+    private async Task ChangeMcpAsync(Func<Task> change)
+    {
+        if (_changingMcp) throw new InvalidOperationException("Un changement MCP est déjà en cours.");
+        _changingMcp = true;
+        try { await change().ConfigureAwait(true); }
+        finally { _changingMcp = false; }
     }
 
     private async Task LoadAiSettingsAsync()
@@ -110,21 +133,43 @@ public sealed partial class MainWindowViewModel
         var json = await _settings.GetAsync("ai.mcp.options.v1").ConfigureAwait(true);
         if (!string.IsNullOrWhiteSpace(json))
         {
-            try { ApplyMcpOptions(JsonSerializer.Deserialize<HubMcpOptions>(json) ?? new()); }
+            try { ApplyMcpOptions(JsonSerializer.Deserialize<HubMcpOptions>(json, McpPreferencesJson) ?? new()); }
             catch (Exception exception) when (exception is JsonException or ArgumentException)
-            { McpOptionsStatus = "Options illisibles : validations conservées par sécurité. " + exception.Message; }
+            {
+                ApplyMcpOptions(new() { AccessProfile = HubMcpAccessProfile.Protected });
+                McpOptionsStatus = "Options MCP illisibles · vérifiez le profil et enregistrez les options. " + exception.Message;
+                return;
+            }
         }
-        if (bool.TryParse(await _settings.GetAsync("ai.mcp.enabled.v1").ConfigureAwait(true), out var enabled) && enabled) StartMcp();
+        if (bool.TryParse(await _settings.GetAsync("ai.mcp.enabled.v1").ConfigureAwait(true), out var enabled) && enabled)
+        {
+            try { StartMcp(); }
+            catch (InvalidOperationException) { /* StartMcp has already reported the bind failure. */ }
+        }
     }
 
     private void StartMcp(string? pipeName = null)
     {
+        if (_assistantStopping || McpEnabled) return;
         if (_mcpServer is { IsCompleted: false }) throw new InvalidOperationException("Le serveur MCP précédent termine sa fermeture. Réessayez.");
-        var registry = SdkRegistry;
-        _mcpStop?.Dispose();
-        _mcpStop = new CancellationTokenSource();
+        SdkMcpRegistry registry;
+        try
+        {
+            registry = SdkRegistry;
+            _mcpHttp = new SdkMcpHttpServer(registry, _mcpOptions);
+        }
+        catch (InvalidOperationException exception)
+        {
+            McpStatus = $"MCP indisponible · port {_mcpOptions.LocalPort} · {exception.Message}";
+            throw;
+        }
         McpEnabled = true;
-        McpStatus = "Actif · local, compte Windows courant · permissions selon les options enregistrées";
+        NotifyMcpConnectionChanged();
+        McpStatus = $"Actif · {McpProfileName(_mcpOptions.AccessProfile)} · {McpHttpUrl}";
+        _mcpServer = null;
+        // Token profiles expose only HTTP. The legacy same-account pipe has no Bearer exchange.
+        if (_mcpOptions.RequiresToken) return;
+        _mcpStop = new CancellationTokenSource();
         var token = _mcpStop.Token;
         _mcpServer = Task.Run(async () =>
         {
@@ -132,7 +177,10 @@ public sealed partial class MainWindowViewModel
             catch (OperationCanceledException) when (token.IsCancellationRequested) { }
             catch (Exception exception)
             {
-                Dispatcher.UIThread.Post(() => { McpEnabled = false; McpStatus = "MCP arrêté : " + exception.Message; });
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (!token.IsCancellationRequested) McpStatus = "MCP HTTP actif · proxy stdio indisponible · " + exception.Message;
+                });
             }
         }, token);
     }
@@ -140,12 +188,37 @@ public sealed partial class MainWindowViewModel
     public void StopMcp()
     {
         McpEnabled = false;
+        var http = _mcpHttp;
+        _mcpHttp = null;
+        NotifyMcpConnectionChanged();
         var stop = _mcpStop;
         _mcpStop = null;
         stop?.Cancel();
-        if (stop is not null) _ = DisposeMcpCancellationAsync(_mcpServer, stop);
+        if (http is not null)
+        {
+            var pipe = _mcpServer;
+            // HTTP workers may still be unwinding an operation dispatched to the UI thread.
+            _mcpServer = Task.Run(async () =>
+            {
+                try
+                {
+                    http.Dispose();
+                    if (pipe is not null) await pipe.ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) { }
+                finally { stop?.Dispose(); }
+            });
+        }
         McpStatus = "Désactivé · connexions coupées";
         foreach (var item in AiProposals.Where(item => item.Status == "En attente")) item.Status = "Révoquée";
+    }
+
+    private void NotifyMcpConnectionChanged()
+    {
+        OnPropertyChanged(nameof(McpHttpUrl));
+        OnPropertyChanged(nameof(McpAccessToken));
+        OnPropertyChanged(nameof(McpHasAccessToken));
+        OnPropertyChanged(nameof(McpConnectionConfigurations));
     }
 
     private static async Task DisposeMcpCancellationAsync(Task? server, CancellationTokenSource stop)
@@ -368,7 +441,7 @@ public sealed partial class MainWindowViewModel
                     if (!owner.IsMarketplaceAvailable(proposal.Source)) throw new InvalidOperationException("Marketplace désactivée.");
                     if (IsFabWebAsset(asset))
                     {
-                        item.Status = "En attente";
+                        item.Status = "Téléchargement à effectuer sur Fab";
                         return new { proposal.Id, status = "requires_browser", productUrl = asset.ListingUri?.AbsoluteUri };
                     }
                     var version = asset.ProjectVersions.FirstOrDefault(value => value.ArtifactId == proposal.VariantId)
@@ -400,7 +473,6 @@ public sealed partial class MainWindowViewModel
                     catch { item.Status = "Erreur · consulter les tâches avant de réessayer"; throw; }
                     finally { owner._aiAutomaticActionRunning = false; }
                 }
-                owner.McpStatus = $"Actif · {owner.AiProposals.Count(value => value.Status == "En attente")} proposition(s) à valider";
                 owner.StatusMessage = "Nouvelle proposition IA · Paramètres > IA / MCP";
                 return new { proposal.Id, status = "pending_human_approval", review = "CyEngineHub > Paramètres > IA / MCP. No files changed, nothing downloaded/installed." };
             });

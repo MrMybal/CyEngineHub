@@ -13,8 +13,8 @@
     </td>
     <td width="300" align="right" valign="top">
       <p><sub>Licence de l’application</sub><br><a href="LICENSE"><strong>GPL-3.0-only</strong></a></p>
-      <p><sub>Version</sub><br><a href="docs/releases/v2.0.0-alpha.46.md"><strong>2.0.0-alpha.46</strong></a><br><strong>ALPHA</strong></p>
-      <p><a href="https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.46/CyEngineHub-2.0.0-alpha.46-Setup-win-x64.exe"><strong>Télécharger</strong></a><br><sub>Windows 10/11 x64</sub></p>
+      <p><sub>Version</sub><br><a href="docs/releases/v2.0.0-alpha.47.md"><strong>2.0.0-alpha.47</strong></a><br><strong>ALPHA</strong></p>
+      <p><a href="https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.47/CyEngineHub-2.0.0-alpha.47-Setup-win-x64.exe"><strong>Télécharger</strong></a><br><sub>Windows 10/11 x64</sub></p>
     </td>
   </tr>
 </table>
@@ -23,13 +23,13 @@
 
 Un hub de développement local pour gérer moteurs de jeu, projets et bibliothèques d’assets sous Windows. Unreal Engine bénéficie de l’intégration la plus poussée ; Unity, Godot et CRYENGINE disposent aussi de providers locaux. Organisez vos installations, préparez vos projets et installez les assets auxquels vous avez droit depuis une seule application.
 
-> **ALPHA · 2.0.0-alpha.46**
+> **ALPHA · 2.0.0-alpha.47**
 >
-> Une version expérimentale destinée aux essais et aux retours : certaines intégrations et conversions restent incomplètes. Cette version intègre l’assistant et le CLI CyMCPSDK, accélère la reconstruction Fab et protège les packages lors des déplacements. Sauvegardez les projets avant installation, déplacement ou conversion. Consultez les [notes de version et limites connues](docs/releases/v2.0.0-alpha.46.md).
+> Cette version expérimentale ajoute quatre profils MCP locaux avec CyMCPSDK 0.7.1. Une fois MCP activé, Free se connecte sur la boucle locale avec l’adresse seule et exécute directement les opérations exposées. Protégé exige un jeton Bearer et applique les permissions du hub. [Notes de version et profils d’accès](docs/releases/v2.0.0-alpha.47.md)
 
 [![Catalogue des moteurs CyEngineHub avec trois installations Unreal fictives](docs/screenshots/engines.png)](docs/screenshots/engines.png)
 
-Les captures sont de véritables images non retouchées de la build de développement alpha.41, avec des données de démonstration fictives et aucun compte connecté. Elles peuvent différer de l’alpha.46. Cliquez sur une image pour l’afficher en taille réelle.
+Les captures sont de véritables images non retouchées de la build de développement alpha.41, avec des données de démonstration fictives et aucun compte connecté. Elles peuvent différer de l’alpha.47. Cliquez sur une image pour l’afficher en taille réelle.
 
 <a id="interface-officielle-v2"></a>
 
@@ -55,7 +55,7 @@ Inspectez une variante téléchargée, sélectionnez une méthode d’installati
 - **Projets** : création Blueprint/C++, profils éditables, packs de fonctionnalités, modèles de plugins, presets de build/packaging, journaux et diagnostic des prérequis.
 - **Bibliothèques** : recherche, filtres, collections et groupes de packs ; compression par marketplace, quotas, bibliothèques ordonnées et emplacements séparés pour cache/téléchargements. Une installation de version locale peut réutiliser un package exploitable déjà présent.
 - **Conversions** : chaînes de scripts configurables, dérivés locaux, extensions de conversion des sources et conversion expérimentale entre versions Unreal. La réparation optionnelle par agent CyMCPSDK exige un consentement distinct pour l’exécution de code.
-- **Assistant et MCP.** Dans Paramètres → IA / MCP, utilisez le chat intégré, un client MCP externe ou le CLI JSON pour piloter les mêmes opérations du hub. [Configuration, commandes et autorisations](docs/ai-mcp.md)
+- **Assistant et MCP.** Dans Paramètres → IA / MCP, pilotez les mêmes opérations avec le chat, le CLI JSON ou un client HTTP local. En Free, l’adresse suffit. [Configuration, commandes et autorisations](docs/ai-mcp.md)
 - **Client éditeur Unreal** : un plugin Alpha optionnel, installé séparément, propose recherche dans la bibliothèque possédée, installation additive dans le projet ouvert et progression des tâches. Les ZIP précompilés sont des [fichiers de release séparés](https://github.com/MrMybal/CyEngineHub/releases/tag/v2.0.0-alpha.45) ; une compatibilité exacte avec le build moteur est nécessaire.
 - **Documentation intégrée** : Aide / F1 ouvre le même [lecteur HTML CyDoc](https://mrmybal.github.io/CyEngineHub/Documentation.html#/fr/welcome) que le site public : 25 chapitres utilisateur en anglais et français, références SDK publiques, recherche, images, galerie et schémas SVG.
 
@@ -75,11 +75,11 @@ L’accès aux marketplaces nécessite votre compte et vos droits sur les assets
 
 Les builds publiés ciblent **Windows 10/11 x64**. Le runtime .NET est inclus ; le SDK .NET sert uniquement à compiler les sources. L’hébergement du navigateur et de l’aide intégrés sous Windows utilise le runtime WebView2 de Microsoft, installé séparément. Les exécutables Alpha ne sont pas signés avec Authenticode : Windows peut afficher un avertissement.
 
-1. [Téléchargez l’installateur Windows alpha.46](https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.46/CyEngineHub-2.0.0-alpha.46-Setup-win-x64.exe), ou choisissez le [ZIP autonome](https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.46/CyEngineHub-2.0.0-alpha.46-win-x64.zip).
+1. [Téléchargez l’installateur Windows alpha.47](https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.47/CyEngineHub-2.0.0-alpha.47-Setup-win-x64.exe), ou choisissez le [ZIP autonome](https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.47/CyEngineHub-2.0.0-alpha.47-win-x64.zip).
 2. Lancez l’installateur par utilisateur, sans droits administrateur. Pour le ZIP, extrayez **tous** les fichiers ensemble avant de lancer `CyEngineHub.Desktop.exe`.
 3. Ouvrez l’application, vérifiez les moteurs/projets détectés et configurez les connexions et dossiers de bibliothèque nécessaires. L’ajout d’un compte marketplace reste optionnel.
 
-Les [fichiers et empreintes de la release](https://github.com/MrMybal/CyEngineHub/releases/tag/v2.0.0-alpha.46) comprennent `SHA256SUMS.txt`. Le plugin éditeur est une installation optionnelle distincte ; suivez son [guide d’installation et de compatibilité](docs/unreal-editor-plugin.md).
+Les [fichiers et empreintes de la release](https://github.com/MrMybal/CyEngineHub/releases/tag/v2.0.0-alpha.47) comprennent `SHA256SUMS.txt`. Le plugin éditeur est une installation optionnelle distincte ; suivez son [guide d’installation et de compatibilité](docs/unreal-editor-plugin.md).
 
 Le manuel complet est livré dans `Documentation/` : ouvrez directement `Documentation/Documentation.html` avec ses ressources `DocData/`, ou utilisez Aide / F1. La lecture fonctionne en `file://`, sans serveur web, CDN ni compte. L’anglais est la langue par défaut ; le français est complet et sa sélection est indépendante de l’interface applicative partiellement traduite.
 
@@ -152,7 +152,7 @@ Le code propre à CyEngineHub, les scripts intégrés et sa documentation sont s
 | [Runtime .NET 8](https://github.com/dotnet/runtime) | [MIT et notices des composants](https://github.com/dotnet/runtime/blob/main/LICENSE.TXT) | Runtime inclus dans la distribution Windows. |
 | [CyDoc 0.1.0](https://github.com/MrMybal/CyDoc) | [MIT](https://github.com/MrMybal/CyDoc/blob/6ddf9a582defb2f11fbb3f992afef6f98dcadc93/LICENSE) | Lecteur hors ligne avec modules image/gallery ; licence complète dans `Documentation/DocData/`. |
 | [egs-api-rs](https://github.com/AchetaGames/egs-api-rs) | [MIT](THIRD_PARTY_NOTICES.md#egs-api-rs) | Code adapté pour les manifests/chunks Epic et la compatibilité Fab. |
-| [CyMCPSDK 0.7.0](https://github.com/MrMybal/CyMCPSDK) | MIT | Chat intégré, outils MCP et tâches de réparation. |
+| [CyMCPSDK 0.7.1](https://github.com/MrMybal/CyMCPSDK) | MIT | Chat intégré, outils MCP et tâches de réparation. |
 
 ### Génération documentaire et tests
 
@@ -170,7 +170,7 @@ Ces tableaux indexent les composants principaux ; ils ne constituent ni les noti
 
 - [Documentation française](https://mrmybal.github.io/CyEngineHub/Documentation.html#/fr/welcome) · [Documentation anglaise](https://mrmybal.github.io/CyEngineHub/Documentation.html#/en/welcome) — le véritable lecteur HTML, également livré hors ligne.
 - [Dépôt des sources](https://github.com/MrMybal/CyEngineHub) · [Releases](https://github.com/MrMybal/CyEngineHub/releases) · [Suivi des problèmes](https://github.com/MrMybal/CyEngineHub/issues).
-- [Notes alpha.46](docs/releases/v2.0.0-alpha.46.md) · [Périmètre des licences](LICENSING.md).
+- [Notes alpha.47](docs/releases/v2.0.0-alpha.47.md) · [Périmètre des licences](LICENSING.md).
 - Références développeur : [architecture](docs/architecture.md), [SDK d’extensions](docs/extensions.md), [convertisseurs de sources](docs/source-converters.md), [configuration MCP optionnelle](extensions/builtin/cyenginehub.unreal-version-bridge/mcp/README.md).
 
 <a id="optional-megascans-catalog-access"></a>

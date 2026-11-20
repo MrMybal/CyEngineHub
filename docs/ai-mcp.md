@@ -1,6 +1,6 @@
 # Assistant CyEngineHub et MCP
 
-CyEngineHub passe de **CyMCPSDK 0.5.6** (`70105709d7e0574a3e8b3b240e8134790a9e243b`) à **0.7.0 en développement** (`ced8296b555c1969cb29740eba65beaa0687da7d`). Le script privilégie un dépôt `CyMCPSDK` voisin de CyEngineHub et en prend un instantané Git. Pour utiliser une autre copie locale contenant cette révision, renseignez `CYHUB_CYMCP_SOURCE` ou `-CyMcpSource`. En l’absence de copie locale, le script récupère la révision épinglée depuis le dépôt public.
+CyEngineHub utilise **CyMCPSDK 0.7.1** à la révision `34d4bcae126bc83d1a2925b5047dac36e3d09d92`. Le script privilégie un dépôt `CyMCPSDK` voisin de CyEngineHub et en prend un instantané Git. Pour une autre copie locale contenant cette révision, renseignez `CYHUB_CYMCP_SOURCE` ou `-CyMcpSource`. En l’absence de copie locale, le script récupère la révision épinglée depuis le dépôt public.
 
 ```powershell
 pwsh -NoProfile -File tools/ui/build-cyui-native.ps1 -CyMcpSource '../CyMCPSDK'
@@ -27,7 +27,18 @@ Activez MCP pour que le chat et les clients externes puissent appeler les foncti
 
 ## Client MCP externe
 
-Activez MCP dans **Paramètres → IA / MCP** et gardez CyEngineHub ouvert. Fusionnez le bloc généré par cette page dans la configuration de votre client. Le bloc contient le chemin réel de `Mcp/CyEngineHub.Mcp.exe`. Par exemple dans `config.toml` de Codex
+Activez MCP dans **Paramètres → IA / MCP** et gardez CyEngineHub ouvert. Dans un client Streamable HTTP, utilisez l’adresse affichée, par défaut `http://127.0.0.1:47842/mcp`. Le port `0` demande à Windows d’attribuer un port libre. Le serveur écoute sur `127.0.0.1`.
+
+| Profil | Connexion HTTP | Opérations exposées |
+| --- | --- | --- |
+| Free (par défaut) | Adresse seule | Exécution directe, avec validation des arguments |
+| Local contrôlé | Adresse seule | Permissions et confirmations du hub |
+| Jeton seul | Adresse et jeton Bearer | Exécution directe, avec validation des arguments |
+| Protégé | Adresse et jeton Bearer | Permissions et confirmations du hub |
+
+Les anciens réglages sans profil utilisent Free et conservent leurs limites. Chaque profil déjà enregistré est conservé. Tout processus local peut se connecter aux profils sans jeton. Pour Jeton seul et Protégé, copiez le jeton affiché dans le client HTTP. Le hub génère un nouveau jeton à chaque démarrage du serveur. Un changement de profil ou de port enregistré redémarre la connexion active.
+
+Free et Local contrôlé acceptent aussi les anciens clients stdio. Fusionnez le bloc généré avec la configuration utilisée par votre client. Le bloc contient le chemin réel de `Mcp/CyEngineHub.Mcp.exe`. Exemple de bloc Codex dans `config.toml`
 
 ```toml
 [mcp_servers.cyenginehub]
@@ -35,11 +46,11 @@ command = 'C:\Program Files\CyEngineHub\Mcp\CyEngineHub.Mcp.exe'
 args = []
 ```
 
-Les blocs Claude Desktop, Claude Code et OpenCode sont également disponibles dans cette page. Le proxy stdio relaie vers un pipe nommé limité au même compte système. Le registre CyMCPSDK de l’application valide les schémas et appelle le même code métier que le chat.
+Les blocs Claude Desktop, Claude Code et OpenCode sont également disponibles dans cette page. Le proxy stdio relaie vers un pipe nommé limité au même compte système. Jeton seul et Protégé utilisent le transport HTTP avec Bearer. Le chat intégré appelle directement le même registre et applique les permissions du profil sélectionné.
 
 ## Commandes CLI
 
-Sans verbe, les exécutables conservent leur transport MCP stdio et leurs anciennes options. Avec un verbe, la sortie standard contient un seul résultat JSON.
+Sans verbe, les exécutables conservent leur transport MCP stdio et leurs anciennes options. Avec un verbe, la sortie standard contient un seul résultat JSON. Le CLI du hub accepte aussi `--url` avant le verbe. Pour Jeton seul ou Protégé, placez le jeton de la session dans une variable d’environnement et indiquez son nom avec `--token-env`.
 
 ```powershell
 & .\Mcp\CyEngineHub.Mcp.exe --help
@@ -47,6 +58,8 @@ Sans verbe, les exécutables conservent leur transport MCP stdio et leurs ancien
 & .\Mcp\CyEngineHub.Mcp.exe describe hub_targets
 & .\Mcp\CyEngineHub.Mcp.exe call hub_targets
 & .\Mcp\CyEngineHub.Mcp.exe call hub_propose --json-file .\proposition.json
+& .\Mcp\CyEngineHub.Mcp.exe --url http://127.0.0.1:47842/mcp call hub_targets
+& .\Mcp\CyEngineHub.Mcp.exe --url http://127.0.0.1:47842/mcp --token-env CYHUB_MCP_TOKEN list
 ```
 
 Les opérations du hub utilisent l’instance ouverte avec MCP activé. Pour cibler un profil isolé, lancez son application avec `--mcp-pipe CyEngineHub.ProfilQA` et placez `--pipe CyEngineHub.ProfilQA` avant le verbe côté CLI. Les blocs de connexion de cette instance incluent ce même nom.
@@ -76,15 +89,15 @@ Les inspections et recherches conservent la pagination et les limites du hub. Le
 | `hub_pack_files` | Rechercher les noms dans un dossier ou une archive enregistrés, sans extraction. |
 | `hub_targets` | Lister projets et moteurs connus. |
 | `hub_tasks` | Suivre les tâches, statuts et progressions. |
-| `hub_options` | Lire les limites et les permissions enregistrées. |
+| `hub_options` | Lire le profil, les limites et les permissions effectives. |
 | `hub_download_plan` | Estimer un transfert depuis les manifests disponibles. |
-| `hub_download_batch` | Proposer ou mettre en file un lot selon les permissions enregistrées. |
+| `hub_download_batch` | Proposer ou mettre en file un lot selon le profil et ses permissions. |
 | `hub_propose` | Proposer un classement, un téléchargement ou une installation pour une fiche connue. |
 | `hub_proposals` | Lire l’état des propositions et les identifiants de tâches associés. |
 
 Pour les outils de liste `hub_targets`, `hub_tasks` et `hub_proposals`, le contenu structuré contient `items`. La réponse textuelle conserve le tableau utilisé par les clients existants.
 
-Les options de classement, de téléchargement et d’installation automatiques sont indépendantes et désactivées par défaut. Les opérations nécessitant une approbation apparaissent dans la page IA / MCP. Les confirmations existantes s’appliquent, et le hub vérifie encore les marketplaces activées, les variantes et les cibles. Désactiver MCP révoque les propositions en attente et laisse les tâches déjà confirmées suivre leur cycle normal.
+Dans Local contrôlé et Protégé, les permissions automatiques de classement, de téléchargement et d’installation sont indépendantes. Les opérations qui exigent une approbation apparaissent dans la page IA / MCP. Tous les profils vérifient les marketplaces activées, les variantes et les cibles. Les téléchargements réservés à Fab suivent le parcours du site. Désactiver MCP révoque les propositions en attente et laisse les tâches déjà engagées suivre leur cycle normal.
 
 | Fonctions en dehors du registre général | Motif |
 | --- | --- |

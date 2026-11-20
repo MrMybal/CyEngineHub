@@ -5,11 +5,20 @@ description: Connect an AI client, review permissions and follow assisted operat
 section: Plugins and automation
 parent: extensions-sdk
 order: 19
-revision: 4
+revision: 5
 ---
 # AI, MCP and assisted conversion {#ai-mcp-and-assisted-conversion}
 
-MCP is optional and disabled until you enable it in Settings → AI / MCP. Keep the hub running. Copy the configuration displayed for your chosen client and merge it into that client's existing settings; do not overwrite unrelated servers or send tokens through chat. The local stdio proxy communicates with the hub through a same-account named pipe.
+Enable MCP in **Settings → AI / MCP** and keep the hub running. For a Streamable HTTP client, use the displayed URL, which defaults to `http://127.0.0.1:47842/mcp`. Port 0 selects a free port. Existing stdio clients use a same-account named pipe with Free and Local controlled.
+
+| Profile | HTTP connection | Operation authorization |
+| --- | --- | --- |
+| Free | URL only | Direct execution |
+| Local controlled | URL only | Hub permissions |
+| Token only | URL and Bearer token | Direct execution |
+| Protected | URL and Bearer token | Hub permissions |
+
+Free applies when no profile has been saved. Any local process can connect to a tokenless profile using its URL. The UI displays the token for Token only and Protected. Each server start generates a new token.
 
 The **CyEngineHub Assistant** on the same page provides streaming, cancellation, conversation history and attachments. Choose Ollama for a local tool-capable model or OpenAI, Anthropic or OpenRouter with the matching environment key. Enable MCP to let chat use the hub's business operations. To connect an external MCP HTTP server, enter its endpoint and the exact tool names you allow.
 
@@ -27,7 +36,7 @@ hub_download_batch returns per-item task IDs, approval requirements, browser req
 
 ## Permissions and agent repair {#permissions-and-agent-repair}
 
-Categorize, download and install without validation are independent user permissions, off by default. Inspect and save them in the UI; MCP cannot enable its own permissions. Otherwise review proposals and confirm/refuse them. Client-side approvals remain separate. Disabling MCP prevents new requests but does not cancel work already confirmed/queued.
+In Local controlled and Protected, set separate permissions for categorizing, downloading and installing. Actions that need approval appear as proposals to review. Every profile validates arguments and targets. Client-side approvals remain separate. Work already started continues when you disable MCP.
 
 Version Bridge agent repair is a separate optional code-execution workflow. It uses an isolated workspace and must validate the produced content in the target engine. Installing an SDK is not automatic model access, nor a guarantee that an agent can repair every Blueprint or plugin. External tools run with user privileges.
 

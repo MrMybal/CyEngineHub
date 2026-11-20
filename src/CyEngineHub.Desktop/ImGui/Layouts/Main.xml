@@ -3601,59 +3601,79 @@
                     </Border>
                   </StackPanel>
                   <StackPanel IsVisible="{Binding IsSettingsAiSelected}">
-                    <AssistantSettingsPanel />
                     <Border Classes="card">
                       <StackPanel>
                         <TextBlock Text="OPTIONS MCP · AUTONOMIE ET LIMITES" />
-                        <TextBlock Text="Sans validation : le client connecté peut lancer des téléchargements et modifier les projets via leurs scripts d’installation. Activez uniquement les actions souhaitées puis enregistrez. Les validations propres à Fab et au client IA restent indépendantes." TextWrapping="Wrap" Foreground="#D9A55C" />
-                        <CheckBox Content="Catégoriser sans validation" IsChecked="{Binding McpAutoCategorize}" />
-                        <CheckBox Content="Télécharger sans validation" IsChecked="{Binding McpAutoDownload}" />
-                        <CheckBox Content="Installer sans validation (scripts configurés inclus)" IsChecked="{Binding McpAutoInstall}" />
+                        <TextBlock Text="{Binding McpStatus}" Foreground="#55C7A6" TextWrapping="Wrap" />
+                        <Button Content="Activer / désactiver MCP" Command="{Binding ToggleMcpCommand}" />
                         <Grid ColumnDefinitions="*,180">
-                          <TextBlock Text="Résultats par défaut (0 = illimité)" />
-                          <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpDefaultPageSize}" />
+                          <TextBlock Text="Profil d’accès local" />
+                          <ComboBox Grid.Column="1" ItemsSource="{Binding McpAccessProfiles}" SelectedItem="{Binding McpSelectedAccessProfile}" />
                         </Grid>
                         <Grid ColumnDefinitions="*,180">
-                          <TextBlock Text="Maximum de résultats par requête (0 = illimité)" />
-                          <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpMaximumPageSize}" />
+                          <TextBlock Text="Port HTTP local (0 = automatique)" />
+                          <NumericUpDown Grid.Column="1" Minimum="0" Maximum="65535" FormatString="0" Value="{Binding McpLocalPort}" />
                         </Grid>
-                        <Grid ColumnDefinitions="*,180">
-                          <TextBlock Text="Longueur des descriptions de recherche (0 = illimité)" />
-                          <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpDescriptionLength}" />
-                        </Grid>
-                        <Grid ColumnDefinitions="*,180">
-                          <TextBlock Text="Fichiers inspectés par requête (0 = illimité)" />
-                          <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpScanLimit}" />
-                        </Grid>
-                        <Grid ColumnDefinitions="*,180">
-                          <TextBlock Text="Chemins de versions inspectés (0 = illimité)" />
-                          <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpRegisteredPathsLimit}" />
-                        </Grid>
-                        <Grid ColumnDefinitions="*,180">
-                          <TextBlock Text="Tâches retournées (0 = illimité)" />
-                          <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpTaskHistoryLimit}" />
-                        </Grid>
-                        <Grid ColumnDefinitions="*,180">
-                          <TextBlock Text="Propositions en attente (0 = illimité)" />
-                          <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpPendingProposalLimit}" />
-                        </Grid>
-                        <Grid ColumnDefinitions="*,180">
-                          <TextBlock Text="Historique des propositions terminées (0 = illimité)" />
-                          <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpProposalHistoryLimit}" />
-                        </Grid>
-                        <TextBlock Text="Illimité peut produire de très grosses réponses et consommer beaucoup de mémoire. La protection des archives, des identifiants et des chemins reste active." TextWrapping="Wrap" FontSize="11" />
+                        <TextBlock Text="Free donne accès à tous les outils depuis cette machine avec l’adresse seule. Local contrôlé applique les permissions ci-dessous. Jeton seul exige un jeton. Protégé combine le jeton et les permissions." TextWrapping="Wrap" />
+                        <StackPanel IsVisible="{Binding McpEditsControlledOperations}">
+                          <CheckBox Content="Catégoriser sans validation" IsChecked="{Binding McpAutoCategorize}" />
+                          <CheckBox Content="Télécharger sans validation" IsChecked="{Binding McpAutoDownload}" />
+                          <CheckBox Content="Installer sans validation (scripts configurés inclus)" IsChecked="{Binding McpAutoInstall}" />
+                        </StackPanel>
+                        <Expander Header="Limites des requêtes et de l’historique">
+                          <StackPanel>
+                            <Grid ColumnDefinitions="*,180">
+                              <TextBlock Text="Résultats par défaut (0 = illimité)" />
+                              <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpDefaultPageSize}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,180">
+                              <TextBlock Text="Maximum de résultats par requête (0 = illimité)" />
+                              <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpMaximumPageSize}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,180">
+                              <TextBlock Text="Longueur des descriptions de recherche (0 = illimité)" />
+                              <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpDescriptionLength}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,180">
+                              <TextBlock Text="Fichiers inspectés par requête (0 = illimité)" />
+                              <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpScanLimit}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,180">
+                              <TextBlock Text="Chemins de versions inspectés (0 = illimité)" />
+                              <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpRegisteredPathsLimit}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,180">
+                              <TextBlock Text="Tâches retournées (0 = illimité)" />
+                              <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpTaskHistoryLimit}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,180">
+                              <TextBlock Text="Propositions en attente (0 = illimité)" />
+                              <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpPendingProposalLimit}" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,180">
+                              <TextBlock Text="Historique des propositions terminées (0 = illimité)" />
+                              <NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpProposalHistoryLimit}" />
+                            </Grid>
+                            <TextBlock Text="Illimité peut produire de très grosses réponses et consommer beaucoup de mémoire." TextWrapping="Wrap" FontSize="11" />
+                          </StackPanel>
+                        </Expander>
                         <TextBlock Text="{Binding McpOptionsStatus}" TextWrapping="Wrap" />
                         <Button Content="Enregistrer les options MCP" Command="{Binding SaveMcpOptionsCommand}" />
                       </StackPanel>
                     </Border>
                     <Border Classes="card">
+                      <Expander Header="Connexion des clients">
                       <StackPanel>
-                        <TextBlock Text="ASSISTANTS IA · MCP LOCAL" FontSize="18" />
-                        <TextBlock Text="Connectez votre client Codex, Claude ou OpenCode au hub. Recherche dans les packs possédés, fichiers locaux, collections et propositions d’installation. Aucun achat, aucun accès aux mots de passe, aucune commande système libre." TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding McpStatus}" Foreground="#55C7A6" TextWrapping="Wrap" />
-                        <TextBlock Text="L’activation autorise le client IA connecté à consulter les métadonnées et noms de fichiers de vos packs. Ces données peuvent être transmises au fournisseur de votre client. Les changements exigent votre validation sauf pour les actions explicitement autorisées dans les options MCP enregistrées. Fermer le hub coupe la connexion ; le mode tray la conserve." TextWrapping="Wrap" Foreground="#8294A8" FontSize="12" />
+                        <TextBlock Text="Utilisez l’adresse affichée dans votre client MCP HTTP. Pour un client stdio, fusionnez le bloc correspondant dans sa configuration." TextWrapping="Wrap" FontSize="12" />
+                        <TextBox Text="{Binding McpConnectionConfigurations}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100" MaxHeight="260" />
+                        <StackPanel IsVisible="{Binding McpHasAccessToken}">
+                          <TextBlock Text="Jeton de la session locale" />
+                          <TextBox Text="{Binding McpAccessToken}" IsReadOnly="True" />
+                        </StackPanel>
                       </StackPanel>
+                      </Expander>
                     </Border>
+                    <AssistantSettingsPanel />
                     <Border Classes="card">
                       <StackPanel>
                         <TextBlock Text="PROPOSITIONS ET ACTIONS MCP" />
@@ -3673,13 +3693,6 @@
                           <Button Content="Valider / préparer" Command="{Binding ApproveAiProposalCommand}" />
                           <Button Content="Refuser" Command="{Binding RejectAiProposalCommand}" />
                         </StackPanel>
-                      </StackPanel>
-                    </Border>
-                    <Border Classes="card">
-                      <StackPanel>
-                        <TextBlock Text="CONNEXION DES CLIENTS" />
-                        <TextBlock Text="Fusionnez uniquement le bloc de votre client dans sa configuration existante, puis reconnectez le serveur MCP. Ne remplacez pas vos autres serveurs. Le hub doit rester ouvert et MCP activé. L’authentification à l’IA reste dans son client." TextWrapping="Wrap" FontSize="12" />
-                        <TextBox Text="{Binding McpConnectionConfigurations}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="240" MaxHeight="480" />
                       </StackPanel>
                     </Border>
                   </StackPanel>

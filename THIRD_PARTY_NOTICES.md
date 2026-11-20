@@ -22,7 +22,7 @@ The exact source/ABI revisions and selected modules are recorded in
 
 ## CyMCPSDK
 
-CyMCPSDK 0.7.0 (MIT), revision `ced8296b555c1969cb29740eba65beaa0687da7d`, is built from source.
+CyMCPSDK 0.7.1 (MIT), revision `34d4bcae126bc83d1a2925b5047dac36e3d09d92`, is built from source.
 The Windows archive includes the SDK revision, license and the nlohmann/json, cpp-httplib and PicoSHA2 notices in `LICENCES/CyMCPSDK`.
 
 ## Microsoft Edge WebView2

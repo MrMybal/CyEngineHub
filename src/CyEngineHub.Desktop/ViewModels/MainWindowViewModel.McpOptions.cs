@@ -6,11 +6,30 @@ namespace CyEngineHub.Desktop.ViewModels;
 
 public sealed partial class MainWindowViewModel
 {
+    private static readonly string[] McpProfileNames = ["Free", "Local contrôlé", "Jeton seul", "Protégé"];
     private HubMcpOptions _mcpOptions = new();
-    private string _mcpOptionsStatus = "Mode avec validation par défaut. Les changements prennent effet après Enregistrer.";
+    private string _mcpOptionsStatus = "Les changements prennent effet après Enregistrer.";
     public string McpOptionsStatus { get => _mcpOptionsStatus; private set => SetProperty(ref _mcpOptionsStatus, value); }
     private ICommand? _saveMcpOptionsCommand;
-    public ICommand SaveMcpOptionsCommand => _saveMcpOptionsCommand ??= new AsyncRelayCommand(SaveMcpOptionsAsync, onError: exception => McpOptionsStatus = "Non enregistré : " + exception.Message);
+    public ICommand SaveMcpOptionsCommand => _saveMcpOptionsCommand ??= new AsyncRelayCommand(
+        () => ChangeMcpAsync(SaveMcpOptionsAsync), onError: exception => McpOptionsStatus = "Options MCP · " + exception.Message);
+    public IReadOnlyList<string> McpAccessProfiles { get; } = Array.AsReadOnly(McpProfileNames);
+    private HubMcpAccessProfile _mcpDraftAccessProfile;
+    public string McpSelectedAccessProfile
+    {
+        get => McpProfileName(_mcpDraftAccessProfile);
+        set
+        {
+            var index = Array.IndexOf(McpProfileNames, value);
+            if (index >= 0 && SetProperty(ref _mcpDraftAccessProfile, (HubMcpAccessProfile)index))
+                OnPropertyChanged(nameof(McpEditsControlledOperations));
+        }
+    }
+    public bool McpEditsControlledOperations =>
+        _mcpDraftAccessProfile is HubMcpAccessProfile.LocalControlled or HubMcpAccessProfile.Protected;
+    private int _mcpLocalPort = HubMcpOptions.DefaultLocalPort;
+    public int McpLocalPort { get => _mcpLocalPort; set => SetProperty(ref _mcpLocalPort, value); }
+    private static string McpProfileName(HubMcpAccessProfile profile) => McpProfileNames[(int)profile];
     private bool _McpAutoCategorize;
     public bool McpAutoCategorize { get => _McpAutoCategorize; set => SetProperty(ref _McpAutoCategorize, value); }
     private bool _McpAutoDownload;
@@ -37,6 +56,8 @@ public sealed partial class MainWindowViewModel
     {
         var options = new HubMcpOptions
         {
+            AccessProfile = _mcpDraftAccessProfile,
+            LocalPort = McpLocalPort,
             AutoCategorize = McpAutoCategorize,
             AutoDownload = McpAutoDownload,
             AutoInstall = McpAutoInstall,
@@ -50,12 +71,21 @@ public sealed partial class MainWindowViewModel
             ProposalHistoryLimit = McpProposalHistoryLimit,
         }.Validate();
         await _settings.SetAsync("ai.mcp.options.v1", JsonSerializer.Serialize(options)).ConfigureAwait(true);
-        _mcpOptions = options;
-        McpOptionsStatus = "Enregistré · options appliquées aux prochaines requêtes. Les anciennes propositions restent à valider.";
+        var restart = McpEnabled && (options.AccessProfile != _mcpOptions.AccessProfile || options.LocalPort != _mcpOptions.LocalPort);
+        if (restart)
+        {
+            StopMcp();
+            if (_mcpServer is { } server) await server.ConfigureAwait(true);
+        }
+        ApplyMcpOptions(options);
+        if (restart) StartMcp();
+        McpOptionsStatus = restart ? "Enregistré · connexion MCP redémarrée." : "Enregistré · options appliquées aux prochaines requêtes.";
     }
     private void ApplyMcpOptions(HubMcpOptions options)
     {
         _mcpOptions = options.Validate();
+        McpSelectedAccessProfile = McpProfileName(options.AccessProfile);
+        McpLocalPort = options.LocalPort;
         McpAutoCategorize = options.AutoCategorize;
         McpAutoDownload = options.AutoDownload;
         McpAutoInstall = options.AutoInstall;

@@ -1,4 +1,4 @@
-CyMCPSDK 0.7.0 (MIT), revision ced8296b555c1969cb29740eba65beaa0687da7d
+CyMCPSDK 0.7.1 (MIT), revision 34d4bcae126bc83d1a2925b5047dac36e3d09d92
 https://github.com/MrMybal/CyMCPSDK
 The SDK and third-party notices are distributed in LICENCES/CyMCPSDK.
 

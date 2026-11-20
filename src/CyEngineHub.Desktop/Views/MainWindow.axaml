@@ -3866,10 +3866,14 @@
                 <StackPanel IsVisible="{Binding IsSettingsAiSelected}" Spacing="14">
                   <Border Classes="card"><StackPanel Spacing="10">
                     <TextBlock Text="OPTIONS MCP · AUTONOMIE ET LIMITES" FontWeight="SemiBold" />
-                    <TextBlock Text="Sans validation : le client connecté peut lancer des téléchargements et modifier les projets via leurs scripts d’installation. Activez uniquement les actions souhaitées puis enregistrez. Les validations propres à Fab et au client IA restent indépendantes." TextWrapping="Wrap" Foreground="#D9A55C" />
-                    <CheckBox Content="Catégoriser sans validation" IsChecked="{Binding McpAutoCategorize}" />
-                    <CheckBox Content="Télécharger sans validation" IsChecked="{Binding McpAutoDownload}" />
-                    <CheckBox Content="Installer sans validation (scripts configurés inclus)" IsChecked="{Binding McpAutoInstall}" />
+                    <Grid ColumnDefinitions="*,180"><TextBlock Text="Profil d’accès local" VerticalAlignment="Center" /><ComboBox Grid.Column="1" ItemsSource="{Binding McpAccessProfiles}" SelectedItem="{Binding McpSelectedAccessProfile}" HorizontalAlignment="Stretch" /></Grid>
+                    <Grid ColumnDefinitions="*,180"><TextBlock Text="Port HTTP local (0 = automatique)" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="65535" FormatString="0" Value="{Binding McpLocalPort}" /></Grid>
+                    <TextBlock Text="Free donne accès à tous les outils depuis cette machine avec l’adresse seule. Local contrôlé applique les permissions ci-dessous. Jeton seul exige un jeton. Protégé combine le jeton et les permissions." TextWrapping="Wrap" />
+                    <StackPanel IsVisible="{Binding McpEditsControlledOperations}" Spacing="5">
+                      <CheckBox Content="Catégoriser sans validation" IsChecked="{Binding McpAutoCategorize}" />
+                      <CheckBox Content="Télécharger sans validation" IsChecked="{Binding McpAutoDownload}" />
+                      <CheckBox Content="Installer sans validation (scripts configurés inclus)" IsChecked="{Binding McpAutoInstall}" />
+                    </StackPanel>
                     <Grid ColumnDefinitions="*,180"><TextBlock Text="Résultats par défaut (0 = illimité)" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpDefaultPageSize}" /></Grid>
                     <Grid ColumnDefinitions="*,180"><TextBlock Text="Maximum de résultats par requête (0 = illimité)" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpMaximumPageSize}" /></Grid>
                     <Grid ColumnDefinitions="*,180"><TextBlock Text="Longueur des descriptions de recherche (0 = illimité)" VerticalAlignment="Center" /><NumericUpDown Grid.Column="1" Minimum="0" Maximum="2147483647" FormatString="0" Value="{Binding McpDescriptionLength}" /></Grid>
@@ -3889,7 +3893,7 @@
                       <TextBlock Text="{Binding McpStatus}" Foreground="#55C7A6" TextWrapping="Wrap" />
                       <Button Content="Activer / désactiver MCP" Command="{Binding ToggleMcpCommand}" HorizontalAlignment="Left" />
                       <Button Content="Ouvrir l’assistant" Click="OpenAssistantWindow" HorizontalAlignment="Left" />
-                      <TextBlock Text="L’activation autorise le client IA connecté à consulter les métadonnées et noms de fichiers de vos packs. Ces données peuvent être transmises au fournisseur de votre client. Les changements exigent votre validation sauf pour les actions explicitement autorisées dans les options MCP enregistrées. Fermer le hub coupe la connexion ; le mode tray la conserve." TextWrapping="Wrap" Foreground="#8294A8" FontSize="12" />
+                      <TextBlock Text="Tout processus local peut utiliser un profil sans jeton. En Free, les outils peuvent modifier les collections, télécharger et installer selon les règles de Fab et du hub. Fermer le hub coupe la connexion. Le mode tray la conserve." TextWrapping="Wrap" Foreground="#8294A8" FontSize="12" />
                     </StackPanel>
                   </Border>
                   <Border Classes="card">
@@ -3906,8 +3910,12 @@
                   <Border Classes="card">
                     <StackPanel Spacing="10">
                       <TextBlock Text="CONNEXION DES CLIENTS" FontWeight="SemiBold" />
-                      <TextBlock Text="Fusionnez uniquement le bloc de votre client dans sa configuration existante, puis reconnectez le serveur MCP. Ne remplacez pas vos autres serveurs. Le hub doit rester ouvert et MCP activé. L’authentification à l’IA reste dans son client." TextWrapping="Wrap" FontSize="12" />
+                      <TextBlock Text="Utilisez l’adresse affichée dans votre client MCP HTTP. Pour un client stdio, fusionnez le bloc correspondant dans sa configuration." TextWrapping="Wrap" FontSize="12" />
                       <TextBox Text="{Binding McpConnectionConfigurations}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="240" MaxHeight="480" />
+                      <StackPanel IsVisible="{Binding McpHasAccessToken}" Spacing="5">
+                        <TextBlock Text="Jeton de la session locale" />
+                        <TextBox Text="{Binding McpAccessToken, Mode=OneWay}" IsReadOnly="True" />
+                      </StackPanel>
                     </StackPanel>
                   </Border>
                 </StackPanel>

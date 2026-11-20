@@ -3,7 +3,6 @@
     <StackPanel>
       <TextBlock Text="Assistant CyEngineHub" FontSize="18" />
       <TextBlock Text="MCP autorise les outils du hub, dans ce chat et pour les clients externes." TextWrapping="Wrap" />
-      <Button Content="Activer / désactiver MCP" Command="{Binding ToggleMcpCommand}" />
       <Expander Header="Fournisseur et outils d’autres applications">
         <StackPanel>
           <TextBox Text="{Binding AssistantProvider}" PlaceholderText="ollama, openai, anthropic ou openrouter" />

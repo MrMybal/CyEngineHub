@@ -1,7 +1,7 @@
 {
   "cyui": { "repository": "https://github.com/MrMybal/CyUI.git", "revision": "6ef01cfcdb197f3a89d64618ce5ef8818c704728" },
   "cimgui": { "repository": "https://github.com/JunaMeinhold/cimgui.git", "revision": "d61baefa0ce2a9db938ffdeb29e64f90f44cc037" },
-  "cymcp": { "repository": "https://github.com/MrMybal/CyMCPSDK.git", "version": "0.7.0", "revision": "ced8296b555c1969cb29740eba65beaa0687da7d" },
+  "cymcp": { "repository": "https://github.com/MrMybal/CyMCPSDK.git", "version": "0.7.1", "revision": "34d4bcae126bc83d1a2925b5047dac36e3d09d92" },
   "imgui": { "revision": "44aa9a4b3a6f27d09a4eb5770d095cbd376dfc4b", "version": "1.92.1", "wchar32": true },
   "binding": { "package": "Hexa.NET.ImGui", "version": "2.2.8.5" },
   "modules": ["Core", "DocumentViews", "Diagnostics", "Inspector", "Images"]

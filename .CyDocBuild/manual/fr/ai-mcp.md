@@ -5,11 +5,20 @@ description: Connectez un client IA, examinez ses permissions et suivez les opé
 section: Plugins et automatisation
 parent: extensions-sdk
 order: 19
-sourceRevision: 4
+sourceRevision: 5
 ---
 # IA, MCP et conversion assistée {#ai-mcp-and-assisted-conversion}
 
-MCP est facultatif et désactivé tant que vous ne l’activez pas dans Paramètres → IA / MCP. Gardez le hub ouvert. Copiez le bloc affiché pour votre client dans sa configuration existante, sans écraser les autres serveurs ni transmettre de jetons dans un chat. Le proxy stdio local communique par pipe nommé limité au même compte.
+Activez MCP dans **Paramètres → IA / MCP** et gardez le hub ouvert. Pour un client Streamable HTTP, utilisez l’adresse affichée, par défaut `http://127.0.0.1:47842/mcp`. Le port 0 choisit un port libre. Les clients stdio existants utilisent un pipe limité au même compte avec Free et Local contrôlé.
+
+| Profil | Connexion HTTP | Autorisation des opérations |
+| --- | --- | --- |
+| Free | Adresse seule | Exécution directe |
+| Local contrôlé | Adresse seule | Permissions du hub |
+| Jeton seul | Adresse et jeton Bearer | Exécution directe |
+| Protégé | Adresse et jeton Bearer | Permissions du hub |
+
+Free est utilisé quand aucun profil n’a été enregistré. Tout processus local peut se connecter avec l’adresse d’un profil sans jeton. Le jeton des profils Jeton seul et Protégé s’affiche dans l’interface et change à chaque démarrage du serveur.
 
 Dans la même page, **Assistant CyEngineHub** propose un chat natif avec réponse progressive, annulation, historique et pièces jointes. Choisissez Ollama pour un modèle local compatible avec les outils, ou OpenAI, Anthropic ou OpenRouter avec la clé d’environnement correspondante. Activez MCP pour donner au chat les droits métier du hub. Pour utiliser un serveur MCP HTTP externe, renseignez son adresse et les noms exacts des outils à autoriser.
 
@@ -27,7 +36,7 @@ hub_download_batch retourne par élément identifiants de tâches, validation/na
 
 ## Permissions et réparation par agent {#permissions-and-agent-repair}
 
-Classer, télécharger et installer sans validation sont trois permissions indépendantes, désactivées par défaut. Vérifiez/enregistrez-les dans l’interface ; MCP ne peut pas s’autoriser lui-même. Sinon, examinez les propositions et validez/refusez. Les autorisations du client IA restent distinctes. Désactiver MCP empêche les nouvelles demandes, sans annuler le travail déjà confirmé/en file.
+Dans Local contrôlé et Protégé, choisissez séparément les permissions pour classer, télécharger et installer. Les autres opérations apparaissent comme propositions à valider ou à refuser. Tous les profils valident les arguments et les cibles. Les autorisations du client IA restent distinctes. Les tâches déjà engagées continuent si vous désactivez MCP.
 
 La réparation agent Version Bridge est un parcours facultatif d’exécution de code distinct. Elle utilise un atelier isolé et exige validation dans le moteur cible. Installer un SDK ne donne ni accès automatique à un modèle ni réparation garantie de tous les Blueprints/plugins. Les outils externes possèdent les permissions utilisateur.
 

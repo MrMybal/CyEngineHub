@@ -42,7 +42,10 @@ static partial class Program
         var asset = new RemoteFabAsset("assistant-fixture", "ue", "Assisted trees", "Local fixture",
             "Fab", "assetPack", null, null, [], [new("fixture-variant", [], ["5.5"], ["Windows"])]);
         Call(vm, "ReplaceRemoteAssets", (Func<RemoteFabAsset, bool>)(_ => true), new[] { asset });
-        Call(vm, "ApplyMcpOptions", new HubMcpOptions { AutoCategorize = true });
+        await settings.SetAsync("ai.mcp.options.v1", """{"LocalPort":0,"AutoCategorize":false,"MaximumPageSize":42}""");
+        await (Task)typeof(MainWindowViewModel).GetMethod("LoadAiSettingsAsync", Private)!.Invoke(vm, null)!;
+        Check(vm.McpSelectedAccessProfile == "Free" && vm.McpMaximumPageSize == 42,
+            "A saved profile without an access choice loads as Free and retains its limits");
         var pipe = "CyEngineHub.Mcp.Smoke." + Guid.NewGuid().ToString("N");
         Call(vm, "StartMcp", pipe);
         try
@@ -51,6 +54,7 @@ static partial class Program
             using var client = Process.Start(new ProcessStartInfo(proxy, "--pipe " + pipe)
             {
                 UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true,
+                StandardInputEncoding = new UTF8Encoding(false), StandardOutputEncoding = Encoding.UTF8,
             })!;
             try
             {
@@ -71,9 +75,10 @@ static partial class Program
                 Check(read.GetProperty("structuredContent").GetProperty("items").GetArrayLength() == 2, "External MCP reads the live hub catalog");
                 var change = await Request("tools/call", new { name = "hub_propose", arguments = new
                 { action = "categorize", assetId = asset.AssetId, source = "Fab", categories = new[] { "External MCP" }, reason = "QA permissions" } });
+                if (change.GetProperty("isError").GetBoolean()) throw new InvalidOperationException(change.GetRawText());
                 Check(change.GetProperty("structuredContent").GetProperty("automatic").GetBoolean() &&
-                    vm.AiProposals.Any(item => item.Status == "Collections appliquées"),
-                    "External MCP live mutation uses registered automatic categorization permission");
+                    change.GetProperty("structuredContent").GetProperty("status").GetString() == "Collections appliquées",
+                    "Legacy stdio uses the Free profile for a live mutation");
                 var denied = await Request("tools/call", new { name = "hub_propose", arguments = new
                 { action = "install", assetId = asset.AssetId, source = "Fab", variantId = "fixture-variant", targetId = "unregistered-target", reason = "QA refusal" } });
                 Check(denied.GetProperty("isError").GetBoolean(), "External MCP refuses installation into an unregistered target");
@@ -84,11 +89,13 @@ static partial class Program
                 await client.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(8));
             }
 
+            string? cliToken = null;
             async Task<JsonElement> Command(int expectedExit, params string[] arguments)
             {
                 var start = new ProcessStartInfo(proxy) { UseShellExecute = false, CreateNoWindow = true,
                     RedirectStandardOutput = true, StandardOutputEncoding = Encoding.UTF8 };
                 foreach (var argument in arguments) start.ArgumentList.Add(argument);
+                if (cliToken is not null) start.Environment["CYHUB_SMOKE_MCP_TOKEN"] = cliToken;
                 using var command = Process.Start(start)!;
                 var text = await command.StandardOutput.ReadToEndAsync();
                 await command.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
@@ -113,6 +120,29 @@ static partial class Program
             await Command(2, "--pipe", pipe, "call", "hub_targets", "--json", "[]");
             await Command(1, "--pipe", pipe + ".absent", "call", "hub_targets");
             Check(true, "CLI publishes JSON and distinct operation, usage and transport exit codes");
+
+            using (var http = new LocalMcpTestClient(vm.McpHttpUrl))
+            {
+                Check((await http.InitializeAsync(origin: "https://example.test")).Status == HttpStatusCode.Forbidden,
+                    "Free rejects cross-origin browser requests");
+                Check((await http.InitializeAsync()).Status == HttpStatusCode.OK && vm.McpAccessToken.Length == 0,
+                    "Free opens Streamable HTTP with the loopback URL alone");
+                var (discoveryStatus, discovery) = await http.SendAsync("tools/list", new { });
+                Check(discoveryStatus == HttpStatusCode.OK && discovery.GetProperty("result").GetProperty("tools").GetArrayLength() == 10,
+                    "An HTTP client discovers all ten tools without a token");
+                var read = await http.CallAsync("hub_targets", new { });
+                Check(read.GetProperty("structuredContent").GetProperty("items").GetArrayLength() == 2,
+                    "Free reads the live project and engine without a token");
+                var change = await http.CallAsync("hub_propose", new
+                { action = "categorize", assetId = asset.AssetId, source = "Fab", categories = new[] { "Free HTTP" }, reason = "local QA" });
+                Check(change.GetProperty("structuredContent").GetProperty("automatic").GetBoolean() &&
+                    (await settings.GetAsync(MainWindowViewModel.FabCollectionsSetting))!.Contains("Free HTTP", StringComparison.Ordinal),
+                    "Free persists a real collection change without a token or approval");
+                Check((await http.CallAsync("hub_targets", new { unexpected = true })).GetProperty("isError").GetBoolean(),
+                    "Free keeps SDK schema validation enabled");
+            }
+            Check((await Command(0, "--url", vm.McpHttpUrl, "describe", "hub_targets")).TryGetProperty("outputSchema", out _),
+                "CLI also discovers schemas through the Free HTTP URL");
 
             vm.ShowSettingsCommand.Execute(null);
             vm.SelectedSettingsCategory = vm.SettingsCategories.Single(category => category.Id == "ai");
@@ -209,12 +239,107 @@ static partial class Program
             var overBudget = await Wait(state => !Busy(state));
             Check(provider.ChatRequests == requests && overBudget.GetProperty("messages").EnumerateArray().Last().GetProperty("error").GetString()!.Length > 0,
                 "An oversized active turn fails locally without forwarding or replaying an operation");
+
+            async Task ChangeProfile(HubMcpAccessProfile profile)
+            {
+                await ImGuiDiagnostics.FramesAsync(window, 3);
+                await ImGuiDiagnostics.ClickAsync(window, "combo/McpSelectedAccessProfile");
+                await ImGuiDiagnostics.ClickAsync(window, "combo-option/McpSelectedAccessProfile/" + (int)profile);
+                Check(vm.McpSelectedAccessProfile == vm.McpAccessProfiles[(int)profile], $"The settings picker selects {profile}");
+                await (Task)typeof(MainWindowViewModel).GetMethod("SaveMcpOptionsAsync", Private)!.Invoke(vm, null)!;
+                var saved = JsonSerializer.Deserialize<HubMcpOptions>((await settings.GetAsync("ai.mcp.options.v1"))!)!;
+                Check(saved.AccessProfile == profile && vm.McpEnabled, $"Saving {profile} persists the choice and restarts active MCP");
+            }
+
+            await ChangeProfile(HubMcpAccessProfile.Protected);
+            using (var noToken = new LocalMcpTestClient(vm.McpHttpUrl))
+            using (var wrongToken = new LocalMcpTestClient(vm.McpHttpUrl, "wrong"))
+            using (var authorized = new LocalMcpTestClient(vm.McpHttpUrl, vm.McpAccessToken))
+            {
+                Check((await noToken.InitializeAsync()).Status == HttpStatusCode.Unauthorized &&
+                    (await wrongToken.InitializeAsync()).Status == HttpStatusCode.Unauthorized &&
+                    (await authorized.InitializeAsync()).Status == HttpStatusCode.OK,
+                    "Protected requires the correct Bearer token");
+                var pending = await authorized.CallAsync("hub_propose", new
+                { action = "categorize", assetId = asset.AssetId, source = "Fab", categories = new[] { "Needs review" }, reason = "local QA" });
+                Check(pending.GetProperty("structuredContent").GetProperty("status").GetString() == "pending_human_approval" &&
+                    !(await settings.GetAsync(MainWindowViewModel.FabCollectionsSetting))!.Contains("Needs review", StringComparison.Ordinal),
+                    "Protected retains the app's action confirmations after authentication");
+            }
+            await Command(1, "--pipe", pipe, "list");
+            await Command(1, "--url", vm.McpHttpUrl, "list");
+            Check(true, "The legacy pipe and tokenless HTTP CLI cannot bypass Protected");
+            cliToken = vm.McpAccessToken;
+            Check((await Command(0, "--url", vm.McpHttpUrl, "--token-env", "CYHUB_SMOKE_MCP_TOKEN", "list"))
+                .GetProperty("tools").GetArrayLength() == 10, "The HTTP CLI reads Protected tools with a Bearer token from its environment");
+            cliToken = null;
+
+            await ChangeProfile(HubMcpAccessProfile.TokenOnly);
+            using (var authorized = new LocalMcpTestClient(vm.McpHttpUrl, vm.McpAccessToken))
+            {
+                Check((await authorized.InitializeAsync()).Status == HttpStatusCode.OK, "Token only accepts its Bearer token");
+                var change = await authorized.CallAsync("hub_propose", new
+                { action = "categorize", assetId = asset.AssetId, source = "Fab", categories = new[] { "Token only" }, reason = "local QA" });
+                Check(change.GetProperty("structuredContent").GetProperty("automatic").GetBoolean(), "Token only executes the action after authentication");
+            }
+
+            await ChangeProfile(HubMcpAccessProfile.LocalControlled);
+            using (var local = new LocalMcpTestClient(vm.McpHttpUrl))
+            {
+                Check((await local.InitializeAsync()).Status == HttpStatusCode.OK, "Local controlled connects without a token");
+                var pending = await local.CallAsync("hub_propose", new
+                { action = "categorize", assetId = asset.AssetId, source = "Fab", categories = new[] { "Local review" }, reason = "local QA" });
+                Check(pending.GetProperty("structuredContent").GetProperty("status").GetString() == "pending_human_approval",
+                    "Local controlled keeps the configured confirmation policy");
+            }
         }
         finally
         {
             vm.StopMcp();
             await (Task)typeof(MainWindowViewModel).GetMethod("StopAssistantAsync", Private)!.Invoke(vm, null)!;
         }
+    }
+
+    private sealed class LocalMcpTestClient(string url, string? token = null) : IDisposable
+    {
+        private readonly HttpClient _client = new(new SocketsHttpHandler { UseProxy = false }) { Timeout = TimeSpan.FromSeconds(10) };
+        private string? _session;
+        private int _id;
+
+        public Task<(HttpStatusCode Status, JsonElement Payload)> InitializeAsync(string? origin = null) =>
+            SendAsync("initialize", new { protocolVersion = "2025-06-18", capabilities = new { },
+                clientInfo = new { name = "independent-http-qa", version = "1" } }, origin);
+
+        public async Task<(HttpStatusCode Status, JsonElement Payload)> SendAsync(string method, object parameters, string? origin = null)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, url)
+            {
+                Content = new StringContent(JsonSerializer.Serialize(new { jsonrpc = "2.0", id = ++_id, method, @params = parameters }),
+                    Encoding.UTF8, "application/json"),
+            };
+            request.Headers.Accept.ParseAdd("application/json, text/event-stream");
+            if (token is not null) request.Headers.Authorization = new("Bearer", token);
+            if (origin is not null) request.Headers.Add("Origin", origin);
+            if (_session is not null)
+            {
+                request.Headers.Add("Mcp-Session-Id", _session);
+                request.Headers.Add("MCP-Protocol-Version", "2025-06-18");
+            }
+            using var response = await _client.SendAsync(request);
+            if (!response.IsSuccessStatusCode) return (response.StatusCode, default);
+            if (response.Headers.TryGetValues("Mcp-Session-Id", out var sessions)) _session = sessions.Single();
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            return (response.StatusCode, document.RootElement.Clone());
+        }
+
+        public async Task<JsonElement> CallAsync(string name, object arguments)
+        {
+            var response = await SendAsync("tools/call", new { name, arguments });
+            if (response.Status != HttpStatusCode.OK) throw new InvalidOperationException("MCP tool HTTP status: " + response.Status);
+            return response.Payload.GetProperty("result");
+        }
+
+        public void Dispose() => _client.Dispose();
     }
 
     private sealed class AssistantFixture : IAsyncDisposable

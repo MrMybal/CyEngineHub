@@ -156,7 +156,7 @@ export const libraryTabs = [
 ];
 export const optionalDestinations = {
   repository: 'https://github.com/MrMybal/CyEngineHub',
-  release: 'https://github.com/MrMybal/CyEngineHub/releases/tag/v2.0.0-alpha.46',
-  installer: 'https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.46/CyEngineHub-2.0.0-alpha.46-Setup-win-x64.exe',
-  archive: 'https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.46/CyEngineHub-2.0.0-alpha.46-win-x64.zip',
+  release: 'https://github.com/MrMybal/CyEngineHub/releases/tag/v2.0.0-alpha.47',
+  installer: 'https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.47/CyEngineHub-2.0.0-alpha.47-Setup-win-x64.exe',
+  archive: 'https://github.com/MrMybal/CyEngineHub/releases/download/v2.0.0-alpha.47/CyEngineHub-2.0.0-alpha.47-win-x64.zip',
 };

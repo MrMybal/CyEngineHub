@@ -165,10 +165,38 @@ public sealed class HubMcpTests
     {
         Assert.Throws<ArgumentException>(() => new HubMcpOptions { MaximumPageSize = -1 }.Validate());
         Assert.Throws<ArgumentException>(() => new HubMcpOptions { MaximumPageSize = 10 }.Validate());
-        var options = new HubMcpOptions { AutoDownload = true };
+        var options = new HubMcpOptions { AccessProfile = HubMcpAccessProfile.LocalControlled, AutoDownload = true };
         Assert.True(options.IsAutomatic("download"));
         Assert.False(options.IsAutomatic("install"));
         Assert.False(options.IsAutomatic("shell"));
+    }
+
+    [Fact]
+    public void LegacyOptionsUseFreeAndKeepSavedLimits()
+    {
+        var options = JsonSerializer.Deserialize<HubMcpOptions>("""{"AutoDownload":false,"MaximumPageSize":42}""")!.Validate();
+        Assert.Equal(HubMcpAccessProfile.Free, options.AccessProfile);
+        Assert.Equal(42, options.MaximumPageSize);
+        Assert.True(options.IsAutomatic("categorize"));
+        Assert.True(options.IsAutomatic("download"));
+        Assert.True(options.IsAutomatic("install"));
+        Assert.False(options.IsAutomatic("shell"));
+    }
+
+    [Theory]
+    [InlineData("free", HubMcpAccessProfile.Free, false, false)]
+    [InlineData("local_controlled", HubMcpAccessProfile.LocalControlled, false, true)]
+    [InlineData("token_only", HubMcpAccessProfile.TokenOnly, true, false)]
+    [InlineData("protected", HubMcpAccessProfile.Protected, true, true)]
+    public void ExplicitAccessProfilesRoundTrip(string name, HubMcpAccessProfile profile, bool token, bool control)
+    {
+        var options = JsonSerializer.Deserialize<HubMcpOptions>($$"""{"AccessProfile":"{{name}}","LocalPort":0}""")!.Validate();
+        Assert.Equal(profile, options.AccessProfile);
+        Assert.Equal(token, options.RequiresToken);
+        Assert.Equal(control, options.ControlsOperations);
+        Assert.Equal(!control, options.IsAutomatic("install"));
+        Assert.Contains($"\"AccessProfile\":\"{name}\"", JsonSerializer.Serialize(options));
+        Assert.Throws<ArgumentException>(() => (options with { LocalPort = 65536 }).Validate());
     }
 
     private static async Task<JsonElement> CallAsync(HubMcpSession session, string name, object args)
